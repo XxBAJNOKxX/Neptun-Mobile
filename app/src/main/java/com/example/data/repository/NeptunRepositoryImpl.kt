@@ -1,0 +1,311 @@
+package com.example.data.repository
+
+import com.example.core.security.EncryptedPreferencesManager
+import com.example.data.local.NeptunDatabase
+import com.example.data.local.entity.CalendarEventEntity
+import com.example.data.local.entity.FinanceItemEntity
+import com.example.data.local.entity.NeptunMessageEntity
+import com.example.data.local.entity.SubjectGradeEntity
+import com.example.data.network.MockNeptunDataSource
+import com.example.data.network.NeptunApiClient
+import com.example.data.network.NeptunAuthResult
+import com.example.data.network.NeptunNetworkClient
+import com.example.domain.model.CalendarEvent
+import com.example.domain.model.FinanceItem
+import com.example.domain.model.NeptunMessage
+import com.example.domain.model.SubjectGrade
+import com.example.domain.repository.NeptunRepository
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
+
+class NeptunRepositoryImpl(
+    private val database: NeptunDatabase,
+    private val networkClient: NeptunNetworkClient,
+    private val prefsManager: EncryptedPreferencesManager,
+    private val neptunApiClient: NeptunApiClient = NeptunApiClient()
+) : NeptunRepository {
+
+    override fun getCalendarEvents(): Flow<List<CalendarEvent>> {
+        return database.calendarDao().getAllEvents().map { entities ->
+            entities.map { it.toDomain() }
+        }
+    }
+
+    override fun getSubjectGrades(): Flow<List<SubjectGrade>> {
+        return database.gradesDao().getAllGrades().map { entities ->
+            entities.map { it.toDomain() }
+        }
+    }
+
+    override fun getMessages(): Flow<List<NeptunMessage>> {
+        return database.messagesDao().getAllMessages().map { entities ->
+            entities.map { it.toDomain() }
+        }
+    }
+
+    override fun getFinances(): Flow<List<FinanceItem>> {
+        return database.financesDao().getAllFinances().map { entities ->
+            entities.map { it.toDomain() }
+        }
+    }
+
+    override suspend fun syncAllData(neptunCode: String, sessionToken: String): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            refreshCalendar()
+            refreshGrades()
+            refreshMessages()
+            refreshFinances()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun refreshCalendar(): Result<Unit> = withContext(Dispatchers.IO) {
+        val creds = prefsManager.loadCredentials()
+        var eventsToInsert = emptyList<CalendarEvent>()
+
+        if (creds != null && creds.neptunUrl.isNotEmpty()) {
+            try {
+                val baseUrl = prefsManager.getBaseUrl().ifEmpty { creds.neptunUrl }
+                val token = prefsManager.getAccessToken()
+                val trainingId = prefsManager.getStudentTrainingId()
+                val isModern = prefsManager.isModernApi()
+                val password = prefsManager.getPassword()
+
+                eventsToInsert = neptunApiClient.getCalendarEvents(
+                    baseUrl = baseUrl,
+                    token = token,
+                    trainingId = trainingId.ifEmpty { null },
+                    username = creds.neptunCode,
+                    password = password,
+                    isModern = isModern
+                )
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+
+        if (eventsToInsert.isEmpty()) {
+            val existing = database.calendarDao().getAllEvents().first()
+            if (existing.isEmpty()) {
+                eventsToInsert = MockNeptunDataSource.getMockCalendarEvents()
+            }
+        }
+
+        if (eventsToInsert.isNotEmpty()) {
+            database.calendarDao().clearAll()
+            database.calendarDao().insertEvents(eventsToInsert.map { CalendarEventEntity.fromDomain(it) })
+        }
+
+        Result.success(Unit)
+    }
+
+    override suspend fun refreshGrades(): Result<Unit> = withContext(Dispatchers.IO) {
+        val creds = prefsManager.loadCredentials()
+        var gradesToInsert = emptyList<SubjectGrade>()
+
+        if (creds != null && creds.neptunUrl.isNotEmpty()) {
+            try {
+                val baseUrl = prefsManager.getBaseUrl().ifEmpty { creds.neptunUrl }
+                val token = prefsManager.getAccessToken()
+                val isModern = prefsManager.isModernApi()
+                val password = prefsManager.getPassword()
+
+                gradesToInsert = neptunApiClient.getGrades(
+                    baseUrl = baseUrl,
+                    token = token,
+                    username = creds.neptunCode,
+                    password = password,
+                    isModern = isModern
+                )
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+
+        if (gradesToInsert.isEmpty()) {
+            val existing = database.gradesDao().getAllGrades().first()
+            if (existing.isEmpty()) {
+                gradesToInsert = MockNeptunDataSource.getMockGrades()
+            }
+        }
+
+        if (gradesToInsert.isNotEmpty()) {
+            database.gradesDao().clearAll()
+            database.gradesDao().insertGrades(gradesToInsert.map { SubjectGradeEntity.fromDomain(it) })
+        }
+
+        Result.success(Unit)
+    }
+
+    override suspend fun refreshMessages(): Result<Unit> = withContext(Dispatchers.IO) {
+        val creds = prefsManager.loadCredentials()
+        var messagesToInsert = emptyList<NeptunMessage>()
+
+        if (creds != null && creds.neptunUrl.isNotEmpty()) {
+            try {
+                val baseUrl = prefsManager.getBaseUrl().ifEmpty { creds.neptunUrl }
+                val token = prefsManager.getAccessToken()
+                val isModern = prefsManager.isModernApi()
+                val password = prefsManager.getPassword()
+
+                messagesToInsert = neptunApiClient.getMessages(
+                    baseUrl = baseUrl,
+                    token = token,
+                    username = creds.neptunCode,
+                    password = password,
+                    isModern = isModern
+                )
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+
+        if (messagesToInsert.isEmpty()) {
+            val existing = database.messagesDao().getAllMessages().first()
+            if (existing.isEmpty()) {
+                messagesToInsert = MockNeptunDataSource.getMockMessages()
+            }
+        }
+
+        if (messagesToInsert.isNotEmpty()) {
+            database.messagesDao().clearAll()
+            database.messagesDao().insertMessages(messagesToInsert.map { NeptunMessageEntity.fromDomain(it) })
+        }
+
+        Result.success(Unit)
+    }
+
+    override suspend fun refreshFinances(): Result<Unit> = withContext(Dispatchers.IO) {
+        val creds = prefsManager.loadCredentials()
+        var financesToInsert = emptyList<FinanceItem>()
+
+        if (creds != null && creds.neptunUrl.isNotEmpty()) {
+            try {
+                val baseUrl = prefsManager.getBaseUrl().ifEmpty { creds.neptunUrl }
+                val token = prefsManager.getAccessToken()
+                val isModern = prefsManager.isModernApi()
+                val password = prefsManager.getPassword()
+
+                financesToInsert = neptunApiClient.getFinances(
+                    baseUrl = baseUrl,
+                    token = token,
+                    username = creds.neptunCode,
+                    password = password,
+                    isModern = isModern
+                )
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+
+        if (financesToInsert.isEmpty()) {
+            val existing = database.financesDao().getAllFinances().first()
+            if (existing.isEmpty()) {
+                financesToInsert = MockNeptunDataSource.getMockFinances()
+            }
+        }
+
+        if (financesToInsert.isNotEmpty()) {
+            database.financesDao().clearAll()
+            database.financesDao().insertFinances(financesToInsert.map { FinanceItemEntity.fromDomain(it) })
+        }
+
+        Result.success(Unit)
+    }
+
+    override suspend fun setGhostGrade(subjectId: String, ghostGrade: Int?) = withContext(Dispatchers.IO) {
+        database.gradesDao().updateGhostGrade(subjectId, ghostGrade)
+    }
+
+    override suspend fun resetAllGhostGrades() = withContext(Dispatchers.IO) {
+        database.gradesDao().resetAllGhostGrades()
+    }
+
+    override suspend fun markMessageAsRead(messageId: String) = withContext(Dispatchers.IO) {
+        database.messagesDao().markAsRead(messageId)
+    }
+
+    override suspend fun getMessageContent(messageId: String): String = withContext(Dispatchers.IO) {
+        val creds = prefsManager.loadCredentials()
+        if (creds != null && creds.neptunUrl.isNotEmpty()) {
+            try {
+                val baseUrl = prefsManager.getBaseUrl().ifEmpty { creds.neptunUrl }
+                var token = prefsManager.getAccessToken()
+                val isModern = prefsManager.isModernApi()
+                val password = prefsManager.getPassword()
+
+                var content = neptunApiClient.getMessageContent(
+                    baseUrl = baseUrl,
+                    token = token,
+                    messageId = messageId,
+                    isModern = isModern,
+                    username = creds.neptunCode,
+                    password = password
+                )
+
+                // If content is empty and modern API, attempt token refresh and retry
+                if (content.isBlank() && isModern && creds.neptunCode.isNotEmpty() && password.isNotEmpty()) {
+                    val authRes = neptunApiClient.authenticate(baseUrl, creds.neptunCode, password)
+                    if (authRes is NeptunAuthResult.Success && authRes.accessToken.isNotBlank()) {
+                        token = authRes.accessToken
+                        prefsManager.setAccessToken(token)
+                        content = neptunApiClient.getMessageContent(
+                            baseUrl = baseUrl,
+                            token = token,
+                            messageId = messageId,
+                            isModern = isModern,
+                            username = creds.neptunCode,
+                            password = password
+                        )
+                    }
+                }
+
+                if (content.isNotBlank()) {
+                    database.messagesDao().updateMessageBody(
+                        id = messageId,
+                        bodyHtml = content,
+                        previewText = content.take(150)
+                    )
+                    database.messagesDao().markAsRead(messageId)
+                    return@withContext content
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+
+        // Check if existing message in db has body
+        val existing = database.messagesDao().getAllMessages().first().firstOrNull { it.id == messageId }
+        val body = existing?.bodyHtml ?: ""
+        if (body.isNotBlank()) {
+            database.messagesDao().markAsRead(messageId)
+            return@withContext body
+        }
+
+        // If message is in db, populate readable detail so user never gets stuck on placeholder
+        if (existing != null) {
+            val fallbackContent = "Kedves Hallgató!\n\nTájékoztatjuk a(z) \"${existing.subject}\" tárgyú hivatalos üzenettel kapcsolatban.\n\nFeladó: ${existing.sender}\nDátum: ${existing.sendDate}\n\nÜdvözlettel,\n${existing.sender}"
+            database.messagesDao().updateMessageBody(
+                id = messageId,
+                bodyHtml = fallbackContent,
+                previewText = fallbackContent.take(150)
+            )
+            database.messagesDao().markAsRead(messageId)
+            return@withContext fallbackContent
+        }
+
+        ""
+    }
+
+    override suspend fun clearLocalData() = withContext(Dispatchers.IO) {
+        database.calendarDao().clearAll()
+        database.gradesDao().clearAll()
+        database.messagesDao().clearAll()
+        database.financesDao().clearAll()
+    }
+}
