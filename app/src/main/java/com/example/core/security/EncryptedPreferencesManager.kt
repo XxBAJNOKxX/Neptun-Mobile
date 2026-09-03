@@ -5,6 +5,9 @@ import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.example.domain.model.StudentCredentials
+import com.example.ui.theme.AppAccentColor
+import com.example.ui.theme.ThemeMode
+import com.example.ui.theme.ThemeSettings
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -30,6 +33,9 @@ class EncryptedPreferencesManager(context: Context) {
 
     private val _credentialsFlow = MutableStateFlow(loadCredentials())
     val credentialsFlow: StateFlow<StudentCredentials?> = _credentialsFlow.asStateFlow()
+
+    private val _themeSettingsFlow = MutableStateFlow(loadThemeSettings())
+    val themeSettingsFlow: StateFlow<ThemeSettings> = _themeSettingsFlow.asStateFlow()
 
     fun saveCredentials(
         neptunCode: String,
@@ -131,6 +137,39 @@ class EncryptedPreferencesManager(context: Context) {
         return prefs.getString(KEY_PASSWORD, "") ?: ""
     }
 
+    fun loadThemeSettings(): ThemeSettings {
+        val modeStr = prefs.getString(KEY_THEME_MODE, ThemeMode.SYSTEM.name) ?: ThemeMode.SYSTEM.name
+        val themeMode = try {
+            ThemeMode.valueOf(modeStr)
+        } catch (e: Exception) {
+            ThemeMode.SYSTEM
+        }
+        val dynamicColor = prefs.getBoolean(KEY_DYNAMIC_COLOR, true)
+        val accentId = prefs.getString(KEY_ACCENT_COLOR, AppAccentColor.BLUE.id) ?: AppAccentColor.BLUE.id
+        val accentColor = AppAccentColor.fromId(accentId)
+
+        return ThemeSettings(
+            themeMode = themeMode,
+            useDynamicColor = dynamicColor,
+            accentColor = accentColor
+        )
+    }
+
+    fun setThemeMode(mode: ThemeMode) {
+        prefs.edit().putString(KEY_THEME_MODE, mode.name).apply()
+        _themeSettingsFlow.value = loadThemeSettings()
+    }
+
+    fun setDynamicColor(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_DYNAMIC_COLOR, enabled).apply()
+        _themeSettingsFlow.value = loadThemeSettings()
+    }
+
+    fun setAccentColor(accent: AppAccentColor) {
+        prefs.edit().putString(KEY_ACCENT_COLOR, accent.id).apply()
+        _themeSettingsFlow.value = loadThemeSettings()
+    }
+
     fun clear() {
         prefs.edit().clear().apply()
         _credentialsFlow.value = null
@@ -152,5 +191,8 @@ class EncryptedPreferencesManager(context: Context) {
         private const val KEY_TRAINING_ID = "key_training_id"
         private const val KEY_IS_LOGGED_IN = "key_is_logged_in"
         private const val KEY_LAST_SYNC = "key_last_sync"
+        private const val KEY_THEME_MODE = "key_theme_mode"
+        private const val KEY_DYNAMIC_COLOR = "key_dynamic_color"
+        private const val KEY_ACCENT_COLOR = "key_accent_color"
     }
 }
