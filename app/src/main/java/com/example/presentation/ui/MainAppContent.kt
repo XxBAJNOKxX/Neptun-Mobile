@@ -25,6 +25,7 @@ import com.example.presentation.ui.screens.TimetableScreen
 import com.example.presentation.viewmodel.AuthViewModel
 import com.example.presentation.viewmodel.GradesViewModel
 import com.example.presentation.viewmodel.MessagesViewModel
+import com.example.presentation.viewmodel.SettingsViewModel
 import com.example.presentation.viewmodel.TimetableViewModel
 
 @Composable
@@ -98,9 +99,18 @@ private fun MainDashboard(
         )
     )
 
+    val settingsViewModel: SettingsViewModel = viewModel(
+        factory = SettingsViewModel.provideFactory(
+            prefsManager = appContainer.prefsManager,
+            authRepository = appContainer.authRepository,
+            neptunRepository = appContainer.neptunRepository
+        )
+    )
+
     val timetableState by timetableViewModel.uiState.collectAsStateWithLifecycle()
     val gradesState by gradesViewModel.uiState.collectAsStateWithLifecycle()
     val messagesState by messagesViewModel.uiState.collectAsStateWithLifecycle()
+    val settingsState by settingsViewModel.uiState.collectAsStateWithLifecycle()
 
     var currentDestination by rememberSaveable { mutableStateOf(NavigationItem.TIMETABLE) }
 
@@ -155,6 +165,10 @@ private fun MainDashboard(
 
                     NavigationItem.SETTINGS -> SettingsScreen(
                         credentials = authState.credentials,
+                        themeSettings = settingsState.themeSettings,
+                        onThemeModeChange = settingsViewModel::setThemeMode,
+                        onDynamicColorToggle = settingsViewModel::setDynamicColor,
+                        onAccentColorSelect = settingsViewModel::setAccentColor,
                         onLogoutClick = authViewModel::logout,
                         onManualSync = {
                             timetableViewModel.refreshCalendar()
