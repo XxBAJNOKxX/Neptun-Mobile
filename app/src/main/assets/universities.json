@@ -1,0 +1,408 @@
+[
+  {
+    "id": "ppke_auto",
+    "name": "Pázmány Péter Katolikus Egyetem (Automatikus Terheléselosztó)",
+    "shortName": "PPKE (Auto)",
+    "city": "Budapest",
+    "neptunUrl": "https://neptun2.ppke.hu/hallgato_uj"
+  },
+  {
+    "id": "ppke_neptun2",
+    "name": "Pázmány Péter Katolikus Egyetem (Neptun 2)",
+    "shortName": "PPKE (neptun2)",
+    "city": "Budapest",
+    "neptunUrl": "https://neptun2.ppke.hu/hallgato_uj"
+  },
+  {
+    "id": "ppke_neptun3",
+    "name": "Pázmány Péter Katolikus Egyetem (Neptun 3)",
+    "shortName": "PPKE (neptun3)",
+    "city": "Budapest",
+    "neptunUrl": "https://neptun3.ppke.hu/hallgato_uj"
+  },
+  {
+    "id": "ppke_neptun3_3",
+    "name": "Pázmány Péter Katolikus Egyetem (Neptun 3 / hallgato3)",
+    "shortName": "PPKE (hallgato3)",
+    "city": "Budapest",
+    "neptunUrl": "https://neptun3.ppke.hu/hallgato3_uj"
+  },
+  {
+    "id": "ppke_neptun3_2",
+    "name": "Pázmány Péter Katolikus Egyetem (Neptun 3 / hallgato2)",
+    "shortName": "PPKE (hallgato2)",
+    "city": "Budapest",
+    "neptunUrl": "https://neptun3.ppke.hu/hallgato2_uj"
+  },
+  {
+    "id": "atankapujabu",
+    "name": "A Tan Kapuja Buddhista Főiskola",
+    "shortName": "ATKB",
+    "city": "Budapest",
+    "neptunUrl": "https://host.sdakft.hu/tkbfhw"
+  },
+  {
+    "id": "llatorvostud",
+    "name": "Állatorvostudományi Egyetem",
+    "shortName": "ÁTE",
+    "city": "Magyarország",
+    "neptunUrl": "https://neptun.univet.hu/ate_hw"
+  },
+  {
+    "id": "aporvilmoska",
+    "name": "Apor Vilmos Katolikus Főiskola",
+    "shortName": "AVKF",
+    "city": "Vác",
+    "neptunUrl": "https://neptun.avkf.hu/hallgatoiangular"
+  },
+  {
+    "id": "bhaktivedant",
+    "name": "Bhaktivedanta Hittudományi Főiskola",
+    "shortName": "BHF",
+    "city": "Budapest",
+    "neptunUrl": "https://host.sdakft.hu/bhfhw"
+  },
+  {
+    "id": "brennerjnosh",
+    "name": "Brenner János Hittudományi Főiskola",
+    "shortName": "BJHF",
+    "city": "Győr",
+    "neptunUrl": "https://host.sdakft.hu/bjhfhw"
+  },
+  {
+    "id": "budapesticor",
+    "name": "Budapesti Corvinus Egyetem",
+    "shortName": "BCE",
+    "city": "Budapest",
+    "neptunUrl": "https://neptun3r.web.uni-corvinus.hu/Hallgatoi"
+  },
+  {
+    "id": "budapestigaz",
+    "name": "Budapesti Gazdasági Egyetem",
+    "shortName": "BGE",
+    "city": "Budapest",
+    "neptunUrl": "https://neptun18.uni-bge.hu/hallgato"
+  },
+  {
+    "id": "budapestimet",
+    "name": "Budapesti Metropolitan Egyetem",
+    "shortName": "METU",
+    "city": "Budapest",
+    "neptunUrl": "https://neptunweb1.metropolitan.hu/hallgato"
+  },
+  {
+    "id": "budapestimsz",
+    "name": "Budapesti Műszaki és Gazdaságtudományi Egyetem",
+    "shortName": "BME",
+    "city": "Budapest",
+    "neptunUrl": "https://neptun.bme.hu/hallgatoi"
+  },
+  {
+    "id": "debreceniegy",
+    "name": "Debreceni Egyetem",
+    "shortName": "DE",
+    "city": "Debrecen",
+    "neptunUrl": "https://www-h-ng.neptun.unideb.hu/hallgato_ng"
+  },
+  {
+    "id": "debreceniref",
+    "name": "Debreceni Református Hittudományi Egyetem",
+    "shortName": "DRHE",
+    "city": "Debrecen",
+    "neptunUrl": "https://host.sdakft.hu/drhehw"
+  },
+  {
+    "id": "dunajvrosieg",
+    "name": "Dunaújvárosi Egyetem",
+    "shortName": "DUE",
+    "city": "Dunaújváros",
+    "neptunUrl": "https://nappw.dfad.duf.hu/hallgato_ng"
+  },
+  {
+    "id": "edutusfiskol",
+    "name": "Edutus Főiskola",
+    "shortName": "EF",
+    "city": "Tatabánya",
+    "neptunUrl": "https://neptun.edutus.hu/hallgato"
+  },
+  {
+    "id": "etvsjzseffis",
+    "name": "Eötvös József Főiskola",
+    "shortName": "EJF",
+    "city": "Baja",
+    "neptunUrl": "https://neptun.ejf.hu/hallgato_ng"
+  },
+  {
+    "id": "etvslorndtud",
+    "name": "Eötvös Loránd Tudományegyetem",
+    "shortName": "ELTE",
+    "city": "Magyarország",
+    "neptunUrl": "https://neptun.elte.hu/Account"
+  },
+  {
+    "id": "eszterhzykro",
+    "name": "Eszterházy Károly Katolikus Egyetem",
+    "shortName": "EKKE",
+    "city": "Szeged",
+    "neptunUrl": "https://neptunh.uni-eszterhazy.hu/Hallgato"
+  },
+  {
+    "id": "gbordnesegye",
+    "name": "Gábor Dénes Egyetem",
+    "shortName": "GDE",
+    "city": "Magyarország",
+    "neptunUrl": "https://neptun.gde.hu/hallgato"
+  },
+  {
+    "id": "glferencegye",
+    "name": "Gál Ferenc Egyetem",
+    "shortName": "GFE",
+    "city": "Szeged",
+    "neptunUrl": "https://host.sdakft.hu/gfehw"
+  },
+  {
+    "id": "ibsnemzetkzi",
+    "name": "IBS Nemzetközi Üzleti Főiskola",
+    "shortName": "INÜF",
+    "city": "Budapest",
+    "neptunUrl": "https://neptun.ibs-b.hu/student"
+  },
+  {
+    "id": "kaposvriegye",
+    "name": "Kaposvári Egyetem",
+    "shortName": "KE",
+    "city": "Magyarország",
+    "neptunUrl": "https://hallgato.uni-mate.hu/hallgato_ng"
+  },
+  {
+    "id": "kroligsprref",
+    "name": "Károli Gáspár Református Egyetem",
+    "shortName": "KRE",
+    "city": "Budapest",
+    "neptunUrl": "https://neptun.kre.hu/hallgato"
+  },
+  {
+    "id": "krolyrbertfi",
+    "name": "Károly Róbert Főiskola, Gyöngyös",
+    "shortName": "KRFG",
+    "city": "Magyarország",
+    "neptunUrl": "https://hallgato.uni-mate.hu/hallgato_ng"
+  },
+  {
+    "id": "kodolnyijnos",
+    "name": "Kodolányi János Egyetem",
+    "shortName": "KJE",
+    "city": "Magyarország",
+    "neptunUrl": "https://neptun.kodolanyi.hu/hallgato_NG"
+  },
+  {
+    "id": "lisztferencz",
+    "name": "Liszt Ferenc Zeneművészeti Egyetem",
+    "shortName": "LFZE",
+    "city": "Budapest",
+    "neptunUrl": "https://neptun.lfze.hu/hallgato"
+  },
+  {
+    "id": "magyaragrrsl",
+    "name": "Magyar Agrár- és Élettudományi Egyetem",
+    "shortName": "MATE",
+    "city": "Gödöllő",
+    "neptunUrl": "https://hallgato.uni-mate.hu/hallgato_ng"
+  },
+  {
+    "id": "magyarkpzmvs",
+    "name": "Magyar Képzőművészeti Egyetem",
+    "shortName": "MKE",
+    "city": "Budapest",
+    "neptunUrl": "https://mke-neptun.mke.hu/hallgato/MobileService.svc"
+  },
+  {
+    "id": "magyartncmvs",
+    "name": "Magyar Táncművészeti Egyetem",
+    "shortName": "MTE",
+    "city": "Budapest",
+    "neptunUrl": "https://host.sdakft.hu/mtfhw"
+  },
+  {
+    "id": "miltonfriedm",
+    "name": "Milton Friedman Egyetem",
+    "shortName": "MFE",
+    "city": "Budapest",
+    "neptunUrl": "https://neptun.uni-milton.hu/hallgato"
+  },
+  {
+    "id": "miskolciegye",
+    "name": "Miskolci Egyetem",
+    "shortName": "ME",
+    "city": "Miskolc",
+    "neptunUrl": "https://neptunweb1.uni-miskolc.hu/hallgato_ng"
+  },
+  {
+    "id": "moholynagymv",
+    "name": "Moholy-Nagy Művészeti Egyetem",
+    "shortName": "MNME",
+    "city": "Magyarország",
+    "neptunUrl": "https://host.sdakft.hu/momehw"
+  },
+  {
+    "id": "nemzetikzszo",
+    "name": "Nemzeti Közszolgálati Egyetem",
+    "shortName": "NKE",
+    "city": "Magyarország",
+    "neptunUrl": "https://neptunweb.uni-nke.hu/hallgato_ng"
+  },
+  {
+    "id": "neumannjnose",
+    "name": "Neumann János Egyetem",
+    "shortName": "NJE",
+    "city": "Kecskemét",
+    "neptunUrl": "https://neptun.nje.hu/hallgato"
+  },
+  {
+    "id": "nyregyhziegy",
+    "name": "Nyíregyházi Egyetem",
+    "shortName": "NE",
+    "city": "Nyíregyháza",
+    "neptunUrl": "https://neptunweb.nye.hu/hallgato"
+  },
+  {
+    "id": "budaiegyetem",
+    "name": "Óbudai Egyetem",
+    "shortName": "ÓE",
+    "city": "Budapest",
+    "neptunUrl": "https://neptun.uni-obuda.hu/ujhallgato"
+  },
+  {
+    "id": "orszgosrabbi",
+    "name": "Országos Rabbiképző - Zsidó Egyetem",
+    "shortName": "ORZE",
+    "city": "Budapest",
+    "neptunUrl": "https://neptun.or-zse.hu/hallgato"
+  },
+  {
+    "id": "pannonegyete",
+    "name": "Pannon Egyetem",
+    "shortName": "PE",
+    "city": "Veszprém",
+    "neptunUrl": "https://neptun-ws01.uni-pannon.hu/hallgato"
+  },
+  {
+    "id": "pcsitudomnye",
+    "name": "Pécsi Tudományegyetem",
+    "shortName": "PTE",
+    "city": "Pécs",
+    "neptunUrl": "https://neptun-web4.tr.pte.hu/hallgato"
+  },
+  {
+    "id": "sapientiaerd",
+    "name": "Sapientia Erdélyi Magyar Tudományegyetem",
+    "shortName": "SEMT",
+    "city": "Kolozsvár",
+    "neptunUrl": "https://host.sdakft.hu/semtehw/MobileService.svc"
+  },
+  {
+    "id": "sapientiasze",
+    "name": "Sapientia Szerzetesi Hittudományi Főiskola",
+    "shortName": "SSHF",
+    "city": "Kolozsvár",
+    "neptunUrl": "https://neptun3r.sapientia.hu/hallgato"
+  },
+  {
+    "id": "semmelweiseg",
+    "name": "Semmelweis Egyetem",
+    "shortName": "SE",
+    "city": "Budapest",
+    "neptunUrl": "https://neptunweb.semmelweis.hu/hallgato"
+  },
+  {
+    "id": "soproniegyet",
+    "name": "Soproni Egyetem",
+    "shortName": "SOE",
+    "city": "Sopron",
+    "neptunUrl": "https://neptun3r.uni-sopron.hu/hallgato_ng"
+  },
+  {
+    "id": "szchenyiistv",
+    "name": "Széchenyi István Egyetem",
+    "shortName": "SZE",
+    "city": "Győr",
+    "neptunUrl": "https://neptun-hweb.sze.hu/hallgato_ng"
+  },
+  {
+    "id": "szegeditudom",
+    "name": "Szegedi Tudományegyetem",
+    "shortName": "SZTE",
+    "city": "Szeged",
+    "neptunUrl": "https://neptun.szte.hu/hallgato"
+  },
+  {
+    "id": "szentatanzgr",
+    "name": "Szent Atanáz Görög Katolikus Hittudományi Főiskola",
+    "shortName": "SAGK",
+    "city": "Nyíregyháza",
+    "neptunUrl": "https://neptun.szentatanaz.hu/hallgato"
+  },
+  {
+    "id": "szentistvneg",
+    "name": "Szent István Egyetem",
+    "shortName": "SIE",
+    "city": "Gödöllő",
+    "neptunUrl": "https://hallgato.uni-mate.hu/hallgato_ng"
+  },
+  {
+    "id": "szentplakadm",
+    "name": "Szent Pál Akadémia",
+    "shortName": "SPA",
+    "city": "Magyarország",
+    "neptunUrl": "https://neptun.szpa.hu/hallgato/MobileService.svc"
+  },
+  {
+    "id": "sznhzsfilmmv",
+    "name": "Színház- és Filmművészeti Egyetem",
+    "shortName": "SFE",
+    "city": "Budapest",
+    "neptunUrl": "https://host.sdakft.hu/szfehw"
+  },
+  {
+    "id": "testnevelsie",
+    "name": "Testnevelési Egyetem",
+    "shortName": "TE",
+    "city": "Budapest",
+    "neptunUrl": "https://neptun.tf.hu/hallgato"
+  },
+  {
+    "id": "tokajhegyalj",
+    "name": "Tokaj-Hegyalja Egyetem",
+    "shortName": "THE",
+    "city": "Sárospatak",
+    "neptunUrl": "https://neptun.unithe.hu/hallgato"
+  },
+  {
+    "id": "tomoriplfisk",
+    "name": "Tomori Pál Főiskola",
+    "shortName": "TPF",
+    "city": "Kalocsa",
+    "neptunUrl": "https://host.sdakft.hu/tpfhw"
+  },
+  {
+    "id": "veszprmirsek",
+    "name": "Veszprémi Érseki Foiskola",
+    "shortName": "VÉF",
+    "city": "Veszprém",
+    "neptunUrl": "https://neptun.vhf.hu/hallgato_ng"
+  },
+  {
+    "id": "wekerlesndor",
+    "name": "Wekerle Sándor Üzleti Főiskola",
+    "shortName": "WSÜF",
+    "city": "Budapest",
+    "neptunUrl": "https://neptun.wsne.hu/hallgato"
+  },
+  {
+    "id": "wesleyjnosle",
+    "name": "Wesley János Lelkészképző Főiskola",
+    "shortName": "WJLF",
+    "city": "Budapest",
+    "neptunUrl": "https://host.sdakft.hu/wjlfhw"
+  }
+]

@@ -1,0 +1,6 @@
+{
+  "name": "Neptun Mobile",
+  "description": "Modern alternatív Neptun kliens magyar egyetemistáknak: órarend, szellemjegy kalkulátor, üzenetek, pénzügyek és órarendi értesítések.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
