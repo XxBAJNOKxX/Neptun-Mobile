@@ -9,14 +9,12 @@ import com.example.domain.model.FinanceStatus
 import com.example.domain.model.NeptunMessage
 import com.example.domain.model.SubjectGrade
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
@@ -28,16 +26,13 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import okhttp3.Response
 import java.security.SecureRandom
 import java.security.cert.X509Certificate
-import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import java.time.temporal.TemporalAdjusters
 import java.util.concurrent.TimeUnit
 import javax.net.ssl.HostnameVerifier
 import javax.net.ssl.SSLContext
@@ -112,6 +107,41 @@ class NeptunApiClient {
         return url
     }
 
+    fun getLegacyBaseUrl(baseUrl: String): String {
+        var clean = baseUrl.trim()
+        while (clean.endsWith("/")) {
+            clean = clean.substring(0, clean.length - 1)
+        }
+        return if (clean.endsWith("/MobileService.svc", ignoreCase = true)) {
+            clean
+        } else {
+            "$clean/MobileService.svc"
+        }
+    }
+
+    fun getLegacyServiceUrl(baseUrl: String, method: String): String {
+        val legacyBase = getLegacyBaseUrl(baseUrl)
+        val cleanMethod = method.trimStart('/')
+        return if (cleanMethod.isEmpty()) legacyBase else "$legacyBase/$cleanMethod"
+    }
+
+    private fun safeParseJson(raw: String?): JsonElement? {
+        if (raw == null) return null
+        val trimmed = raw.trim()
+        if (trimmed.isEmpty() || trimmed.startsWith("<") || (!trimmed.startsWith("{") && !trimmed.startsWith("["))) {
+            return null
+        }
+        return try {
+            json.parseToJsonElement(trimmed)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun safeParseJsonObject(raw: String?): JsonObject? {
+        return safeParseJson(raw) as? JsonObject
+    }
+
     suspend fun authenticate(
         rawUrl: String,
         neptunCode: String,
@@ -164,7 +194,7 @@ class NeptunApiClient {
                     studentName = "Hallgató ($username)",
                     trainingProgram = "Egyetemi képzés",
                     isModernApi = false,
-                    normalizedBaseUrl = "$baseUrl/MobileService.svc"
+                    normalizedBaseUrl = getLegacyBaseUrl(baseUrl)
                 )
             } else {
                 NeptunAuthResult.Failure("Nem sikerült a bejelentkezés a Neptun kiszolgálóra!")
@@ -202,7 +232,7 @@ class NeptunApiClient {
             val extractedCookie = extractDeviceCookie(setCookieHeader)
             val extractedRefreshToken = extractRefreshToken(setCookieHeader)
 
-            if (responseBody.trim().startsWith("<!DOCTYPE") || responseBody.trim().startsWith("<html")) {
+            if (responseBody.trim().startsWith("<")) {
                 // Fallback to legacy if modern API route returned webpage
                 val fallbackLegacy = tryLegacyLogin(baseUrl, username, pwd)
                 if (fallbackLegacy) {
@@ -213,19 +243,26 @@ class NeptunApiClient {
                         studentName = "Hallgató ($username)",
                         trainingProgram = "Egyetemi képzés",
                         isModernApi = false,
-                        normalizedBaseUrl = "$baseUrl/MobileService.svc"
+                        normalizedBaseUrl = getLegacyBaseUrl(baseUrl)
                     )
                 }
                 return@withContext NeptunAuthResult.Failure("A Neptun szervere nem elérhető (HTML válasz).")
             }
 
-            val parsed = try {
-                json.parseToJsonElement(responseBody).jsonObject
-            } catch (e: Exception) {
-                null
-            }
-
+            val parsed = safeParseJsonObject(responseBody)
             if (parsed == null) {
+                val fallbackLegacy = tryLegacyLogin(baseUrl, username, pwd)
+                if (fallbackLegacy) {
+                    return@withContext NeptunAuthResult.Success(
+                        accessToken = "legacy-token-$username",
+                        refreshToken = null,
+                        deviceCookie = null,
+                        studentName = "Hallgató ($username)",
+                        trainingProgram = "Egyetemi képzés",
+                        isModernApi = false,
+                        normalizedBaseUrl = getLegacyBaseUrl(baseUrl)
+                    )
+                }
                 return@withContext NeptunAuthResult.Failure("Érvénytelen válasz a szervertől.")
             }
 
@@ -245,7 +282,6 @@ class NeptunApiClient {
 
             val accessToken = dataObj?.get("accessToken")?.jsonPrimitive?.contentOrNull
             if (!accessToken.isNullOrEmpty()) {
-                // Also optionally fetch student training info
                 val trainingName = try {
                     getStudentTrainingInfo(baseUrl, accessToken)?.second ?: "Egyetemi képzés"
                 } catch (e: Exception) {
@@ -268,7 +304,6 @@ class NeptunApiClient {
                 ?: parsed["message"]?.jsonPrimitive?.contentOrNull
                 ?: "Hibás felhasználónév vagy jelszó!"
 
-            // If modern authentication returned 404 or specific error, try legacy API as fallback
             if (response.code == 404) {
                 val legacySuccess = tryLegacyLogin(baseUrl, username, pwd)
                 if (legacySuccess) {
@@ -279,7 +314,7 @@ class NeptunApiClient {
                         studentName = "Hallgató ($username)",
                         trainingProgram = "Egyetemi képzés",
                         isModernApi = false,
-                        normalizedBaseUrl = "$baseUrl/MobileService.svc"
+                        normalizedBaseUrl = getLegacyBaseUrl(baseUrl)
                     )
                 }
             }
@@ -296,7 +331,7 @@ class NeptunApiClient {
                     studentName = "Hallgató ($username)",
                     trainingProgram = "Egyetemi képzés",
                     isModernApi = false,
-                    normalizedBaseUrl = "$baseUrl/MobileService.svc"
+                    normalizedBaseUrl = getLegacyBaseUrl(baseUrl)
                 )
             } else {
                 NeptunAuthResult.Failure("Hálózati hiba a Neptunhoz kapcsolódáskor: ${e.localizedMessage}")
@@ -316,9 +351,9 @@ class NeptunApiClient {
 
             val resp = okHttpClient.newCall(req).execute()
             if (resp.isSuccessful) {
-                val body = resp.body?.string() ?: ""
-                val parsed = json.parseToJsonElement(body).jsonObject
-                return@withContext parsed["data"]?.jsonObject?.get("accessToken")?.jsonPrimitive?.contentOrNull
+                val body = resp.body?.string()
+                val parsed = safeParseJsonObject(body)
+                return@withContext parsed?.get("data")?.jsonObject?.get("accessToken")?.jsonPrimitive?.contentOrNull
             }
         } catch (e: Exception) {
             Log.e(tag, "Refresh token error: ${e.message}")
@@ -338,7 +373,7 @@ class NeptunApiClient {
 
     private suspend fun tryLegacyLogin(baseUrl: String, username: String, password: String): Boolean = withContext(Dispatchers.IO) {
         try {
-            val url = "$baseUrl/MobileService.svc/GetTrainings"
+            val url = getLegacyServiceUrl(baseUrl, "GetTrainings")
             val body = """{"UserLogin":"$username","Password":"$password"}"""
             val req = Request.Builder()
                 .url(url)
@@ -347,11 +382,10 @@ class NeptunApiClient {
                 .build()
 
             val resp = okHttpClient.newCall(req).execute()
+            if (!resp.isSuccessful) return@withContext false
             val respBody = resp.body?.string() ?: ""
-            if (respBody.trim().startsWith("{")) {
-                val parsed = json.parseToJsonElement(respBody).jsonObject
-                return@withContext parsed["ErrorMessage"] == null || parsed["ErrorMessage"]?.jsonPrimitive?.contentOrNull.isNullOrEmpty()
-            }
+            val parsed = safeParseJsonObject(respBody) ?: return@withContext false
+            return@withContext parsed["ErrorMessage"] == null || parsed["ErrorMessage"]?.jsonPrimitive?.contentOrNull.isNullOrEmpty()
         } catch (e: Exception) {
             Log.e(tag, "Legacy login error: ${e.message}")
         }
@@ -372,7 +406,7 @@ class NeptunApiClient {
             val resp = okHttpClient.newCall(req).execute()
             if (resp.isSuccessful) {
                 val body = resp.body?.string() ?: ""
-                val parsed = json.parseToJsonElement(body).jsonObject
+                val parsed = safeParseJsonObject(body) ?: return@withContext null
                 val dataArr = parsed["data"]?.jsonArray
                 if (!dataArr.isNullOrEmpty()) {
                     var selected = dataArr.first().jsonObject
@@ -408,7 +442,6 @@ class NeptunApiClient {
         }
 
         try {
-            // Target the semester window (from 2 months back to 5 months ahead)
             val now = LocalDate.now()
             val startWindow = now.minusMonths(2).withDayOfMonth(1)
             val endWindow = now.plusMonths(5).let { it.withDayOfMonth(it.lengthOfMonth()) }
@@ -418,10 +451,8 @@ class NeptunApiClient {
 
             val trainId = trainingId ?: getStudentTrainingInfo(baseUrl, token)?.first ?: ""
 
-            // Attempt with trainId
             var events = fetchModernCalendarEvents(baseUrl, token, trainId, startIso, endIso)
 
-            // If empty and trainId was used, retry without trainId filter (modern Neptun often needs unfiltered call)
             if (events.isEmpty() && trainId.isNotEmpty()) {
                 events = fetchModernCalendarEvents(baseUrl, token, "", startIso, endIso)
             }
@@ -437,6 +468,32 @@ class NeptunApiClient {
                 return@withContext getLegacyCalendarEvents(baseUrl, username, password)
             }
             return@withContext emptyList()
+        }
+    }
+
+    private fun extractAllText(element: JsonElement?): String {
+        if (element == null) return ""
+        return try {
+            when (element) {
+                is JsonPrimitive -> element.contentOrNull ?: element.toString()
+                is JsonObject -> element.values.joinToString(" ") { extractAllText(it) }
+                is JsonArray -> element.joinToString(" ") { extractAllText(it) }
+                else -> ""
+            }
+        } catch (e: Exception) {
+            element.toString()
+        }
+    }
+
+    private fun detectCourseType(item: JsonElement, courseCode: String = "", name: String = ""): CourseType {
+        val fullText = (extractAllText(item) + " " + courseCode + " " + name).lowercase()
+        return when {
+            fullText.contains("labor") || fullText.contains("lab") || courseCode.contains("lab", ignoreCase = true) || courseCode.startsWith("L", ignoreCase = true) -> CourseType.LAB
+            fullText.contains("gyakorlat") || fullText.contains("gyak") || courseCode.contains("gyak", ignoreCase = true) || courseCode.startsWith("G", ignoreCase = true) -> CourseType.PRACTICE
+            fullText.contains("szeminárium") || fullText.contains("szem") -> CourseType.SEMINAR
+            fullText.contains("vizsga") -> CourseType.EXAM
+            fullText.contains("előadás") || fullText.contains("elmélet") || fullText.contains("ea") -> CourseType.LECTURE
+            else -> CourseType.LECTURE
         }
     }
 
@@ -477,7 +534,7 @@ class NeptunApiClient {
             val resp = okHttpClient.newCall(req).execute()
             if (!resp.isSuccessful) return@withContext emptyList()
             val respBody = resp.body?.string() ?: ""
-            val parsed = json.parseToJsonElement(respBody).jsonObject
+            val parsed = safeParseJsonObject(respBody) ?: return@withContext emptyList()
             val dataPart = parsed["data"] ?: parsed["calendarData"] ?: parsed["events"]
 
             val items: List<JsonElement> = when (dataPart) {
@@ -508,7 +565,6 @@ class NeptunApiClient {
                 val tutor = obj["courseTutor"]?.jsonPrimitive?.contentOrNull
                     ?: obj["teacher"]?.jsonPrimitive?.contentOrNull
                     ?: "Oktató nincs megadva"
-                val typeId = obj["eventTypeId"]?.jsonPrimitive?.intOrNull ?: 1
 
                 val startDt = try {
                     LocalDateTime.parse(startRaw.substringBefore("."))
@@ -522,14 +578,8 @@ class NeptunApiClient {
                     startDt.plusHours(2)
                 }
 
-                val dayOfWeekNum = startDt.dayOfWeek.value // 1 = Monday, 7 = Sunday
-                val courseType = when (typeId) {
-                    1 -> CourseType.LECTURE
-                    2 -> CourseType.PRACTICE
-                    3 -> CourseType.LAB
-                    4 -> CourseType.EXAM
-                    else -> CourseType.LECTURE
-                }
+                val dayOfWeekNum = startDt.dayOfWeek.value
+                val courseType = detectCourseType(item, courseCode, name)
 
                 list.add(
                     CalendarEvent(
@@ -575,50 +625,59 @@ class NeptunApiClient {
                 }
             """.trimIndent()
 
+            val url = getLegacyServiceUrl(baseUrl, "GetCalendarData")
             val req = Request.Builder()
-                .url("$baseUrl/GetCalendarData")
+                .url(url)
                 .post(body.toRequestBody("application/json".toMediaType()))
                 .addHeader("Content-Type", "application/json")
                 .build()
 
             val resp = okHttpClient.newCall(req).execute()
+            if (!resp.isSuccessful) return@withContext emptyList()
             val respBody = resp.body?.string() ?: ""
-            val parsed = json.parseToJsonElement(respBody).jsonObject
-            val calData = parsed["calendarData"]?.jsonArray ?: return@withContext emptyList()
+            val parsed = safeParseJsonObject(respBody) ?: return@withContext emptyList()
+            val calData = parsed["calendarData"]?.jsonArray ?: parsed["CalendarData"]?.jsonArray ?: return@withContext emptyList()
 
             val list = mutableListOf<CalendarEvent>()
             for (item in calData) {
                 val obj = item.jsonObject
                 val title = obj["title"]?.jsonPrimitive?.contentOrNull ?: "Óra"
                 val location = obj["location"]?.jsonPrimitive?.contentOrNull ?: "Nincs megadva"
+                val cCode = obj["courseCode"]?.jsonPrimitive?.contentOrNull ?: ""
+                val teacher = obj["teacher"]?.jsonPrimitive?.contentOrNull
+                    ?: obj["tutor"]?.jsonPrimitive?.contentOrNull
+                    ?: "Oktató"
+
                 val rawStart = obj["start"]?.jsonPrimitive?.contentOrNull?.replace(Regex("""\D"""), "")?.toLongOrNull() ?: now
                 val rawEnd = obj["end"]?.jsonPrimitive?.contentOrNull?.replace(Regex("""\D"""), "")?.toLongOrNull() ?: (now + 5400000L)
 
                 val startInstant = Instant.ofEpochMilli(rawStart).atZone(ZoneId.systemDefault()).toLocalDateTime()
                 val endInstant = Instant.ofEpochMilli(rawEnd).atZone(ZoneId.systemDefault()).toLocalDateTime()
 
+                val courseType = detectCourseType(item, cCode, title)
+
                 list.add(
                     CalendarEvent(
-                        id = "leg_${startInstant.toLocalDate()}_${startInstant.hour}",
+                        id = "leg_${startInstant.toLocalDate()}_${startInstant.hour}_${title.hashCode()}",
                         subjectName = title,
-                        subjectCode = "-",
-                        courseCode = "-",
+                        subjectCode = if (cCode.isNotBlank()) cCode else "-",
+                        courseCode = if (cCode.isNotBlank()) cCode else "-",
                         location = location,
                         room = location,
-                        teacherName = "Oktató",
+                        teacherName = teacher,
                         startHour = startInstant.hour,
                         startMinute = startInstant.minute,
                         endHour = endInstant.hour,
                         endMinute = endInstant.minute,
                         dayOfWeek = startInstant.dayOfWeek.value,
-                        courseType = CourseType.LECTURE,
+                        courseType = courseType,
                         dateString = startInstant.toLocalDate().toString()
                     )
                 )
             }
             return@withContext list
         } catch (e: Exception) {
-            Log.e(tag, "Legacy calendar fetch error: ${e.message}")
+            Log.e(tag, "Legacy calendar error: ${e.message}")
             return@withContext emptyList()
         }
     }
@@ -649,25 +708,28 @@ class NeptunApiClient {
                     .build()
 
                 val termsResp = okHttpClient.newCall(termsReq).execute()
-                val termsBody = termsResp.body?.string() ?: ""
-                val termsData = json.parseToJsonElement(termsBody).jsonObject["data"]?.jsonArray
+                if (termsResp.isSuccessful) {
+                    val termsBody = termsResp.body?.string() ?: ""
+                    val termsData = safeParseJsonObject(termsBody)?.get("data")?.jsonArray
 
-                if (!termsData.isNullOrEmpty()) {
-                    // Reversed so newest semesters come first
-                    for (termItem in termsData.reversed()) {
-                        val tObj = termItem.jsonObject
-                        val tid = tObj["value"]?.jsonPrimitive?.contentOrNull
-                            ?: tObj["termId"]?.jsonPrimitive?.contentOrNull
-                            ?: tObj["id"]?.jsonPrimitive?.contentOrNull
-                            ?: tObj["Id"]?.jsonPrimitive?.contentOrNull
-                            ?: ""
-                        val tname = tObj["text"]?.jsonPrimitive?.contentOrNull
-                            ?: tObj["termName"]?.jsonPrimitive?.contentOrNull
-                            ?: tObj["name"]?.jsonPrimitive?.contentOrNull
-                            ?: tObj["Text"]?.jsonPrimitive?.contentOrNull
-                            ?: ""
-                        if (tid.isNotEmpty() && candidateTerms.none { it.first == tid }) {
-                            candidateTerms.add(tid to tname.ifEmpty { tid })
+                    if (!termsData.isNullOrEmpty()) {
+                        for (termItem in termsData.reversed()) {
+                            val tObj = termItem.jsonObject
+                            val tidRaw = when (val v = tObj["value"] ?: tObj["termId"] ?: tObj["id"] ?: tObj["Id"]) {
+                                is JsonObject -> v["id"]?.jsonPrimitive?.contentOrNull ?: v["termId"]?.jsonPrimitive?.contentOrNull ?: v["name"]?.jsonPrimitive?.contentOrNull ?: v.toString()
+                                is JsonElement -> v.jsonPrimitive.contentOrNull ?: ""
+                                else -> ""
+                            }
+                            val tnameRaw = when (val t = tObj["text"] ?: tObj["termName"] ?: tObj["name"] ?: tObj["Text"]) {
+                                is JsonObject -> t["name"]?.jsonPrimitive?.contentOrNull ?: t["text"]?.jsonPrimitive?.contentOrNull ?: t.toString()
+                                is JsonElement -> t.jsonPrimitive.contentOrNull ?: ""
+                                else -> ""
+                            }
+                            val tid = cleanTermString(tidRaw)
+                            val tname = cleanTermString(tnameRaw).ifEmpty { tid }
+                            if (tid.isNotEmpty() && candidateTerms.none { it.first == tid }) {
+                                candidateTerms.add(tid to tname)
+                            }
                         }
                     }
                 }
@@ -677,7 +739,6 @@ class NeptunApiClient {
 
             val allGrades = mutableListOf<SubjectGrade>()
 
-            // If no terms found, query TakenSubjects directly
             if (candidateTerms.isEmpty()) {
                 candidateTerms.add("" to "Aktuális félév")
             }
@@ -709,7 +770,7 @@ class NeptunApiClient {
                         val subResp = okHttpClient.newCall(subReq).execute()
                         if (!subResp.isSuccessful) continue
                         val subBody = subResp.body?.string() ?: ""
-                        val parsed = json.parseToJsonElement(subBody)
+                        val parsed = safeParseJson(subBody) ?: continue
                         val subjectsData = when {
                             parsed is JsonObject && parsed["data"] is JsonArray -> parsed["data"]?.jsonArray
                             parsed is JsonObject && parsed["data"] is JsonObject && parsed["data"]?.jsonObject?.get("takenSubjects") is JsonArray ->
@@ -770,12 +831,14 @@ class NeptunApiClient {
                                     isSigned = true
                                 }
 
-                                val effectiveTermId = termId.ifEmpty {
-                                    obj["termId"]?.jsonPrimitive?.contentOrNull ?: "current_term"
+                                val rawTermId = termId.ifEmpty {
+                                    obj["termId"]?.jsonPrimitive?.contentOrNull ?: "2025/26/1"
                                 }
-                                val effectiveTermName = termName.ifEmpty {
-                                    obj["termName"]?.jsonPrimitive?.contentOrNull ?: "Aktuális félév"
+                                val rawTermName = termName.ifEmpty {
+                                    obj["termName"]?.jsonPrimitive?.contentOrNull ?: "2025/26/1 félév"
                                 }
+                                val effectiveTermId = cleanTermString(rawTermId)
+                                val effectiveTermName = cleanTermString(rawTermName)
 
                                 val itemUniqueId = "${effectiveTermId}_${subjectCode}_$subjectId"
                                 if (allGrades.none { it.id == itemUniqueId || (it.subjectCode == subjectCode && it.termId == effectiveTermId) }) {
@@ -802,7 +865,7 @@ class NeptunApiClient {
                 }
             }
 
-            // Also check OfferedGrades (megajánlott jegyek)
+            // Also check OfferedGrades
             try {
                 val offeredUrl = "$baseUrl/api/OfferedGrades/GetOfferedGrades?sortAndPage.firstRow=0&sortAndPage.lastRow=50"
                 val offReq = Request.Builder()
@@ -812,23 +875,25 @@ class NeptunApiClient {
                     .addHeader("Content-Type", "application/json")
                     .build()
                 val offResp = okHttpClient.newCall(offReq).execute()
-                val offBody = offResp.body?.string() ?: ""
-                val offData = json.parseToJsonElement(offBody).jsonObject["data"]?.jsonArray
-                if (!offData.isNullOrEmpty()) {
-                    for (offItem in offData) {
-                        val offObj = offItem.jsonObject
-                        val sCode = offObj["subjectCode"]?.jsonPrimitive?.contentOrNull ?: ""
-                        val resVal = offObj["resultValue"]?.jsonPrimitive?.intOrNull
-                        val resName = offObj["resultName"]?.jsonPrimitive?.contentOrNull ?: ""
-                        if (sCode.isNotEmpty() && (resVal != null || resName.isNotEmpty())) {
-                            val idx = allGrades.indexOfFirst { it.subjectCode.equals(sCode, ignoreCase = true) }
-                            if (idx >= 0 && allGrades[idx].grade == null) {
-                                val cur = allGrades[idx]
-                                allGrades[idx] = cur.copy(
-                                    grade = resVal ?: parseTextToGrade(resName),
-                                    gradeText = resName.ifEmpty { "Megajánlott ($resVal)" },
-                                    isSigned = true
-                                )
+                if (offResp.isSuccessful) {
+                    val offBody = offResp.body?.string() ?: ""
+                    val offData = safeParseJsonObject(offBody)?.get("data")?.jsonArray
+                    if (!offData.isNullOrEmpty()) {
+                        for (offItem in offData) {
+                            val offObj = offItem.jsonObject
+                            val sCode = offObj["subjectCode"]?.jsonPrimitive?.contentOrNull ?: ""
+                            val resVal = offObj["resultValue"]?.jsonPrimitive?.intOrNull
+                            val resName = offObj["resultName"]?.jsonPrimitive?.contentOrNull ?: ""
+                            if (sCode.isNotEmpty() && (resVal != null || resName.isNotEmpty())) {
+                                val idx = allGrades.indexOfFirst { it.subjectCode.equals(sCode, ignoreCase = true) }
+                                if (idx >= 0 && allGrades[idx].grade == null) {
+                                    val cur = allGrades[idx]
+                                    allGrades[idx] = cur.copy(
+                                        grade = resVal ?: parseTextToGrade(resName),
+                                        gradeText = resName.ifEmpty { "Megajánlott ($resVal)" },
+                                        isSigned = true
+                                    )
+                                }
                             }
                         }
                     }
@@ -852,103 +917,40 @@ class NeptunApiClient {
         }
     }
 
-    private suspend fun fetchSubjectGradeDetail(
-        baseUrl: String,
-        token: String,
-        subjectId: String,
-        termId: String,
-        termName: String,
-        subjectName: String,
-        subjectCode: String,
-        credit: Int
-    ): SubjectGrade? = withContext(Dispatchers.IO) {
-        try {
-            val url = "$baseUrl/api/SubjectCourse/GetSubjectDetails?subjectId=$subjectId&termId=$termId"
-            val req = Request.Builder()
-                .url(url)
-                .get()
-                .addHeader("Authorization", "Bearer $token")
-                .addHeader("Content-Type", "application/json")
-                .build()
-
-            val resp = okHttpClient.newCall(req).execute()
-            val body = resp.body?.string() ?: ""
-            val parsed = json.parseToJsonElement(body).jsonObject["data"]?.jsonObject ?: return@withContext null
-
-            var grade: Int? = null
-            var gradeText = ""
-            var isSigned = false
-
-            val subResult = parsed["subjectResult"]?.jsonObject
-            if (subResult != null) {
-                isSigned = subResult["passed"]?.jsonPrimitive?.booleanOrNull ?: false
-                val resVal = subResult["resultValue"]?.jsonPrimitive?.intOrNull
-                val resName = subResult["resultName"]?.jsonPrimitive?.contentOrNull ?: ""
-                gradeText = resName
-
-                if (resVal != null && resVal in 1..5) {
-                    grade = resVal
-                } else if (resName.isNotEmpty()) {
-                    grade = parseTextToGrade(resName)
-                }
-            } else {
-                val subStatus = parsed["subjectStatus"]?.jsonObject
-                val statusText = subStatus?.get("statusText")?.jsonPrimitive?.contentOrNull ?: ""
-                gradeText = statusText
-                if (statusText.contains("Teljesített", ignoreCase = true)) {
-                    isSigned = true
-                    grade = 5
-                }
-            }
-
-            SubjectGrade(
-                id = subjectId,
-                termId = termId,
-                termName = termName,
-                subjectName = subjectName,
-                subjectCode = subjectCode,
-                credit = credit,
-                grade = grade,
-                gradeText = gradeText,
-                isSigned = isSigned
-            )
-        } catch (e: Exception) {
-            SubjectGrade(
-                id = subjectId,
-                termId = termId,
-                termName = termName,
-                subjectName = subjectName,
-                subjectCode = subjectCode,
-                credit = credit,
-                grade = null,
-                gradeText = "Folyamatban",
-                isSigned = false
-            )
-        }
-    }
-
     private suspend fun getLegacyGrades(baseUrl: String, user: String, pass: String): List<SubjectGrade> = withContext(Dispatchers.IO) {
         try {
             val body = """{"UserLogin":"$user","Password":"$pass","CurrentPage":1,"filter":{"TermID":0},"TotalRowCount":-1}"""
+            val url = getLegacyServiceUrl(baseUrl, "GetMarkbookData")
             val req = Request.Builder()
-                .url("$baseUrl/GetMarkbookData")
+                .url(url)
                 .post(body.toRequestBody("application/json".toMediaType()))
                 .addHeader("Content-Type", "application/json")
                 .build()
 
             val resp = okHttpClient.newCall(req).execute()
+            if (!resp.isSuccessful) return@withContext emptyList()
             val respBody = resp.body?.string() ?: ""
-            val parsed = json.parseToJsonElement(respBody).jsonObject
-            val markbookList = parsed["MarkBookList"]?.jsonArray ?: return@withContext emptyList()
+            val parsed = safeParseJsonObject(respBody) ?: return@withContext emptyList()
+            val markbookList = parsed["MarkBookList"]?.jsonArray ?: parsed["markBookList"]?.jsonArray ?: return@withContext emptyList()
 
             val list = mutableListOf<SubjectGrade>()
             for (item in markbookList) {
                 val obj = item.jsonObject
-                val subName = obj["SubjectName"]?.jsonPrimitive?.contentOrNull ?: "Tantárgy"
-                val subId = obj["ID"]?.jsonPrimitive?.contentOrNull ?: "mb_${System.nanoTime()}"
-                val credit = obj["Credit"]?.jsonPrimitive?.intOrNull ?: 0
-                val values = obj["Values"]?.jsonPrimitive?.contentOrNull ?: ""
-                val completed = obj["Completed"]?.jsonPrimitive?.booleanOrNull ?: false
+                val subName = obj["SubjectName"]?.jsonPrimitive?.contentOrNull
+                    ?: obj["subjectName"]?.jsonPrimitive?.contentOrNull
+                    ?: "Tantárgy"
+                val subId = obj["ID"]?.jsonPrimitive?.contentOrNull
+                    ?: obj["id"]?.jsonPrimitive?.contentOrNull
+                    ?: "mb_${System.nanoTime()}"
+                val credit = obj["Credit"]?.jsonPrimitive?.intOrNull
+                    ?: obj["credit"]?.jsonPrimitive?.intOrNull
+                    ?: 0
+                val values = obj["Values"]?.jsonPrimitive?.contentOrNull
+                    ?: obj["values"]?.jsonPrimitive?.contentOrNull
+                    ?: ""
+                val completed = obj["Completed"]?.jsonPrimitive?.booleanOrNull
+                    ?: obj["completed"]?.jsonPrimitive?.booleanOrNull
+                    ?: false
                 val parsedGrade = parseTextToGrade(values)
 
                 list.add(
@@ -974,7 +976,6 @@ class NeptunApiClient {
 
     private fun parseTextToGrade(text: String): Int {
         val lower = text.lowercase()
-        // Check for single digit 1-5
         val digitMatch = Regex("""\b([1-5])\b""").find(text)
         if (digitMatch != null) {
             return digitMatch.groupValues[1].toInt()
@@ -1016,18 +1017,24 @@ class NeptunApiClient {
                 .build()
 
             val resp = okHttpClient.newCall(req).execute()
+            if (!resp.isSuccessful) return@withContext emptyList()
             val respBody = resp.body?.string() ?: ""
-            val parsed = json.parseToJsonElement(respBody).jsonObject
+            val parsed = safeParseJsonObject(respBody) ?: return@withContext emptyList()
             val recMessages = parsed["data"]?.jsonObject?.get("receivedMessages")?.jsonArray ?: return@withContext emptyList()
 
             val list = mutableListOf<NeptunMessage>()
             for (item in recMessages) {
                 val obj = item.jsonObject
-                val id = obj["messageId"]?.jsonPrimitive?.contentOrNull ?: "msg_${System.nanoTime()}"
                 val subject = obj["subject"]?.jsonPrimitive?.contentOrNull ?: "Nincs tárgy"
                 val sender = obj["senderName"]?.jsonPrimitive?.contentOrNull ?: "Ismeretlen feladó"
                 val dateStr = obj["lastPostDate"]?.jsonPrimitive?.contentOrNull ?: ""
                 val unreadCount = obj["unreadedPostCount"]?.jsonPrimitive?.intOrNull ?: 0
+
+                val id = obj["messageId"]?.jsonPrimitive?.contentOrNull
+                    ?: obj["MessageID"]?.jsonPrimitive?.contentOrNull
+                    ?: obj["id"]?.jsonPrimitive?.contentOrNull
+                    ?: obj["ID"]?.jsonPrimitive?.contentOrNull
+                    ?: "msg_${sender.hashCode()}_${subject.hashCode()}_${dateStr.hashCode()}"
 
                 val formattedDate = try {
                     val ldt = LocalDateTime.parse(dateStr.substringBefore("."))
@@ -1086,7 +1093,6 @@ class NeptunApiClient {
                     var resp = okHttpClient.newCall(req).execute()
                     var bodyStr = resp.body?.string() ?: ""
 
-                    // Retry once if server error
                     if (resp.code >= 500 || bodyStr.contains("Hiba történt") || bodyStr.contains("\"statusCode\":500")) {
                         kotlinx.coroutines.delay(200)
                         resp = okHttpClient.newCall(req).execute()
@@ -1095,7 +1101,7 @@ class NeptunApiClient {
 
                     if (!resp.isSuccessful || bodyStr.isBlank()) continue
 
-                    val parsed = json.parseToJsonElement(bodyStr)
+                    val parsed = safeParseJson(bodyStr)
                     if (parsed is JsonObject) {
                         val dataObj = parsed["data"]
                         if (dataObj is JsonObject) {
@@ -1127,7 +1133,6 @@ class NeptunApiClient {
                             }
                         }
 
-                        // Direct properties on data or root
                         val directHtml = (parsed["data"]?.jsonObject ?: parsed).let { obj ->
                             obj["htmlText"]?.jsonPrimitive?.contentOrNull
                                 ?: obj["detail"]?.jsonPrimitive?.contentOrNull
@@ -1152,23 +1157,28 @@ class NeptunApiClient {
             try {
                 val numId = messageId.toLongOrNull() ?: 0L
                 val body = """{"UserLogin":"$username","Password":"$password","CurrentPage":0,"TotalRowCount":-1,"MessageID":$numId,"MessageSortEnum":0}"""
+                val url = getLegacyServiceUrl(baseUrl, "GetMessages")
                 val req = Request.Builder()
-                    .url("$baseUrl/GetMessages")
+                    .url(url)
                     .post(body.toRequestBody("application/json".toMediaType()))
                     .addHeader("Content-Type", "application/json")
                     .build()
 
                 val resp = okHttpClient.newCall(req).execute()
-                val respBody = resp.body?.string() ?: ""
-                val parsed = json.parseToJsonElement(respBody).jsonObject
-                val msgs = parsed["MessagesList"]?.jsonArray
-                if (!msgs.isNullOrEmpty()) {
-                    for (item in msgs) {
-                        val obj = item.jsonObject
-                        val id = obj["PersonMessageId"]?.jsonPrimitive?.contentOrNull ?: ""
-                        if (id == messageId || numId == 0L) {
-                            val detail = cleanHtml(obj["Detail"]?.jsonPrimitive?.contentOrNull ?: "")
-                            if (detail.isNotBlank()) return@withContext detail
+                if (resp.isSuccessful) {
+                    val respBody = resp.body?.string() ?: ""
+                    val parsed = safeParseJsonObject(respBody)
+                    val msgs = parsed?.get("MessagesList")?.jsonArray ?: parsed?.get("messagesList")?.jsonArray
+                    if (!msgs.isNullOrEmpty()) {
+                        for (item in msgs) {
+                            val obj = item.jsonObject
+                            val id = obj["PersonMessageId"]?.jsonPrimitive?.contentOrNull
+                                ?: obj["personMessageId"]?.jsonPrimitive?.contentOrNull
+                                ?: ""
+                            if (id == messageId || numId == 0L) {
+                                val detail = cleanHtml(obj["Detail"]?.jsonPrimitive?.contentOrNull ?: obj["detail"]?.jsonPrimitive?.contentOrNull ?: "")
+                                if (detail.isNotBlank()) return@withContext detail
+                            }
                         }
                     }
                 }
@@ -1183,26 +1193,38 @@ class NeptunApiClient {
     private suspend fun getLegacyMessages(baseUrl: String, user: String, pass: String, page: Int): List<NeptunMessage> = withContext(Dispatchers.IO) {
         try {
             val body = """{"UserLogin":"$user","Password":"$pass","CurrentPage":$page,"TotalRowCount":-1,"MessageID":0,"MessageSortEnum":0}"""
+            val url = getLegacyServiceUrl(baseUrl, "GetMessages")
             val req = Request.Builder()
-                .url("$baseUrl/GetMessages")
+                .url(url)
                 .post(body.toRequestBody("application/json".toMediaType()))
                 .addHeader("Content-Type", "application/json")
                 .build()
 
             val resp = okHttpClient.newCall(req).execute()
+            if (!resp.isSuccessful) return@withContext emptyList()
             val respBody = resp.body?.string() ?: ""
-            val parsed = json.parseToJsonElement(respBody).jsonObject
-            val msgs = parsed["MessagesList"]?.jsonArray ?: return@withContext emptyList()
+            val parsed = safeParseJsonObject(respBody) ?: return@withContext emptyList()
+            val msgs = parsed["MessagesList"]?.jsonArray ?: parsed["messagesList"]?.jsonArray ?: return@withContext emptyList()
 
             val list = mutableListOf<NeptunMessage>()
             for (item in msgs) {
                 val obj = item.jsonObject
-                val id = obj["PersonMessageId"]?.jsonPrimitive?.contentOrNull ?: "lmsg_${System.nanoTime()}"
-                val subject = obj["Subject"]?.jsonPrimitive?.contentOrNull ?: "Tárgy"
-                val sender = obj["Name"]?.jsonPrimitive?.contentOrNull ?: "Feladó"
-                val detail = cleanHtml(obj["Detail"]?.jsonPrimitive?.contentOrNull ?: "")
-                val isNew = obj["IsNew"]?.jsonPrimitive?.booleanOrNull ?: false
+                val subject = obj["Subject"]?.jsonPrimitive?.contentOrNull
+                    ?: obj["subject"]?.jsonPrimitive?.contentOrNull
+                    ?: "Tárgy"
+                val sender = obj["Name"]?.jsonPrimitive?.contentOrNull
+                    ?: obj["name"]?.jsonPrimitive?.contentOrNull
+                    ?: "Feladó"
                 val sendDateRaw = obj["SendDate"]?.jsonPrimitive?.contentOrNull?.replace(Regex("""\D"""), "")?.toLongOrNull() ?: System.currentTimeMillis()
+
+                val id = obj["PersonMessageId"]?.jsonPrimitive?.contentOrNull
+                    ?: obj["personMessageId"]?.jsonPrimitive?.contentOrNull
+                    ?: obj["MessageID"]?.jsonPrimitive?.contentOrNull
+                    ?: obj["ID"]?.jsonPrimitive?.contentOrNull
+                    ?: "lmsg_${sender.hashCode()}_${subject.hashCode()}_${sendDateRaw.hashCode()}"
+
+                val detail = cleanHtml(obj["Detail"]?.jsonPrimitive?.contentOrNull ?: obj["detail"]?.jsonPrimitive?.contentOrNull ?: "")
+                val isNew = obj["IsNew"]?.jsonPrimitive?.booleanOrNull ?: obj["isNew"]?.jsonPrimitive?.booleanOrNull ?: false
 
                 val formattedDate = try {
                     val ldt = Instant.ofEpochMilli(sendDateRaw).atZone(ZoneId.systemDefault()).toLocalDateTime()
@@ -1229,6 +1251,64 @@ class NeptunApiClient {
             Log.e(tag, "Legacy messages error: ${e.message}")
             emptyList()
         }
+    }
+
+    suspend fun markMessageAsReadOnServer(
+        baseUrl: String,
+        token: String,
+        messageId: String,
+        isModern: Boolean,
+        username: String = "",
+        password: String = ""
+    ): Boolean = withContext(Dispatchers.IO) {
+        var success = false
+        try {
+            if (isModern && token.isNotBlank()) {
+                val urls = listOf(
+                    "$baseUrl/api/Message/SetMessageRead?messageId=$messageId",
+                    "$baseUrl/api/Message/SetReadState?messageId=$messageId",
+                    "$baseUrl/api/Message/MarkAsRead?messageId=$messageId",
+                    "$baseUrl/api/Messages/$messageId/Read"
+                )
+                for (url in urls) {
+                    try {
+                        val req = Request.Builder()
+                            .url(url)
+                            .post("""{"messageId":"$messageId","isRead":true}""".toRequestBody("application/json".toMediaType()))
+                            .addHeader("Authorization", "Bearer $token")
+                            .addHeader("Content-Type", "application/json")
+                            .build()
+                        val resp = okHttpClient.newCall(req).execute()
+                        if (resp.isSuccessful) success = true
+                    } catch (e: Exception) {
+                        Log.e(tag, "Failed URL $url: ${e.message}")
+                    }
+                }
+            }
+
+            if (username.isNotBlank() && password.isNotBlank()) {
+                val numId = messageId.toLongOrNull() ?: 0L
+                val legacyServices = listOf("SetMessageRead", "ReadMessage", "GetMessageDetail")
+                for (svc in legacyServices) {
+                    try {
+                        val body = """{"UserLogin":"$username","Password":"$password","MessageID":$numId,"PersonMessageID":$numId,"PersonMessageId":$numId,"IsRead":true,"isRead":true}"""
+                        val url = getLegacyServiceUrl(baseUrl, svc)
+                        val req = Request.Builder()
+                            .url(url)
+                            .post(body.toRequestBody("application/json".toMediaType()))
+                            .addHeader("Content-Type", "application/json")
+                            .build()
+                        val resp = okHttpClient.newCall(req).execute()
+                        if (resp.isSuccessful) success = true
+                    } catch (e: Exception) {
+                        Log.e(tag, "Failed legacy $svc: ${e.message}")
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "markMessageAsReadOnServer error: ${e.message}")
+        }
+        return@withContext success
     }
 
     private fun cleanHtml(raw: String): String {
@@ -1259,7 +1339,7 @@ class NeptunApiClient {
 
         val list = mutableListOf<FinanceItem>()
 
-        // 1. Fetch Items To Be Paid (Befizetendő tételek)
+        // 1. Fetch Items To Be Paid
         try {
             val toPayUrl = "$baseUrl/api/FinancialItem/GetItemsToBePayed?sortAndPage.firstRow=0&sortAndPage.lastRow=50"
             val toPayReq = Request.Builder()
@@ -1269,51 +1349,53 @@ class NeptunApiClient {
                 .addHeader("Content-Type", "application/json")
                 .build()
             val toPayResp = okHttpClient.newCall(toPayReq).execute()
-            val toPayBody = toPayResp.body?.string() ?: ""
-            val toPayData = json.parseToJsonElement(toPayBody).jsonObject["data"]?.jsonArray
-            if (toPayData != null) {
-                for (item in toPayData) {
-                    val obj = item.jsonObject
-                    val id = obj["impositionId"]?.jsonPrimitive?.contentOrNull
-                        ?: obj["id"]?.jsonPrimitive?.contentOrNull
-                        ?: "pay_${System.nanoTime()}_${list.size}"
-                    val title = obj["itemTitle"]?.jsonPrimitive?.contentOrNull
-                        ?: obj["impositionName"]?.jsonPrimitive?.contentOrNull
-                        ?: obj["title"]?.jsonPrimitive?.contentOrNull
-                        ?: "Befizetendő tétel"
-                    val amount = (obj["amount"]?.jsonPrimitive?.doubleOrNull
-                        ?: obj["itemValue"]?.jsonPrimitive?.doubleOrNull
-                        ?: obj["price"]?.jsonPrimitive?.doubleOrNull
-                        ?: 0.0).toInt()
-                    val dueDateRaw = obj["deadline"]?.jsonPrimitive?.contentOrNull
-                        ?: obj["dueDate"]?.jsonPrimitive?.contentOrNull
-                        ?: ""
-                    val dueDateFormatted = try {
-                        val ldt = LocalDateTime.parse(dueDateRaw.substringBefore("."))
-                        ldt.format(DateTimeFormatter.ofPattern("yyyy.MM.dd"))
-                    } catch (e: Exception) {
-                        dueDateRaw
-                    }
+            if (toPayResp.isSuccessful) {
+                val toPayBody = toPayResp.body?.string() ?: ""
+                val toPayData = safeParseJsonObject(toPayBody)?.get("data")?.jsonArray
+                if (toPayData != null) {
+                    for (item in toPayData) {
+                        val obj = item.jsonObject
+                        val id = obj["impositionId"]?.jsonPrimitive?.contentOrNull
+                            ?: obj["id"]?.jsonPrimitive?.contentOrNull
+                            ?: "pay_${System.nanoTime()}_${list.size}"
+                        val title = obj["itemTitle"]?.jsonPrimitive?.contentOrNull
+                            ?: obj["impositionName"]?.jsonPrimitive?.contentOrNull
+                            ?: obj["title"]?.jsonPrimitive?.contentOrNull
+                            ?: "Befizetendő tétel"
+                        val amount = (obj["amount"]?.jsonPrimitive?.doubleOrNull
+                            ?: obj["itemValue"]?.jsonPrimitive?.doubleOrNull
+                            ?: obj["price"]?.jsonPrimitive?.doubleOrNull
+                            ?: 0.0).toInt()
+                        val dueDateRaw = obj["deadline"]?.jsonPrimitive?.contentOrNull
+                            ?: obj["dueDate"]?.jsonPrimitive?.contentOrNull
+                            ?: ""
+                        val dueDateFormatted = try {
+                            val ldt = LocalDateTime.parse(dueDateRaw.substringBefore("."))
+                            ldt.format(DateTimeFormatter.ofPattern("yyyy.MM.dd"))
+                        } catch (e: Exception) {
+                            dueDateRaw
+                        }
 
-                    list.add(
-                        FinanceItem(
-                            id = id,
-                            title = title,
-                            termName = "Aktuális",
-                            amountHuf = amount,
-                            status = FinanceStatus.PENDING,
-                            dueDate = dueDateFormatted,
-                            paymentDate = null,
-                            transactionId = id
+                        list.add(
+                            FinanceItem(
+                                id = id,
+                                title = title,
+                                termName = "Aktuális",
+                                amountHuf = amount,
+                                status = FinanceStatus.PENDING,
+                                dueDate = dueDateFormatted,
+                                paymentDate = null,
+                                transactionId = id
+                            )
                         )
-                    )
+                    }
                 }
             }
         } catch (e: Exception) {
             Log.e(tag, "GetItemsToBePayed error: ${e.message}")
         }
 
-        // 2. Fetch Student Impositions (Kiírt tételek)
+        // 2. Fetch Student Impositions
         try {
             val impositionsUrl = "$baseUrl/api/FinancialItem/GetStudentImpositions?sortAndPage.firstRow=0&sortAndPage.lastRow=50"
             val impReq = Request.Builder()
@@ -1323,62 +1405,64 @@ class NeptunApiClient {
                 .addHeader("Content-Type", "application/json")
                 .build()
             val impResp = okHttpClient.newCall(impReq).execute()
-            val impBody = impResp.body?.string() ?: ""
-            val impData = json.parseToJsonElement(impBody).jsonObject["data"]?.jsonArray
-            if (impData != null) {
-                for (item in impData) {
-                    val obj = item.jsonObject
-                    val id = obj["impositionId"]?.jsonPrimitive?.contentOrNull
-                        ?: obj["id"]?.jsonPrimitive?.contentOrNull
-                        ?: "imp_${System.nanoTime()}_${list.size}"
-                    if (list.any { it.id == id }) continue
+            if (impResp.isSuccessful) {
+                val impBody = impResp.body?.string() ?: ""
+                val impData = safeParseJsonObject(impBody)?.get("data")?.jsonArray
+                if (impData != null) {
+                    for (item in impData) {
+                        val obj = item.jsonObject
+                        val id = obj["impositionId"]?.jsonPrimitive?.contentOrNull
+                            ?: obj["id"]?.jsonPrimitive?.contentOrNull
+                            ?: "imp_${System.nanoTime()}_${list.size}"
+                        if (list.any { it.id == id }) continue
 
-                    val title = obj["itemTitle"]?.jsonPrimitive?.contentOrNull
-                        ?: obj["impositionName"]?.jsonPrimitive?.contentOrNull
-                        ?: obj["title"]?.jsonPrimitive?.contentOrNull
-                        ?: "Kiírt tétel"
-                    val amount = (obj["amount"]?.jsonPrimitive?.doubleOrNull
-                        ?: obj["itemValue"]?.jsonPrimitive?.doubleOrNull
-                        ?: obj["price"]?.jsonPrimitive?.doubleOrNull
-                        ?: 0.0).toInt()
-                    val statusText = obj["status"]?.jsonPrimitive?.contentOrNull
-                        ?: obj["statusName"]?.jsonPrimitive?.contentOrNull
-                        ?: "Aktív"
-                    val status = if (statusText.contains("teljesít", ignoreCase = true) || statusText.contains("befizet", ignoreCase = true)) {
-                        FinanceStatus.COMPLETED
-                    } else {
-                        FinanceStatus.PENDING
-                    }
-                    val dateRaw = obj["deadline"]?.jsonPrimitive?.contentOrNull
-                        ?: obj["dueDate"]?.jsonPrimitive?.contentOrNull
-                        ?: obj["impositionDate"]?.jsonPrimitive?.contentOrNull
-                        ?: ""
-                    val dateFormatted = try {
-                        val ldt = LocalDateTime.parse(dateRaw.substringBefore("."))
-                        ldt.format(DateTimeFormatter.ofPattern("yyyy.MM.dd"))
-                    } catch (e: Exception) {
-                        dateRaw
-                    }
+                        val title = obj["itemTitle"]?.jsonPrimitive?.contentOrNull
+                            ?: obj["impositionName"]?.jsonPrimitive?.contentOrNull
+                            ?: obj["title"]?.jsonPrimitive?.contentOrNull
+                            ?: "Kiírt tétel"
+                        val amount = (obj["amount"]?.jsonPrimitive?.doubleOrNull
+                            ?: obj["itemValue"]?.jsonPrimitive?.doubleOrNull
+                            ?: obj["price"]?.jsonPrimitive?.doubleOrNull
+                            ?: 0.0).toInt()
+                        val statusText = obj["status"]?.jsonPrimitive?.contentOrNull
+                            ?: obj["statusName"]?.jsonPrimitive?.contentOrNull
+                            ?: "Aktív"
+                        val status = if (statusText.contains("teljesít", ignoreCase = true) || statusText.contains("befizet", ignoreCase = true)) {
+                            FinanceStatus.COMPLETED
+                        } else {
+                            FinanceStatus.PENDING
+                        }
+                        val dateRaw = obj["deadline"]?.jsonPrimitive?.contentOrNull
+                            ?: obj["dueDate"]?.jsonPrimitive?.contentOrNull
+                            ?: obj["impositionDate"]?.jsonPrimitive?.contentOrNull
+                            ?: ""
+                        val dateFormatted = try {
+                            val ldt = LocalDateTime.parse(dateRaw.substringBefore("."))
+                            ldt.format(DateTimeFormatter.ofPattern("yyyy.MM.dd"))
+                        } catch (e: Exception) {
+                            dateRaw
+                        }
 
-                    list.add(
-                        FinanceItem(
-                            id = id,
-                            title = title,
-                            termName = "Aktuális",
-                            amountHuf = amount,
-                            status = status,
-                            dueDate = dateFormatted,
-                            paymentDate = if (status == FinanceStatus.COMPLETED) dateFormatted else null,
-                            transactionId = id
+                        list.add(
+                            FinanceItem(
+                                id = id,
+                                title = title,
+                                termName = "Aktuális",
+                                amountHuf = amount,
+                                status = status,
+                                dueDate = dateFormatted,
+                                paymentDate = if (status == FinanceStatus.COMPLETED) dateFormatted else null,
+                                transactionId = id
+                            )
                         )
-                    )
+                    }
                 }
             }
         } catch (e: Exception) {
             Log.e(tag, "GetStudentImpositions error: ${e.message}")
         }
 
-        // 3. Fetch Completed Previous Transactions (Korábbi tranzakciók)
+        // 3. Fetch Completed Previous Transactions
         try {
             val url = "$baseUrl/api/Transactions/GetStudentPreviousTransactions?sortAndPage.firstRow=0&sortAndPage.lastRow=50&sortAndPage.transferDate=desc"
             val req = Request.Builder()
@@ -1389,50 +1473,52 @@ class NeptunApiClient {
                 .build()
 
             val resp = okHttpClient.newCall(req).execute()
-            val respBody = resp.body?.string() ?: ""
-            val parsed = json.parseToJsonElement(respBody).jsonObject
-            val dataPart = parsed["data"]?.jsonArray
-            if (dataPart != null) {
-                for (item in dataPart) {
-                    val obj = item.jsonObject
-                    val transId = obj["transactionId"]?.jsonPrimitive?.contentOrNull ?: "tx_${System.nanoTime()}_${list.size}"
-                    if (list.any { it.id == transId }) continue
+            if (resp.isSuccessful) {
+                val respBody = resp.body?.string() ?: ""
+                val parsed = safeParseJsonObject(respBody)
+                val dataPart = parsed?.get("data")?.jsonArray
+                if (dataPart != null) {
+                    for (item in dataPart) {
+                        val obj = item.jsonObject
+                        val transId = obj["transactionId"]?.jsonPrimitive?.contentOrNull ?: "tx_${System.nanoTime()}_${list.size}"
+                        if (list.any { it.id == transId }) continue
 
-                    var amount = (obj["transactionValue"]?.jsonPrimitive?.doubleOrNull ?: 0.0).toInt()
-                    val sign = obj["sign"]?.jsonPrimitive?.contentOrNull ?: "+"
-                    if (sign == "-") {
-                        amount = -amount
-                    }
+                        var amount = (obj["transactionValue"]?.jsonPrimitive?.doubleOrNull ?: 0.0).toInt()
+                        val sign = obj["sign"]?.jsonPrimitive?.contentOrNull ?: "+"
+                        if (sign == "-") {
+                            amount = -amount
+                        }
 
-                    val title = obj["transactionPayingType"]?.jsonPrimitive?.contentOrNull ?: "Tranzakció"
-                    val statusText = obj["transactionStatus"]?.jsonPrimitive?.contentOrNull ?: "Teljesített"
-                    val dateStr = obj["transferDate"]?.jsonPrimitive?.contentOrNull ?: ""
+                        val title = obj["transactionPayingType"]?.jsonPrimitive?.contentOrNull ?: "Tranzakció"
+                        val statusText = obj["transactionStatus"]?.jsonPrimitive?.contentOrNull ?: "Teljesített"
+                        val dateStr = obj["transferDate"]?.jsonPrimitive?.contentOrNull ?: ""
 
-                    val formattedDate = try {
-                        val ldt = LocalDateTime.parse(dateStr.substringBefore("."))
-                        ldt.format(DateTimeFormatter.ofPattern("yyyy.MM.dd"))
-                    } catch (e: Exception) {
-                        dateStr
-                    }
+                        val formattedDate = try {
+                            val ldt = LocalDateTime.parse(dateStr.substringBefore("."))
+                            ldt.format(DateTimeFormatter.ofPattern("yyyy.MM.dd"))
+                        } catch (e: Exception) {
+                            dateStr
+                        }
 
-                    val status = when {
-                        statusText.contains("teljesít", ignoreCase = true) -> FinanceStatus.COMPLETED
-                        statusText.contains("aktív", ignoreCase = true) || statusText.contains("fizetendő", ignoreCase = true) -> FinanceStatus.PENDING
-                        else -> FinanceStatus.COMPLETED
-                    }
+                        val status = when {
+                            statusText.contains("teljesít", ignoreCase = true) -> FinanceStatus.COMPLETED
+                            statusText.contains("aktív", ignoreCase = true) || statusText.contains("fizetendő", ignoreCase = true) -> FinanceStatus.PENDING
+                            else -> FinanceStatus.COMPLETED
+                        }
 
-                    list.add(
-                        FinanceItem(
-                            id = transId,
-                            title = title,
-                            termName = "Aktuális",
-                            amountHuf = amount,
-                            status = status,
-                            dueDate = formattedDate,
-                            paymentDate = if (status == FinanceStatus.COMPLETED) formattedDate else null,
-                            transactionId = transId
+                        list.add(
+                            FinanceItem(
+                                id = transId,
+                                title = title,
+                                termName = "Aktuális",
+                                amountHuf = amount,
+                                status = status,
+                                dueDate = formattedDate,
+                                paymentDate = if (status == FinanceStatus.COMPLETED) formattedDate else null,
+                                transactionId = transId
+                            )
                         )
-                    )
+                    }
                 }
             }
         } catch (e: Exception) {
@@ -1449,16 +1535,18 @@ class NeptunApiClient {
     private suspend fun getLegacyFinances(baseUrl: String, user: String, pass: String): List<FinanceItem> = withContext(Dispatchers.IO) {
         try {
             val body = """{"UserLogin":"$user","Password":"$pass","TotalRowCount":-1}"""
+            val url = getLegacyServiceUrl(baseUrl, "GetCashinData")
             val req = Request.Builder()
-                .url("$baseUrl/GetCashinData")
+                .url(url)
                 .post(body.toRequestBody("application/json".toMediaType()))
                 .addHeader("Content-Type", "application/json")
                 .build()
 
             val resp = okHttpClient.newCall(req).execute()
+            if (!resp.isSuccessful) return@withContext emptyList()
             val respBody = resp.body?.string() ?: ""
-            val parsed = json.parseToJsonElement(respBody).jsonObject
-            val rows = parsed["CashinDataRows"]?.jsonArray ?: return@withContext emptyList()
+            val parsed = safeParseJsonObject(respBody) ?: return@withContext emptyList()
+            val rows = parsed["CashinDataRows"]?.jsonArray ?: parsed["cashinDataRows"]?.jsonArray ?: return@withContext emptyList()
 
             val list = mutableListOf<FinanceItem>()
             for (item in rows) {
@@ -1496,5 +1584,33 @@ class NeptunApiClient {
             Log.e(tag, "Legacy finances error: ${e.message}")
             emptyList()
         }
+    }
+
+    fun cleanTermString(raw: String?): String {
+        if (raw == null || raw.isBlank()) return "2025/26/1"
+        val trimmed = raw.trim()
+        if (trimmed.startsWith("{") || trimmed.contains("{")) {
+            try {
+                val element = json.parseToJsonElement(trimmed)
+                if (element is JsonObject) {
+                    val extracted = element["id"]?.jsonPrimitive?.contentOrNull
+                        ?: element["termId"]?.jsonPrimitive?.contentOrNull
+                        ?: element["value"]?.jsonPrimitive?.contentOrNull
+                        ?: element["name"]?.jsonPrimitive?.contentOrNull
+                        ?: element["termName"]?.jsonPrimitive?.contentOrNull
+                        ?: element["text"]?.jsonPrimitive?.contentOrNull
+                    if (!extracted.isNullOrBlank() && !extracted.startsWith("{")) {
+                        return extracted.trim()
+                    }
+                }
+            } catch (e: Exception) {
+                val regex = Regex(""""(?:id|termId|value|name|termName|text)"\s*:\s*"([^"]+)"""")
+                val match = regex.find(trimmed)
+                if (match != null) {
+                    return match.groupValues[1].trim()
+                }
+            }
+        }
+        return trimmed
     }
 }

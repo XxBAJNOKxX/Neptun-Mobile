@@ -54,14 +54,38 @@ class NeptunRepositoryImpl(
 
     override suspend fun syncAllData(neptunCode: String, sessionToken: String): Result<Unit> = withContext(Dispatchers.IO) {
         try {
+            ensureValidToken(forceRefresh = true)
             refreshCalendar()
             refreshGrades()
             refreshMessages()
             refreshFinances()
+            prefsManager.updateLastSyncTime()
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
         }
+    }
+
+    private suspend fun ensureValidToken(forceRefresh: Boolean = false): String {
+        val creds = prefsManager.loadCredentials() ?: return ""
+        val baseUrl = prefsManager.getBaseUrl().ifEmpty { creds.neptunUrl }
+        val password = prefsManager.getPassword()
+        val currentToken = prefsManager.getAccessToken()
+
+        if (!forceRefresh && currentToken.isNotBlank()) return currentToken
+
+        if (creds.neptunCode.isNotEmpty() && password.isNotEmpty() && baseUrl.isNotEmpty()) {
+            try {
+                val authRes = neptunApiClient.authenticate(baseUrl, creds.neptunCode, password)
+                if (authRes is NeptunAuthResult.Success && authRes.accessToken.isNotBlank()) {
+                    prefsManager.setAccessToken(authRes.accessToken)
+                    return authRes.accessToken
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+        return currentToken
     }
 
     override suspend fun refreshCalendar(): Result<Unit> = withContext(Dispatchers.IO) {
@@ -71,7 +95,7 @@ class NeptunRepositoryImpl(
         if (creds != null && creds.neptunUrl.isNotEmpty()) {
             try {
                 val baseUrl = prefsManager.getBaseUrl().ifEmpty { creds.neptunUrl }
-                val token = prefsManager.getAccessToken()
+                var token = ensureValidToken()
                 val trainingId = prefsManager.getStudentTrainingId()
                 val isModern = prefsManager.isModernApi()
                 val password = prefsManager.getPassword()
@@ -84,6 +108,18 @@ class NeptunRepositoryImpl(
                     password = password,
                     isModern = isModern
                 )
+
+                if (eventsToInsert.isEmpty() && password.isNotEmpty()) {
+                    token = ensureValidToken(forceRefresh = true)
+                    eventsToInsert = neptunApiClient.getCalendarEvents(
+                        baseUrl = baseUrl,
+                        token = token,
+                        trainingId = trainingId.ifEmpty { null },
+                        username = creds.neptunCode,
+                        password = password,
+                        isModern = isModern
+                    )
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -111,7 +147,7 @@ class NeptunRepositoryImpl(
         if (creds != null && creds.neptunUrl.isNotEmpty()) {
             try {
                 val baseUrl = prefsManager.getBaseUrl().ifEmpty { creds.neptunUrl }
-                val token = prefsManager.getAccessToken()
+                var token = ensureValidToken()
                 val isModern = prefsManager.isModernApi()
                 val password = prefsManager.getPassword()
 
@@ -122,6 +158,17 @@ class NeptunRepositoryImpl(
                     password = password,
                     isModern = isModern
                 )
+
+                if (gradesToInsert.isEmpty() && password.isNotEmpty()) {
+                    token = ensureValidToken(forceRefresh = true)
+                    gradesToInsert = neptunApiClient.getGrades(
+                        baseUrl = baseUrl,
+                        token = token,
+                        username = creds.neptunCode,
+                        password = password,
+                        isModern = isModern
+                    )
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -149,7 +196,7 @@ class NeptunRepositoryImpl(
         if (creds != null && creds.neptunUrl.isNotEmpty()) {
             try {
                 val baseUrl = prefsManager.getBaseUrl().ifEmpty { creds.neptunUrl }
-                val token = prefsManager.getAccessToken()
+                var token = ensureValidToken()
                 val isModern = prefsManager.isModernApi()
                 val password = prefsManager.getPassword()
 
@@ -160,6 +207,17 @@ class NeptunRepositoryImpl(
                     password = password,
                     isModern = isModern
                 )
+
+                if (messagesToInsert.isEmpty() && password.isNotEmpty()) {
+                    token = ensureValidToken(forceRefresh = true)
+                    messagesToInsert = neptunApiClient.getMessages(
+                        baseUrl = baseUrl,
+                        token = token,
+                        username = creds.neptunCode,
+                        password = password,
+                        isModern = isModern
+                    )
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -173,8 +231,32 @@ class NeptunRepositoryImpl(
         }
 
         if (messagesToInsert.isNotEmpty()) {
+            val existingEntities = database.messagesDao().getAllMessages().first()
+            val existingById = existingEntities.associateBy { it.id }
+            val existingByKey = existingEntities.associateBy { "${it.sender}_${it.subject}_${it.sendDate}" }
+
+            val entitiesToSave = messagesToInsert.map { msg ->
+                val key = "${msg.sender}_${msg.subject}_${msg.sendDate}"
+                val existing = existingById[msg.id] ?: existingByKey[key]
+                val wasReadLocally = existing?.isRead == true
+
+                NeptunMessageEntity(
+                    id = msg.id,
+                    subject = msg.subject,
+                    sender = msg.sender,
+                    sendDate = msg.sendDate,
+                    previewText = if (existing != null && existing.previewText.isNotBlank() && existing.previewText != "Koppints a teljes üzenet megtekintéséhez...") {
+                        existing.previewText
+                    } else {
+                        msg.previewText
+                    },
+                    bodyHtml = if (existing != null && existing.bodyHtml.isNotBlank()) existing.bodyHtml else msg.bodyHtml,
+                    isRead = wasReadLocally || msg.isRead,
+                    isOfficial = msg.isOfficial
+                )
+            }
             database.messagesDao().clearAll()
-            database.messagesDao().insertMessages(messagesToInsert.map { NeptunMessageEntity.fromDomain(it) })
+            database.messagesDao().insertMessages(entitiesToSave)
         }
 
         Result.success(Unit)
@@ -187,7 +269,7 @@ class NeptunRepositoryImpl(
         if (creds != null && creds.neptunUrl.isNotEmpty()) {
             try {
                 val baseUrl = prefsManager.getBaseUrl().ifEmpty { creds.neptunUrl }
-                val token = prefsManager.getAccessToken()
+                var token = ensureValidToken()
                 val isModern = prefsManager.isModernApi()
                 val password = prefsManager.getPassword()
 
@@ -198,6 +280,17 @@ class NeptunRepositoryImpl(
                     password = password,
                     isModern = isModern
                 )
+
+                if (financesToInsert.isEmpty() && password.isNotEmpty()) {
+                    token = ensureValidToken(forceRefresh = true)
+                    financesToInsert = neptunApiClient.getFinances(
+                        baseUrl = baseUrl,
+                        token = token,
+                        username = creds.neptunCode,
+                        password = password,
+                        isModern = isModern
+                    )
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -228,6 +321,25 @@ class NeptunRepositoryImpl(
 
     override suspend fun markMessageAsRead(messageId: String) = withContext(Dispatchers.IO) {
         database.messagesDao().markAsRead(messageId)
+        val creds = prefsManager.loadCredentials()
+        if (creds != null && creds.neptunUrl.isNotEmpty()) {
+            try {
+                val baseUrl = prefsManager.getBaseUrl().ifEmpty { creds.neptunUrl }
+                val token = prefsManager.getAccessToken()
+                val isModern = prefsManager.isModernApi()
+                val password = prefsManager.getPassword()
+                neptunApiClient.markMessageAsReadOnServer(
+                    baseUrl = baseUrl,
+                    token = token,
+                    messageId = messageId,
+                    isModern = isModern,
+                    username = creds.neptunCode,
+                    password = password
+                )
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
     }
 
     override suspend fun getMessageContent(messageId: String): String = withContext(Dispatchers.IO) {
