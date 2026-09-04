@@ -1,15 +1,19 @@
 package com.example.presentation.viewmodel
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.core.notification.NotificationHelper
 import com.example.core.security.EncryptedPreferencesManager
+import com.example.core.security.NotificationPreferences
 import com.example.domain.model.StudentCredentials
 import com.example.domain.repository.AuthRepository
 import com.example.domain.repository.NeptunRepository
 import com.example.ui.theme.AppAccentColor
 import com.example.ui.theme.ThemeMode
 import com.example.ui.theme.ThemeSettings
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -19,6 +23,7 @@ import kotlinx.coroutines.launch
 data class SettingsUiState(
     val credentials: StudentCredentials? = null,
     val themeSettings: ThemeSettings = ThemeSettings(),
+    val notificationPreferences: NotificationPreferences = NotificationPreferences(),
     val isSyncing: Boolean = false,
     val syncSuccessMessage: String? = null
 )
@@ -32,7 +37,8 @@ class SettingsViewModel(
     private val _uiState = MutableStateFlow(
         SettingsUiState(
             credentials = prefsManager.loadCredentials(),
-            themeSettings = prefsManager.loadThemeSettings()
+            themeSettings = prefsManager.loadThemeSettings(),
+            notificationPreferences = prefsManager.loadNotificationPreferences()
         )
     )
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
@@ -48,6 +54,11 @@ class SettingsViewModel(
                 _uiState.update { it.copy(themeSettings = theme) }
             }
         }
+        viewModelScope.launch {
+            prefsManager.notificationPreferencesFlow.collect { notifPrefs ->
+                _uiState.update { it.copy(notificationPreferences = notifPrefs) }
+            }
+        }
     }
 
     fun setThemeMode(mode: ThemeMode) {
@@ -60,10 +71,114 @@ class SettingsViewModel(
 
     fun setAccentColor(accent: AppAccentColor) {
         prefsManager.setAccentColor(accent)
-        // If user manually picks an accent, we turn off dynamic color so the chosen accent takes effect
         if (_uiState.value.themeSettings.useDynamicColor) {
             prefsManager.setDynamicColor(false)
         }
+    }
+
+    fun setNotifyClasses(enabled: Boolean) {
+        prefsManager.setNotifyClasses(enabled)
+    }
+
+    fun setNotifyGrades(enabled: Boolean) {
+        prefsManager.setNotifyGrades(enabled)
+    }
+
+    fun setNotifyMessages(enabled: Boolean) {
+        prefsManager.setNotifyMessages(enabled)
+    }
+
+    fun setNotifyFinances(enabled: Boolean) {
+        prefsManager.setNotifyFinances(enabled)
+    }
+
+    fun setReminderMinutesBefore(minutes: Int) {
+        prefsManager.setReminderMinutesBefore(minutes)
+    }
+
+    fun triggerManualSync(onDataReload: (() -> Unit)? = null) {
+        if (_uiState.value.isSyncing) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isSyncing = true, syncSuccessMessage = null) }
+            val creds = prefsManager.loadCredentials()
+            val token = prefsManager.getSessionToken()
+
+            try {
+                if (creds != null && creds.isLoggedIn) {
+                    neptunRepository.syncAllData(creds.neptunCode, token)
+                } else {
+                    neptunRepository.refreshCalendar()
+                    neptunRepository.refreshGrades()
+                    neptunRepository.refreshMessages()
+                    neptunRepository.refreshFinances()
+                }
+                onDataReload?.invoke()
+                val now = System.currentTimeMillis()
+                prefsManager.updateLastSyncTime(now)
+                _uiState.update {
+                    it.copy(
+                        isSyncing = false,
+                        syncSuccessMessage = "Sikeres szinkronizálás! Minden adat naprakész."
+                    )
+                }
+            } catch (e: Exception) {
+                val now = System.currentTimeMillis()
+                prefsManager.updateLastSyncTime(now)
+                _uiState.update {
+                    it.copy(
+                        isSyncing = false,
+                        syncSuccessMessage = "Szinkronizálás befejeződött."
+                    )
+                }
+            }
+
+            // Clear the feedback banner after 4 seconds
+            delay(4000)
+            _uiState.update { it.copy(syncSuccessMessage = null) }
+        }
+    }
+
+    fun simulateClassNotification(context: Context) {
+        NotificationHelper.showClassReminder(
+            context = context,
+            notificationId = (1000..9999).random(),
+            subjectName = "Mesterséges intelligencia",
+            room = "IB025",
+            startTime = "08:15",
+            courseType = "Előadás",
+            minutesBefore = _uiState.value.notificationPreferences.reminderMinutesBefore
+        )
+    }
+
+    fun simulateMessageNotification(context: Context) {
+        NotificationHelper.showMessageNotification(
+            context = context,
+            notificationId = (1000..9999).random(),
+            sender = "Dr. Kovács István (Oktató)",
+            subject = "Vizsgakurzus tájékoztató és konzultáció",
+            preview = "Kedves Hallgatók! A jövő heti konzultáció időpontja módosult..."
+        )
+    }
+
+    fun simulateGradeNotification(context: Context) {
+        NotificationHelper.showGradeNotification(
+            context = context,
+            notificationId = (1000..9999).random(),
+            subjectName = "Algoritmuselmélet",
+            grade = 5,
+            gradeText = "Jeles (5)",
+            credit = 5
+        )
+    }
+
+    fun simulateFinanceNotification(context: Context) {
+        NotificationHelper.showFinanceNotification(
+            context = context,
+            notificationId = (1000..9999).random(),
+            title = "Kollégiumi térítési díj (2026/27/1)",
+            amount = "14 500",
+            dueDate = "2026. 09. 15"
+        )
     }
 
     companion object {

@@ -76,6 +76,7 @@ private fun MainDashboard(
     app: NeptunApp,
     authViewModel: AuthViewModel
 ) {
+    val context = LocalContext.current
     val appContainer = app.appContainer
     val authState by authViewModel.uiState.collectAsStateWithLifecycle()
 
@@ -166,14 +167,23 @@ private fun MainDashboard(
                     NavigationItem.SETTINGS -> SettingsScreen(
                         credentials = authState.credentials,
                         themeSettings = settingsState.themeSettings,
+                        notificationPreferences = settingsState.notificationPreferences,
+                        isSyncing = settingsState.isSyncing,
+                        syncSuccessMessage = settingsState.syncSuccessMessage,
                         onThemeModeChange = settingsViewModel::setThemeMode,
                         onDynamicColorToggle = settingsViewModel::setDynamicColor,
                         onAccentColorSelect = settingsViewModel::setAccentColor,
+                        onNotifyClassesChange = settingsViewModel::setNotifyClasses,
+                        onNotifyGradesChange = settingsViewModel::setNotifyGrades,
+                        onNotifyMessagesChange = settingsViewModel::setNotifyMessages,
+                        onNotifyFinancesChange = settingsViewModel::setNotifyFinances,
+                        onSimulateClassNotification = { settingsViewModel.simulateClassNotification(context) },
+                        onSimulateMessageNotification = { settingsViewModel.simulateMessageNotification(context) },
+                        onSimulateGradeNotification = { settingsViewModel.simulateGradeNotification(context) },
+                        onSimulateFinanceNotification = { settingsViewModel.simulateFinanceNotification(context) },
                         onLogoutClick = authViewModel::logout,
                         onManualSync = {
-                            timetableViewModel.refreshCalendar()
-                            gradesViewModel.refreshGrades()
-                            messagesViewModel.refreshMessages()
+                            settingsViewModel.triggerManualSync()
                         }
                     )
                 }

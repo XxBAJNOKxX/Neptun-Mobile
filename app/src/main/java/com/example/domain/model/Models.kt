@@ -25,7 +25,7 @@ data class StudentCredentials(
 enum class CourseType(val displayName: String) {
     LECTURE("Előadás"),
     PRACTICE("Gyakorlat"),
-    LAB("Laboratórium"),
+    LAB("Labor"),
     SEMINAR("Szeminárium"),
     EXAM("Vizsga")
 }

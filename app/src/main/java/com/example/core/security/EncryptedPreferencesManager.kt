@@ -37,6 +37,49 @@ class EncryptedPreferencesManager(context: Context) {
     private val _themeSettingsFlow = MutableStateFlow(loadThemeSettings())
     val themeSettingsFlow: StateFlow<ThemeSettings> = _themeSettingsFlow.asStateFlow()
 
+    private val _notificationPreferencesFlow = MutableStateFlow(loadNotificationPreferences())
+    val notificationPreferencesFlow: StateFlow<NotificationPreferences> = _notificationPreferencesFlow.asStateFlow()
+
+    fun updateLastSyncTime(timestamp: Long = System.currentTimeMillis()) {
+        prefs.edit().putLong(KEY_LAST_SYNC, timestamp).apply()
+        _credentialsFlow.value = loadCredentials()
+    }
+
+    fun loadNotificationPreferences(): NotificationPreferences {
+        return NotificationPreferences(
+            notifyClasses = prefs.getBoolean(KEY_NOTIFY_CLASSES, true),
+            notifyGrades = prefs.getBoolean(KEY_NOTIFY_GRADES, true),
+            notifyMessages = prefs.getBoolean(KEY_NOTIFY_MESSAGES, true),
+            notifyFinances = prefs.getBoolean(KEY_NOTIFY_FINANCES, true),
+            reminderMinutesBefore = prefs.getInt(KEY_CLASS_REMINDER_MINUTES, 15)
+        )
+    }
+
+    fun setNotifyClasses(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_NOTIFY_CLASSES, enabled).apply()
+        _notificationPreferencesFlow.value = loadNotificationPreferences()
+    }
+
+    fun setNotifyGrades(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_NOTIFY_GRADES, enabled).apply()
+        _notificationPreferencesFlow.value = loadNotificationPreferences()
+    }
+
+    fun setNotifyMessages(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_NOTIFY_MESSAGES, enabled).apply()
+        _notificationPreferencesFlow.value = loadNotificationPreferences()
+    }
+
+    fun setNotifyFinances(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_NOTIFY_FINANCES, enabled).apply()
+        _notificationPreferencesFlow.value = loadNotificationPreferences()
+    }
+
+    fun setReminderMinutesBefore(minutes: Int) {
+        prefs.edit().putInt(KEY_CLASS_REMINDER_MINUTES, minutes).apply()
+        _notificationPreferencesFlow.value = loadNotificationPreferences()
+    }
+
     fun saveCredentials(
         neptunCode: String,
         password: String,
@@ -194,5 +237,18 @@ class EncryptedPreferencesManager(context: Context) {
         private const val KEY_THEME_MODE = "key_theme_mode"
         private const val KEY_DYNAMIC_COLOR = "key_dynamic_color"
         private const val KEY_ACCENT_COLOR = "key_accent_color"
+        private const val KEY_NOTIFY_CLASSES = "key_notify_classes"
+        private const val KEY_NOTIFY_GRADES = "key_notify_grades"
+        private const val KEY_NOTIFY_MESSAGES = "key_notify_messages"
+        private const val KEY_NOTIFY_FINANCES = "key_notify_finances"
+        private const val KEY_CLASS_REMINDER_MINUTES = "key_class_reminder_minutes"
     }
 }
+
+data class NotificationPreferences(
+    val notifyClasses: Boolean = true,
+    val notifyGrades: Boolean = true,
+    val notifyMessages: Boolean = true,
+    val notifyFinances: Boolean = true,
+    val reminderMinutesBefore: Int = 15
+)
