@@ -1,11 +1,17 @@
 package com.example.presentation.ui.screens
 
 import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -26,18 +32,24 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.BrightnessAuto
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.AlertDialog
@@ -45,6 +57,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
@@ -60,6 +73,7 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -74,7 +88,10 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import com.example.core.notification.NotificationHelper
+import com.example.core.security.NotificationPreferences
 import com.example.domain.model.StudentCredentials
 import com.example.presentation.ui.components.NeptunTopBar
 import com.example.ui.theme.AppAccentColor
@@ -91,29 +108,56 @@ import java.util.Locale
 fun SettingsScreen(
     credentials: StudentCredentials?,
     themeSettings: ThemeSettings,
+    notificationPreferences: NotificationPreferences,
+    isSyncing: Boolean,
+    syncSuccessMessage: String?,
     onThemeModeChange: (ThemeMode) -> Unit,
     onDynamicColorToggle: (Boolean) -> Unit,
     onAccentColorSelect: (AppAccentColor) -> Unit,
+    onNotifyClassesChange: (Boolean) -> Unit,
+    onNotifyGradesChange: (Boolean) -> Unit,
+    onNotifyMessagesChange: (Boolean) -> Unit,
+    onNotifyFinancesChange: (Boolean) -> Unit,
+    onSimulateClassNotification: () -> Unit,
+    onSimulateMessageNotification: () -> Unit,
+    onSimulateGradeNotification: () -> Unit,
+    onSimulateFinanceNotification: () -> Unit,
     onLogoutClick: () -> Unit,
     onManualSync: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     var showLogoutDialog by remember { mutableStateOf(false) }
-    var notificationPermissionGranted by remember { mutableStateOf(true) }
+
+    fun checkPermission(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+        } else {
+            NotificationManagerCompat.from(context).areNotificationsEnabled()
+        }
+    }
+
+    var isNotificationPermissionGranted by remember { mutableStateOf(checkPermission()) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
-        notificationPermissionGranted = isGranted
+        isNotificationPermissionGranted = isGranted
+    }
+
+    LaunchedEffect(Unit) {
+        isNotificationPermissionGranted = checkPermission()
     }
 
     val lastSyncFormatted = remember(credentials?.lastSyncTime) {
         if (credentials != null && credentials.lastSyncTime > 0) {
-            val sdf = SimpleDateFormat("yyyy.MM.dd. HH:mm", Locale("hu", "HU"))
+            val sdf = SimpleDateFormat("yyyy. MM. dd. HH:mm:ss", Locale("hu", "HU"))
             sdf.format(Date(credentials.lastSyncTime))
         } else {
-            "Nemrég"
+            "Még nincs szinkronizálva"
         }
     }
 
@@ -127,7 +171,7 @@ fun SettingsScreen(
         NeptunTopBar(
             title = "Beállítások",
             subtitle = credentials?.studentName ?: "Profil & Testreszabás",
-            isRefreshing = false,
+            isRefreshing = isSyncing,
             onRefresh = onManualSync
         )
 
@@ -596,118 +640,278 @@ fun SettingsScreen(
                 }
             }
 
+            // ==========================================
+            // NOTIFICATIONS CATEGORIES & PERMISSION CARD
+            // ==========================================
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("notifications_settings_card")
+            ) {
+                Column(
+                    modifier = Modifier.padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(MaterialTheme.colorScheme.primaryContainer),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.NotificationsActive,
+                                contentDescription = "Értesítések",
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = "Értesítések és Emlékeztetők",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Kategóriák és háttérbeli értesítések",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+                    // OS Notification Permission Status Banner / Button
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (isNotificationPermissionGranted) {
+                            NeptunGreen.copy(alpha = 0.12f)
+                        } else {
+                            MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.6f)
+                        },
+                        border = BorderStroke(
+                            1.dp,
+                            if (isNotificationPermissionGranted) NeptunGreen.copy(alpha = 0.4f) else MaterialTheme.colorScheme.error.copy(alpha = 0.4f)
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = if (isNotificationPermissionGranted) Icons.Default.CheckCircle else Icons.Default.NotificationsOff,
+                                contentDescription = null,
+                                tint = if (isNotificationPermissionGranted) NeptunGreen else MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = if (isNotificationPermissionGranted) "Értesítések engedélyezve" else "Értesítési engedély szükséges",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isNotificationPermissionGranted) NeptunGreen else MaterialTheme.colorScheme.onErrorContainer
+                                )
+                                Text(
+                                    text = if (isNotificationPermissionGranted) "Az alkalmazás küldhet órarendi és tanulmányi értesítéseket." else "Kattints az engedély megadásához.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontSize = 11.5.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+
+                            if (!isNotificationPermissionGranted) {
+                                Button(
+                                    onClick = {
+                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                            permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                        } else {
+                                            val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                                                putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                                            }
+                                            context.startActivity(intent)
+                                        }
+                                    },
+                                    shape = RoundedCornerShape(8.dp),
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                                ) {
+                                    Text("Engedély kérése", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+
+                    // 1. Órarendi Értesítések
+                    NotificationCategoryItem(
+                        icon = Icons.Default.Alarm,
+                        iconTint = NeptunCyan40,
+                        title = "Órarendi értesítések",
+                        description = "15 perccel az órák előtt emlékeztető a pontos teremszámmal",
+                        checked = notificationPreferences.notifyClasses,
+                        onCheckedChange = onNotifyClassesChange,
+                        testButtonLabel = "Óra teszt",
+                        onTestClick = onSimulateClassNotification
+                    )
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+
+                    // 2. Jegyek és Értékelések
+                    NotificationCategoryItem(
+                        icon = Icons.Default.School,
+                        iconTint = NeptunGreen,
+                        title = "Jegyek és értékelések",
+                        description = "Azonnali figyelmeztetés új érdemjegy vagy bejegyzés rögzítésekor",
+                        checked = notificationPreferences.notifyGrades,
+                        onCheckedChange = onNotifyGradesChange,
+                        testButtonLabel = "Jegy teszt",
+                        onTestClick = onSimulateGradeNotification
+                    )
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+
+                    // 3. Neptun Üzenetek
+                    NotificationCategoryItem(
+                        icon = Icons.Default.Email,
+                        iconTint = MaterialTheme.colorScheme.primary,
+                        title = "Neptun üzenetek",
+                        description = "Értesítés oktatói és tanulmányi rendszerüzenetek érkezésekor",
+                        checked = notificationPreferences.notifyMessages,
+                        onCheckedChange = onNotifyMessagesChange,
+                        testButtonLabel = "Üzenet teszt",
+                        onTestClick = onSimulateMessageNotification
+                    )
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+
+                    // 4. Pénzügyek
+                    NotificationCategoryItem(
+                        icon = Icons.Default.AccountBalanceWallet,
+                        iconTint = Color(0xFFEAB308),
+                        title = "Pénzügyi tételek",
+                        description = "Emlékeztetők kiírásokról, díjakról és fizetési határidőkről",
+                        checked = notificationPreferences.notifyFinances,
+                        onCheckedChange = onNotifyFinancesChange,
+                        testButtonLabel = "Pénzügy teszt",
+                        onTestClick = onSimulateFinanceNotification
+                    )
+                }
+            }
+
             // Security & Offline Storage Card
             Card(
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
+                Column(
+                    modifier = Modifier.padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.Security,
-                            contentDescription = "Biztonság",
-                            tint = NeptunGreen,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Biztonság és Titkosítás",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(NeptunGreen.copy(alpha = 0.15f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Security,
+                                contentDescription = "Biztonság",
+                                tint = NeptunGreen,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = "Biztonság és Titkosítás",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Helyi és hardveres adatvédelem",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
-                    Spacer(modifier = Modifier.height(8.dp))
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
                     Text(
-                        text = "A Neptun bejelentkezési adatok hardveresen támogatott Android Keystore (AES-256) titkosítással vannak védve. Az órarend, jegyek és üzenetek helyi Room adatbázisban tárolódnak, így internetkapcsolat nélkül is elérhetők.",
+                        text = "A Neptun bejelentkezési adatok hardveresen védett Android Keystore (AES-256) titkosítással vannak tárolva. Az órarend, jegyek és üzenetek helyi Room adatbázisban tárolódnak, így internetkapcsolat nélkül is azonnal elérhetők.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         lineHeight = 18.sp
                     )
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.Sync,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "Utolsó sikeres szinkronizálás: $lastSyncFormatted",
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.primary
-                        )
+
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Sync,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Utolsó sikeres szinkronizálás: $lastSyncFormatted",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
                     }
                 }
             }
 
-            // Notification Settings Card
-            Card(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                modifier = Modifier.fillMaxWidth()
+            // Sync Feedback Banner
+            AnimatedVisibility(
+                visible = syncSuccessMessage != null,
+                enter = fadeIn(),
+                exit = fadeOut()
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = NeptunGreen.copy(alpha = 0.15f),
+                    border = BorderStroke(1.dp, NeptunGreen.copy(alpha = 0.4f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Icon(
-                            imageVector = Icons.Default.Notifications,
-                            contentDescription = "Értesítések",
-                            tint = NeptunCyan40,
+                            imageVector = Icons.Default.CheckCircle,
+                            contentDescription = null,
+                            tint = NeptunGreen,
                             modifier = Modifier.size(20.dp)
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
                         Text(
-                            text = "Órarendi Értesítések",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
+                            text = syncSuccessMessage ?: "",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = NeptunGreen
                         )
-                    }
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = "Az alkalmazás az AlarmManager és a WorkManager segítségével 15 perccel az órák kezdete előtt emlékeztetőt küld a teremszámmal.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        OutlinedButton(
-                            onClick = {
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                    permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                                }
-                            },
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text("Engedély kérése", fontSize = 12.sp)
-                        }
-
-                        Button(
-                            onClick = {
-                                NotificationHelper.showClassReminder(
-                                    context = context,
-                                    notificationId = 9999,
-                                    subjectName = "Mesterséges intelligencia",
-                                    room = "IB025",
-                                    startTime = "08:15",
-                                    courseType = "Előadás"
-                                )
-                            },
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier
-                                .weight(1f)
-                                .testTag("test_notification_btn")
-                        ) {
-                            Icon(imageVector = Icons.Default.Alarm, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Teszt jelzés", fontSize = 12.sp)
-                        }
                     }
                 }
             }
@@ -715,28 +919,50 @@ fun SettingsScreen(
             // Sync and Logout Actions
             OutlinedButton(
                 onClick = onManualSync,
-                shape = RoundedCornerShape(12.dp),
+                enabled = !isSyncing,
+                shape = RoundedCornerShape(14.dp),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(48.dp)
+                    .height(52.dp)
+                    .testTag("manual_sync_button")
             ) {
-                Icon(imageVector = Icons.Default.Refresh, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Azonnali szinkronizálás", fontWeight = FontWeight.Bold)
+                if (isSyncing) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text("Szinkronizálás folyamatban...", fontWeight = FontWeight.Bold)
+                } else {
+                    Icon(imageVector = Icons.Default.Refresh, contentDescription = null)
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text("Azonnali szinkronizálás", fontWeight = FontWeight.Bold)
+                }
             }
 
+            // Logout Button with slightly lighter Red container color
             Button(
                 onClick = { showLogoutDialog = true },
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFFB91C1C), // Slightly lighter Red
+                    contentColor = Color.White
+                ),
+                shape = RoundedCornerShape(14.dp),
+                border = BorderStroke(1.dp, Color(0xFF7F1D1D)),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(48.dp)
+                    .height(52.dp)
                     .testTag("logout_button")
             ) {
-                Icon(imageVector = Icons.Default.Logout, contentDescription = null, tint = Color.White)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Kijelentkezés", fontWeight = FontWeight.Bold, color = Color.White)
+                Icon(
+                    imageVector = Icons.Default.Logout,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Text("Kijelentkezés", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 15.sp)
             }
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -755,7 +981,7 @@ fun SettingsScreen(
                         onLogoutClick()
                     }
                 ) {
-                    Text("Kijelentkezés", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                    Text("Kijelentkezés", color = Color(0xFF991B1B), fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
@@ -764,6 +990,102 @@ fun SettingsScreen(
                 }
             }
         )
+    }
+}
+
+@Composable
+private fun NotificationCategoryItem(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    iconTint: Color,
+    title: String,
+    description: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    testButtonLabel: String,
+    onTestClick: () -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clip(CircleShape)
+                        .background(iconTint.copy(alpha = 0.15f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = iconTint,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(10.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = description,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 11.5.sp
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Switch(
+                    checked = checked,
+                    onCheckedChange = onCheckedChange,
+                    thumbContent = if (checked) {
+                        {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = null,
+                                modifier = Modifier.size(SwitchDefaults.IconSize)
+                            )
+                        }
+                    } else null
+                )
+            }
+
+            if (checked) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    OutlinedButton(
+                        onClick = onTestClick,
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                        modifier = Modifier.height(32.dp)
+                    ) {
+                        Icon(imageVector = Icons.Default.Notifications, contentDescription = null, modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(testButtonLabel, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                }
+            }
+        }
     }
 }
 

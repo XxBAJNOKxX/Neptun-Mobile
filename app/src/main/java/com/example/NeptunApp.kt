@@ -13,7 +13,7 @@ class NeptunApp : Application() {
     override fun onCreate() {
         super.onCreate()
         appContainer = DefaultAppContainer(this)
-        NotificationHelper.createNotificationChannel(this)
+        NotificationHelper.createNotificationChannels(this)
         try {
             SyncWorker.schedulePeriodicSync(this)
         } catch (e: Exception) {

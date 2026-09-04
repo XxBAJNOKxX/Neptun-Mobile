@@ -39,13 +39,30 @@ class GradesViewModel(
     private fun observeGrades() {
         viewModelScope.launch {
             neptunRepository.getSubjectGrades().collect { grades ->
-                val terms = grades.map { it.termId }.distinct().sortedDescending()
+                val cleanedGrades = grades.map { grade ->
+                    val cleanTerm = cleanTermString(grade.termId)
+                    grade.copy(termId = cleanTerm, termName = cleanTermString(grade.termName).ifEmpty { "$cleanTerm félév" })
+                }
+                val terms = cleanedGrades.map { it.termId }.distinct().sortedDescending()
                 val currentTerm = _uiState.value.selectedTerm.ifEmpty {
                     terms.firstOrNull() ?: "2025/26/1"
                 }
-                recalculateState(grades, terms, currentTerm)
+                recalculateState(cleanedGrades, terms, currentTerm)
             }
         }
+    }
+
+    private fun cleanTermString(raw: String): String {
+        if (raw.isBlank()) return "2025/26/1"
+        val trimmed = raw.trim()
+        if (trimmed.startsWith("{") || trimmed.contains("{")) {
+            val regex = Regex(""""(?:id|termId|value|name|termName|text)"\s*:\s*"([^"]+)"""")
+            val match = regex.find(trimmed)
+            if (match != null) {
+                return match.groupValues[1].trim()
+            }
+        }
+        return trimmed
     }
 
     private fun recalculateState(
@@ -53,7 +70,12 @@ class GradesViewModel(
         terms: List<String>,
         selectedTerm: String
     ) {
-        val filtered = allGrades.filter { it.termId == selectedTerm }
+        val filtered = if (selectedTerm.isEmpty()) {
+            allGrades
+        } else {
+            val res = allGrades.filter { it.termId == selectedTerm || it.termName == selectedTerm }
+            if (res.isEmpty()) allGrades else res
+        }
         val calc = calculateAveragesUseCase(selectedTerm, filtered)
 
         _uiState.update {
