@@ -61,7 +61,7 @@ class AuthViewModel(
                 it.copy(
                     universities = list,
                     filteredUniversities = list,
-                    selectedUniversity = list.firstOrNull { uni -> uni.id == "elte" } ?: list.firstOrNull(),
+                    selectedUniversity = list.firstOrNull { uni -> uni.id == "etvslorndtud" || uni.id == "elte" || uni.neptunUrl.contains("elte.hu") } ?: list.firstOrNull(),
                     neptunCode = it.neptunCode.ifEmpty { "I7ZBE7" },
                     isOfflineModeAvailable = offlineAvailable
                 )
@@ -152,7 +152,7 @@ class AuthViewModel(
     }
 
     fun quickElteTestFill() {
-        val elte = _uiState.value.universities.firstOrNull { it.id == "elte" }
+        val elte = _uiState.value.universities.firstOrNull { it.id == "etvslorndtud" || it.id == "elte" }
             ?: _uiState.value.universities.firstOrNull { it.neptunUrl.contains("elte.hu") }
             ?: _uiState.value.selectedUniversity
 
