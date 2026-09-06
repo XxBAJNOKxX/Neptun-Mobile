@@ -54,11 +54,11 @@ class NeptunRepositoryImpl(
 
     override suspend fun syncAllData(neptunCode: String, sessionToken: String): Result<Unit> = withContext(Dispatchers.IO) {
         try {
-            ensureValidToken(forceRefresh = false)
-            try { refreshCalendar() } catch (e: Exception) { e.printStackTrace() }
-            try { refreshGrades() } catch (e: Exception) { e.printStackTrace() }
-            try { refreshMessages() } catch (e: Exception) { e.printStackTrace() }
-            try { refreshFinances() } catch (e: Exception) { e.printStackTrace() }
+            ensureValidToken(forceRefresh = true)
+            refreshCalendar()
+            refreshGrades()
+            refreshMessages()
+            refreshFinances()
             prefsManager.updateLastSyncTime()
             Result.success(Unit)
         } catch (e: Exception) {
@@ -74,18 +74,11 @@ class NeptunRepositoryImpl(
 
         if (!forceRefresh && currentToken.isNotBlank()) return currentToken
 
-        if (creds.neptunCode.isNotEmpty() && password.isNotEmpty() && !password.startsWith("***") && baseUrl.isNotEmpty()) {
+        if (creds.neptunCode.isNotEmpty() && password.isNotEmpty() && baseUrl.isNotEmpty()) {
             try {
-                val cookie = prefsManager.getDeviceCookie(creds.neptunCode)
-                val authRes = neptunApiClient.authenticate(
-                    rawUrl = baseUrl,
-                    neptunCode = creds.neptunCode,
-                    password = password,
-                    savedDeviceCookie = cookie
-                )
+                val authRes = neptunApiClient.authenticate(baseUrl, creds.neptunCode, password)
                 if (authRes is NeptunAuthResult.Success && authRes.accessToken.isNotBlank()) {
                     prefsManager.setAccessToken(authRes.accessToken)
-                    authRes.deviceCookie?.let { prefsManager.setDeviceCookie(creds.neptunCode, it) }
                     return authRes.accessToken
                 }
             } catch (e: Exception) {
@@ -106,7 +99,6 @@ class NeptunRepositoryImpl(
                 val trainingId = prefsManager.getStudentTrainingId()
                 val isModern = prefsManager.isModernApi()
                 val password = prefsManager.getPassword()
-                val cookie = prefsManager.getDeviceCookie(creds.neptunCode)
 
                 eventsToInsert = neptunApiClient.getCalendarEvents(
                     baseUrl = baseUrl,
@@ -114,11 +106,10 @@ class NeptunRepositoryImpl(
                     trainingId = trainingId.ifEmpty { null },
                     username = creds.neptunCode,
                     password = password,
-                    isModern = isModern,
-                    cookie = cookie
+                    isModern = isModern
                 )
 
-                if (eventsToInsert.isEmpty() && password.isNotEmpty() && !password.startsWith("***")) {
+                if (eventsToInsert.isEmpty() && password.isNotEmpty()) {
                     token = ensureValidToken(forceRefresh = true)
                     eventsToInsert = neptunApiClient.getCalendarEvents(
                         baseUrl = baseUrl,
@@ -126,8 +117,7 @@ class NeptunRepositoryImpl(
                         trainingId = trainingId.ifEmpty { null },
                         username = creds.neptunCode,
                         password = password,
-                        isModern = isModern,
-                        cookie = cookie
+                        isModern = isModern
                     )
                 }
             } catch (e: Exception) {
@@ -160,26 +150,23 @@ class NeptunRepositoryImpl(
                 var token = ensureValidToken()
                 val isModern = prefsManager.isModernApi()
                 val password = prefsManager.getPassword()
-                val cookie = prefsManager.getDeviceCookie(creds.neptunCode)
 
                 gradesToInsert = neptunApiClient.getGrades(
                     baseUrl = baseUrl,
                     token = token,
                     username = creds.neptunCode,
                     password = password,
-                    isModern = isModern,
-                    cookie = cookie
+                    isModern = isModern
                 )
 
-                if (gradesToInsert.isEmpty() && password.isNotEmpty() && !password.startsWith("***")) {
+                if (gradesToInsert.isEmpty() && password.isNotEmpty()) {
                     token = ensureValidToken(forceRefresh = true)
                     gradesToInsert = neptunApiClient.getGrades(
                         baseUrl = baseUrl,
                         token = token,
                         username = creds.neptunCode,
                         password = password,
-                        isModern = isModern,
-                        cookie = cookie
+                        isModern = isModern
                     )
                 }
             } catch (e: Exception) {
@@ -212,26 +199,23 @@ class NeptunRepositoryImpl(
                 var token = ensureValidToken()
                 val isModern = prefsManager.isModernApi()
                 val password = prefsManager.getPassword()
-                val cookie = prefsManager.getDeviceCookie(creds.neptunCode)
 
                 messagesToInsert = neptunApiClient.getMessages(
                     baseUrl = baseUrl,
                     token = token,
                     username = creds.neptunCode,
                     password = password,
-                    isModern = isModern,
-                    cookie = cookie
+                    isModern = isModern
                 )
 
-                if (messagesToInsert.isEmpty() && password.isNotEmpty() && !password.startsWith("***")) {
+                if (messagesToInsert.isEmpty() && password.isNotEmpty()) {
                     token = ensureValidToken(forceRefresh = true)
                     messagesToInsert = neptunApiClient.getMessages(
                         baseUrl = baseUrl,
                         token = token,
                         username = creds.neptunCode,
                         password = password,
-                        isModern = isModern,
-                        cookie = cookie
+                        isModern = isModern
                     )
                 }
             } catch (e: Exception) {
@@ -288,26 +272,23 @@ class NeptunRepositoryImpl(
                 var token = ensureValidToken()
                 val isModern = prefsManager.isModernApi()
                 val password = prefsManager.getPassword()
-                val cookie = prefsManager.getDeviceCookie(creds.neptunCode)
 
                 financesToInsert = neptunApiClient.getFinances(
                     baseUrl = baseUrl,
                     token = token,
                     username = creds.neptunCode,
                     password = password,
-                    isModern = isModern,
-                    cookie = cookie
+                    isModern = isModern
                 )
 
-                if (financesToInsert.isEmpty() && password.isNotEmpty() && !password.startsWith("***")) {
+                if (financesToInsert.isEmpty() && password.isNotEmpty()) {
                     token = ensureValidToken(forceRefresh = true)
                     financesToInsert = neptunApiClient.getFinances(
                         baseUrl = baseUrl,
                         token = token,
                         username = creds.neptunCode,
                         password = password,
-                        isModern = isModern,
-                        cookie = cookie
+                        isModern = isModern
                     )
                 }
             } catch (e: Exception) {
@@ -347,15 +328,13 @@ class NeptunRepositoryImpl(
                 val token = prefsManager.getAccessToken()
                 val isModern = prefsManager.isModernApi()
                 val password = prefsManager.getPassword()
-                val cookie = prefsManager.getDeviceCookie(creds.neptunCode)
                 neptunApiClient.markMessageAsReadOnServer(
                     baseUrl = baseUrl,
                     token = token,
                     messageId = messageId,
                     isModern = isModern,
                     username = creds.neptunCode,
-                    password = password,
-                    cookie = cookie
+                    password = password
                 )
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -371,7 +350,6 @@ class NeptunRepositoryImpl(
                 var token = prefsManager.getAccessToken()
                 val isModern = prefsManager.isModernApi()
                 val password = prefsManager.getPassword()
-                val cookie = prefsManager.getDeviceCookie(creds.neptunCode)
 
                 var content = neptunApiClient.getMessageContent(
                     baseUrl = baseUrl,
@@ -379,30 +357,22 @@ class NeptunRepositoryImpl(
                     messageId = messageId,
                     isModern = isModern,
                     username = creds.neptunCode,
-                    password = password,
-                    cookie = cookie
+                    password = password
                 )
 
                 // If content is empty and modern API, attempt token refresh and retry
-                if (content.isBlank() && isModern && creds.neptunCode.isNotEmpty() && password.isNotEmpty() && !password.startsWith("***")) {
-                    val authRes = neptunApiClient.authenticate(
-                        rawUrl = baseUrl,
-                        neptunCode = creds.neptunCode,
-                        password = password,
-                        savedDeviceCookie = cookie
-                    )
+                if (content.isBlank() && isModern && creds.neptunCode.isNotEmpty() && password.isNotEmpty()) {
+                    val authRes = neptunApiClient.authenticate(baseUrl, creds.neptunCode, password)
                     if (authRes is NeptunAuthResult.Success && authRes.accessToken.isNotBlank()) {
                         token = authRes.accessToken
                         prefsManager.setAccessToken(token)
-                        authRes.deviceCookie?.let { prefsManager.setDeviceCookie(creds.neptunCode, it) }
                         content = neptunApiClient.getMessageContent(
                             baseUrl = baseUrl,
                             token = token,
                             messageId = messageId,
                             isModern = isModern,
                             username = creds.neptunCode,
-                            password = password,
-                            cookie = authRes.deviceCookie ?: cookie
+                            password = password
                         )
                     }
                 }
