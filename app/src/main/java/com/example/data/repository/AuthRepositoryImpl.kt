@@ -5,10 +5,12 @@ import com.example.core.security.EncryptedPreferencesManager
 import com.example.data.network.NeptunApiClient
 import com.example.data.network.NeptunAuthResult
 import com.example.data.network.NeptunNetworkClient
+import com.example.domain.model.Neptun2FASession
 import com.example.domain.model.StudentCredentials
 import com.example.domain.model.University
 import com.example.domain.repository.AuthRepository
 import com.example.domain.repository.TwoFactorRequiredException
+import com.example.domain.repository.TwoFactorSessionRequiredException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,6 +32,8 @@ class AuthRepositoryImpl(
     }
 
     private val _universitiesFlow = MutableStateFlow<List<University>>(emptyList())
+    private var lastAttemptedUniversity: University? = null
+    private var lastAttemptedPassword: String = ""
 
     override fun getUniversities(): Flow<List<University>> = _universitiesFlow.asStateFlow()
 
@@ -58,6 +62,8 @@ class AuthRepositoryImpl(
     ): Result<StudentCredentials> = withContext(Dispatchers.IO) {
         val trimmedCode = neptunCode.trim().uppercase()
         val trimmedPassword = password.trim()
+        lastAttemptedUniversity = university
+        lastAttemptedPassword = trimmedPassword
 
         if (trimmedCode.length != 6) {
             return@withContext Result.failure(IllegalArgumentException("A Neptun kódnak pontosan 6 karakterből kell állnia!"))
@@ -107,6 +113,9 @@ class AuthRepositoryImpl(
             is NeptunAuthResult.TwoFactorRequired -> {
                 Result.failure(TwoFactorRequiredException(authResult.twoFactorToken))
             }
+            is NeptunAuthResult.TwoFactorSessionRequired -> {
+                Result.failure(TwoFactorSessionRequiredException(authResult.session))
+            }
             is NeptunAuthResult.Success -> {
                 prefsManager.saveCredentials(
                     neptunCode = trimmedCode,
@@ -137,6 +146,62 @@ class AuthRepositoryImpl(
             }
             is NeptunAuthResult.Failure -> {
                 Result.failure(Exception(authResult.message))
+            }
+        }
+    }
+
+    override suspend fun request2FAEmailCode(session: Neptun2FASession): Result<Neptun2FASession> {
+        return neptunApiClient.request2FAEmailCode(session)
+    }
+
+    override suspend fun verify2FACode(
+        session: Neptun2FASession,
+        code: String,
+        isTotp: Boolean
+    ): Result<StudentCredentials> = withContext(Dispatchers.IO) {
+        val authResult = neptunApiClient.verify2FACode(session, code, isTotp)
+        when (authResult) {
+            is NeptunAuthResult.Success -> {
+                val uni = lastAttemptedUniversity ?: University(
+                    id = "elte",
+                    name = "Eötvös Loránd Tudományegyetem",
+                    shortName = "ELTE",
+                    city = "Budapest",
+                    neptunUrl = session.baseUrl
+                )
+
+                val effectivePassword = lastAttemptedPassword.ifEmpty { prefsManager.getPassword() }
+                prefsManager.saveCredentials(
+                    neptunCode = session.neptunCode,
+                    password = effectivePassword,
+                    universityId = uni.id,
+                    universityName = uni.name,
+                    neptunUrl = authResult.normalizedBaseUrl,
+                    studentName = authResult.studentName,
+                    sessionToken = authResult.accessToken
+                )
+                prefsManager.setAccessToken(authResult.accessToken)
+                authResult.deviceCookie?.let { prefsManager.setDeviceCookie(session.neptunCode, it) }
+                prefsManager.setIsModernApi(true)
+                prefsManager.setBaseUrl(authResult.normalizedBaseUrl)
+
+                val creds = prefsManager.loadCredentials() ?: StudentCredentials(
+                    neptunCode = session.neptunCode,
+                    universityId = uni.id,
+                    universityName = uni.name,
+                    neptunUrl = authResult.normalizedBaseUrl,
+                    studentName = authResult.studentName,
+                    trainingProgram = authResult.trainingProgram,
+                    isLoggedIn = true,
+                    lastSyncTime = System.currentTimeMillis()
+                )
+                Result.success(creds)
+            }
+            is NeptunAuthResult.Failure -> {
+                Result.failure(Exception(authResult.message))
+            }
+            else -> {
+                Result.failure(Exception("Nem sikerült befejezni a kétlépcsős azonosítást!"))
             }
         }
     }
