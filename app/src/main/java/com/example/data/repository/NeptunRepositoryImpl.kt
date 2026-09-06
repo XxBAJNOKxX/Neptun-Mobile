@@ -322,7 +322,7 @@ class NeptunRepositoryImpl(
         if (creds != null && creds.neptunUrl.isNotEmpty()) {
             try {
                 val baseUrl = prefsManager.getBaseUrl().ifEmpty { creds.neptunUrl }
-                val token = prefsManager.getAccessToken()
+                val token = ensureValidToken()
                 val isModern = prefsManager.isModernApi()
                 val password = prefsManager.getPassword()
                 neptunApiClient.markMessageAsReadOnServer(
@@ -344,7 +344,7 @@ class NeptunRepositoryImpl(
         if (creds != null && creds.neptunUrl.isNotEmpty()) {
             try {
                 val baseUrl = prefsManager.getBaseUrl().ifEmpty { creds.neptunUrl }
-                var token = prefsManager.getAccessToken()
+                var token = ensureValidToken()
                 val isModern = prefsManager.isModernApi()
                 val password = prefsManager.getPassword()
 
