@@ -49,7 +49,8 @@ sealed class NeptunAuthResult {
         val studentName: String,
         val trainingProgram: String,
         val isModernApi: Boolean,
-        val normalizedBaseUrl: String
+        val normalizedBaseUrl: String,
+        val studentTrainingId: String? = null
     ) : NeptunAuthResult()
 
     data class TwoFactorRequired(
@@ -63,6 +64,13 @@ sealed class NeptunAuthResult {
 
     data class Failure(val message: String) : NeptunAuthResult()
 }
+
+data class NeptunUserInfo(
+    val name: String,
+    val neptunCode: String,
+    val studentTrainingId: String,
+    val avatarPrintName: String?
+)
 
 class NeptunApiClient {
 
@@ -645,17 +653,24 @@ class NeptunApiClient {
                     val tokenUser = dataObj?.get("userName")?.jsonPrimitive?.contentOrNull ?: username
 
                     if (accessToken.isNotEmpty()) {
+                        val userInfo = try {
+                            getUserInfo(modernBaseUrl, accessToken)
+                        } catch (e: Exception) { null }
+                        val studentName = userInfo?.name?.takeIf { it.isNotBlank() }
+                            ?: "Hallgató ($tokenUser)"
                         val trainingInfo = getStudentTrainingInfo(modernBaseUrl, accessToken)
                         val trainingName = trainingInfo?.second ?: "ELTE Felsőoktatási Képzés"
+                        val trainingId = userInfo?.studentTrainingId?.takeIf { it.isNotBlank() } ?: trainingInfo?.first
 
                         return@withContext NeptunAuthResult.Success(
                             accessToken = accessToken,
                             refreshToken = null,
                             deviceCookie = cookieHeaderString(modernCookieMap),
-                            studentName = "Hallgató ($tokenUser)",
+                            studentName = studentName,
                             trainingProgram = trainingName,
                             isModernApi = true,
-                            normalizedBaseUrl = modernBaseUrl
+                            normalizedBaseUrl = modernBaseUrl,
+                            studentTrainingId = trainingId
                         )
                     }
                 }
@@ -807,20 +822,26 @@ class NeptunApiClient {
 
             val accessToken = dataObj?.get("accessToken")?.jsonPrimitive?.contentOrNull
             if (!accessToken.isNullOrEmpty()) {
-                val trainingName = try {
-                    getStudentTrainingInfo(baseUrl, accessToken)?.second ?: "Egyetemi képzés"
-                } catch (e: Exception) {
-                    "Egyetemi képzés"
-                }
+                val userInfo = try {
+                    getUserInfo(baseUrl, accessToken)
+                } catch (e: Exception) { null }
+                val studentName = userInfo?.name?.takeIf { it.isNotBlank() }
+                    ?: "Hallgató ($username)"
+                val trainingInfo = try {
+                    getStudentTrainingInfo(baseUrl, accessToken)
+                } catch (e: Exception) { null }
+                val trainingName = trainingInfo?.second ?: "Egyetemi képzés"
+                val trainingId = userInfo?.studentTrainingId?.takeIf { it.isNotBlank() } ?: trainingInfo?.first
 
                 return@withContext NeptunAuthResult.Success(
                     accessToken = accessToken,
                     refreshToken = extractedRefreshToken,
                     deviceCookie = extractedCookie,
-                    studentName = "Hallgató ($username)",
+                    studentName = studentName,
                     trainingProgram = trainingName,
                     isModernApi = true,
-                    normalizedBaseUrl = baseUrl
+                    normalizedBaseUrl = baseUrl,
+                    studentTrainingId = trainingId
                 )
             }
 
@@ -923,6 +944,49 @@ class NeptunApiClient {
             Log.e(tag, "Legacy login error: ${e.message}")
         }
         false
+    }
+
+    // --- USER INFO ---
+    suspend fun getUserInfo(baseUrl: String, token: String): NeptunUserInfo? = withContext(Dispatchers.IO) {
+        if (token.isBlank() || token.startsWith("legacy-token") || token.startsWith("aspnet-session")) {
+            return@withContext null
+        }
+        try {
+            val cleanBase = normalizeBaseUrl(baseUrl)
+            val url = "$cleanBase/api/UserInfo"
+            val req = Request.Builder()
+                .url(url)
+                .get()
+                .addHeader("Authorization", "Bearer $token")
+                .addHeader("Accept", "application/json, text/plain, */*")
+                .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36")
+                .build()
+
+            val resp = okHttpClient.newCall(req).execute()
+            if (resp.isSuccessful) {
+                val body = resp.body?.string() ?: ""
+                val parsed = safeParseJsonObject(body) ?: return@withContext null
+                val dataObj = parsed["data"]?.jsonObject ?: return@withContext null
+                val name = dataObj["name"]?.jsonPrimitive?.contentOrNull
+                    ?: dataObj["userAvatar"]?.jsonObject?.get("printName")?.jsonPrimitive?.contentOrNull
+                    ?: ""
+                val code = dataObj["neptunCode"]?.jsonPrimitive?.contentOrNull ?: ""
+                val trainingId = dataObj["studentTrainingId"]?.jsonPrimitive?.contentOrNull ?: ""
+                val avatarPrintName = dataObj["userAvatar"]?.jsonObject?.get("printName")?.jsonPrimitive?.contentOrNull
+
+                if (name.isNotBlank() || code.isNotBlank() || trainingId.isNotBlank()) {
+                    return@withContext NeptunUserInfo(
+                        name = name.ifBlank { avatarPrintName ?: "" },
+                        neptunCode = code,
+                        studentTrainingId = trainingId,
+                        avatarPrintName = avatarPrintName
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "getUserInfo error: ${e.message}")
+        }
+        null
     }
 
     // --- STUDENT TRAINING INFO ---

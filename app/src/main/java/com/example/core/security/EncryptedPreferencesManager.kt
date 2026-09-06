@@ -87,7 +87,8 @@ class EncryptedPreferencesManager(context: Context) {
         universityName: String,
         neptunUrl: String,
         studentName: String = "Teszt Hallgató",
-        sessionToken: String = ""
+        sessionToken: String = "",
+        trainingProgram: String = "Egyetemi Képzés"
     ) {
         prefs.edit()
             .putString(KEY_NEPTUN_CODE, neptunCode)
@@ -97,10 +98,30 @@ class EncryptedPreferencesManager(context: Context) {
             .putString(KEY_NEPTUN_URL, neptunUrl)
             .putString(KEY_STUDENT_NAME, studentName)
             .putString(KEY_SESSION_TOKEN, sessionToken)
+            .putString(KEY_TRAINING_PROGRAM, trainingProgram)
             .putBoolean(KEY_IS_LOGGED_IN, true)
             .putLong(KEY_LAST_SYNC, System.currentTimeMillis())
             .apply()
 
+        _credentialsFlow.value = loadCredentials()
+    }
+
+    fun updateStudentInfo(
+        studentName: String? = null,
+        trainingProgram: String? = null,
+        studentTrainingId: String? = null
+    ) {
+        val editor = prefs.edit()
+        if (!studentName.isNullOrBlank()) {
+            editor.putString(KEY_STUDENT_NAME, studentName)
+        }
+        if (!trainingProgram.isNullOrBlank()) {
+            editor.putString(KEY_TRAINING_PROGRAM, trainingProgram)
+        }
+        if (!studentTrainingId.isNullOrBlank()) {
+            editor.putString(KEY_TRAINING_ID, studentTrainingId)
+        }
+        editor.apply()
         _credentialsFlow.value = loadCredentials()
     }
 
@@ -111,6 +132,7 @@ class EncryptedPreferencesManager(context: Context) {
         val universityName = prefs.getString(KEY_UNIVERSITY_NAME, "Egyetem") ?: "Egyetem"
         val neptunUrl = prefs.getString(KEY_NEPTUN_URL, "") ?: ""
         val studentName = prefs.getString(KEY_STUDENT_NAME, "Hallgató") ?: "Hallgató"
+        val trainingProgram = prefs.getString(KEY_TRAINING_PROGRAM, "Mérnökinformatikus BSc") ?: "Mérnökinformatikus BSc"
         val lastSync = prefs.getLong(KEY_LAST_SYNC, 0L)
 
         return StudentCredentials(
@@ -119,6 +141,7 @@ class EncryptedPreferencesManager(context: Context) {
             universityName = universityName,
             neptunUrl = neptunUrl,
             studentName = studentName,
+            trainingProgram = trainingProgram,
             isLoggedIn = isLoggedIn,
             lastSyncTime = lastSync
         )
@@ -236,6 +259,7 @@ class EncryptedPreferencesManager(context: Context) {
         private const val KEY_IS_MODERN_API = "key_is_modern_api"
         private const val KEY_BASE_URL = "key_base_url"
         private const val KEY_TRAINING_ID = "key_training_id"
+        private const val KEY_TRAINING_PROGRAM = "key_training_program"
         private const val KEY_IS_LOGGED_IN = "key_is_logged_in"
         private const val KEY_LAST_SYNC = "key_last_sync"
         private const val KEY_THEME_MODE = "key_theme_mode"

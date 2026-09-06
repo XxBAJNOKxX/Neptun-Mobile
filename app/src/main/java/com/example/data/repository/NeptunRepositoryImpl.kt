@@ -54,7 +54,22 @@ class NeptunRepositoryImpl(
 
     override suspend fun syncAllData(neptunCode: String, sessionToken: String): Result<Unit> = withContext(Dispatchers.IO) {
         try {
-            ensureValidToken(forceRefresh = false)
+            val token = ensureValidToken(forceRefresh = false)
+            val creds = prefsManager.loadCredentials()
+            val baseUrl = prefsManager.getBaseUrl().ifEmpty { creds?.neptunUrl ?: "" }
+            if (token.isNotBlank() && baseUrl.isNotBlank() && prefsManager.isModernApi()) {
+                try {
+                    val userInfo = neptunApiClient.getUserInfo(baseUrl, token)
+                    if (userInfo != null && userInfo.name.isNotBlank()) {
+                        prefsManager.updateStudentInfo(
+                            studentName = userInfo.name,
+                            studentTrainingId = userInfo.studentTrainingId.ifEmpty { null }
+                        )
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
             refreshCalendar()
             refreshGrades()
             refreshMessages()
