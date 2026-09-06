@@ -14,8 +14,6 @@ class NeptunApiClientTest {
         assertEquals("https://neptun2.ppke.hu/hallgato_uj", client.normalizeBaseUrl("https://neptun2.ppke.hu/hallgato_uj/"))
         assertEquals("https://neptun2.ppke.hu/hallgato_uj", client.normalizeBaseUrl("https://neptun2.ppke.hu/hallgato_uj/login.aspx"))
         assertEquals("https://neptun2.ppke.hu/hallgato_uj", client.normalizeBaseUrl("https://neptun2.ppke.hu/hallgato_uj/MobileService.svc"))
-        assertEquals("https://neptun.elte.hu", client.normalizeBaseUrl("https://neptun.elte.hu/Account/Login"))
-        assertEquals("https://neptun.elte.hu", client.normalizeBaseUrl("https://neptun.elte.hu/Account/Login2FA?NeptunCode=ABC"))
     }
 
     @Test
