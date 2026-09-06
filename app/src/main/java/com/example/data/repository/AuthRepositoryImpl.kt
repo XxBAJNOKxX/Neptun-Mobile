@@ -109,9 +109,11 @@ class AuthRepositoryImpl(
 
         when (authResult) {
             is NeptunAuthResult.TwoFactorRequired -> {
+                prefsManager.setPassword(trimmedPassword)
                 Result.failure(TwoFactorRequiredException(authResult.twoFactorToken))
             }
             is NeptunAuthResult.TwoFactorSessionRequired -> {
+                prefsManager.setPassword(trimmedPassword)
                 Result.failure(TwoFactorSessionRequiredException(authResult.session))
             }
             is NeptunAuthResult.Success -> {
@@ -168,9 +170,10 @@ class AuthRepositoryImpl(
                     neptunUrl = session.baseUrl
                 )
 
+                val savedPassword = prefsManager.getPassword().ifEmpty { "******" }
                 prefsManager.saveCredentials(
                     neptunCode = session.neptunCode,
-                    password = "******",
+                    password = savedPassword,
                     universityId = uni.id,
                     universityName = uni.name,
                     neptunUrl = authResult.normalizedBaseUrl,

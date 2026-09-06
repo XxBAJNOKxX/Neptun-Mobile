@@ -54,7 +54,7 @@ class NeptunRepositoryImpl(
 
     override suspend fun syncAllData(neptunCode: String, sessionToken: String): Result<Unit> = withContext(Dispatchers.IO) {
         try {
-            ensureValidToken(forceRefresh = true)
+            ensureValidToken(forceRefresh = false)
             refreshCalendar()
             refreshGrades()
             refreshMessages()
@@ -74,11 +74,24 @@ class NeptunRepositoryImpl(
 
         if (!forceRefresh && currentToken.isNotBlank()) return currentToken
 
-        if (creds.neptunCode.isNotEmpty() && password.isNotEmpty() && baseUrl.isNotEmpty()) {
+        val refreshToken = prefsManager.getRefreshToken()
+        if (prefsManager.isModernApi() && refreshToken.isNotBlank()) {
+            val refreshed = neptunApiClient.refreshAccessToken(baseUrl, refreshToken)
+            if (!refreshed.isNullOrBlank()) {
+                prefsManager.setAccessToken(refreshed)
+                return refreshed
+            }
+        }
+
+        if (currentToken.isNotBlank()) return currentToken
+
+        if (creds.neptunCode.isNotEmpty() && password.isNotEmpty() && password != "******" && baseUrl.isNotEmpty()) {
             try {
                 val authRes = neptunApiClient.authenticate(baseUrl, creds.neptunCode, password)
                 if (authRes is NeptunAuthResult.Success && authRes.accessToken.isNotBlank()) {
                     prefsManager.setAccessToken(authRes.accessToken)
+                    prefsManager.setBaseUrl(authRes.normalizedBaseUrl)
+                    prefsManager.setIsModernApi(authRes.isModernApi)
                     return authRes.accessToken
                 }
             } catch (e: Exception) {
@@ -91,11 +104,12 @@ class NeptunRepositoryImpl(
     override suspend fun refreshCalendar(): Result<Unit> = withContext(Dispatchers.IO) {
         val creds = prefsManager.loadCredentials()
         var eventsToInsert = emptyList<CalendarEvent>()
+        var fetchSucceeded = false
 
         if (creds != null && creds.neptunUrl.isNotEmpty()) {
             try {
                 val baseUrl = prefsManager.getBaseUrl().ifEmpty { creds.neptunUrl }
-                var token = ensureValidToken()
+                val token = ensureValidToken()
                 val trainingId = prefsManager.getStudentTrainingId()
                 val isModern = prefsManager.isModernApi()
                 val password = prefsManager.getPassword()
@@ -108,33 +122,25 @@ class NeptunRepositoryImpl(
                     password = password,
                     isModern = isModern
                 )
-
-                if (eventsToInsert.isEmpty() && password.isNotEmpty()) {
-                    token = ensureValidToken(forceRefresh = true)
-                    eventsToInsert = neptunApiClient.getCalendarEvents(
-                        baseUrl = baseUrl,
-                        token = token,
-                        trainingId = trainingId.ifEmpty { null },
-                        username = creds.neptunCode,
-                        password = password,
-                        isModern = isModern
-                    )
-                }
+                fetchSucceeded = true
             } catch (e: Exception) {
                 e.printStackTrace()
             }
         }
 
-        if (eventsToInsert.isEmpty()) {
+        val isDemo = creds?.neptunCode == "DEMO01"
+        if (!fetchSucceeded || (isDemo && eventsToInsert.isEmpty())) {
             val existing = database.calendarDao().getAllEvents().first()
             if (existing.isEmpty()) {
                 eventsToInsert = MockNeptunDataSource.getMockCalendarEvents()
             }
         }
 
-        if (eventsToInsert.isNotEmpty()) {
+        if (fetchSucceeded || eventsToInsert.isNotEmpty()) {
             database.calendarDao().clearAll()
-            database.calendarDao().insertEvents(eventsToInsert.map { CalendarEventEntity.fromDomain(it) })
+            if (eventsToInsert.isNotEmpty()) {
+                database.calendarDao().insertEvents(eventsToInsert.map { CalendarEventEntity.fromDomain(it) })
+            }
         }
 
         Result.success(Unit)
@@ -143,11 +149,12 @@ class NeptunRepositoryImpl(
     override suspend fun refreshGrades(): Result<Unit> = withContext(Dispatchers.IO) {
         val creds = prefsManager.loadCredentials()
         var gradesToInsert = emptyList<SubjectGrade>()
+        var fetchSucceeded = false
 
         if (creds != null && creds.neptunUrl.isNotEmpty()) {
             try {
                 val baseUrl = prefsManager.getBaseUrl().ifEmpty { creds.neptunUrl }
-                var token = ensureValidToken()
+                val token = ensureValidToken()
                 val isModern = prefsManager.isModernApi()
                 val password = prefsManager.getPassword()
 
@@ -158,32 +165,25 @@ class NeptunRepositoryImpl(
                     password = password,
                     isModern = isModern
                 )
-
-                if (gradesToInsert.isEmpty() && password.isNotEmpty()) {
-                    token = ensureValidToken(forceRefresh = true)
-                    gradesToInsert = neptunApiClient.getGrades(
-                        baseUrl = baseUrl,
-                        token = token,
-                        username = creds.neptunCode,
-                        password = password,
-                        isModern = isModern
-                    )
-                }
+                fetchSucceeded = true
             } catch (e: Exception) {
                 e.printStackTrace()
             }
         }
 
-        if (gradesToInsert.isEmpty()) {
+        val isDemo = creds?.neptunCode == "DEMO01"
+        if (!fetchSucceeded || (isDemo && gradesToInsert.isEmpty())) {
             val existing = database.gradesDao().getAllGrades().first()
             if (existing.isEmpty()) {
                 gradesToInsert = MockNeptunDataSource.getMockGrades()
             }
         }
 
-        if (gradesToInsert.isNotEmpty()) {
+        if (fetchSucceeded || gradesToInsert.isNotEmpty()) {
             database.gradesDao().clearAll()
-            database.gradesDao().insertGrades(gradesToInsert.map { SubjectGradeEntity.fromDomain(it) })
+            if (gradesToInsert.isNotEmpty()) {
+                database.gradesDao().insertGrades(gradesToInsert.map { SubjectGradeEntity.fromDomain(it) })
+            }
         }
 
         Result.success(Unit)
@@ -192,11 +192,12 @@ class NeptunRepositoryImpl(
     override suspend fun refreshMessages(): Result<Unit> = withContext(Dispatchers.IO) {
         val creds = prefsManager.loadCredentials()
         var messagesToInsert = emptyList<NeptunMessage>()
+        var fetchSucceeded = false
 
         if (creds != null && creds.neptunUrl.isNotEmpty()) {
             try {
                 val baseUrl = prefsManager.getBaseUrl().ifEmpty { creds.neptunUrl }
-                var token = ensureValidToken()
+                val token = ensureValidToken()
                 val isModern = prefsManager.isModernApi()
                 val password = prefsManager.getPassword()
 
@@ -207,30 +208,21 @@ class NeptunRepositoryImpl(
                     password = password,
                     isModern = isModern
                 )
-
-                if (messagesToInsert.isEmpty() && password.isNotEmpty()) {
-                    token = ensureValidToken(forceRefresh = true)
-                    messagesToInsert = neptunApiClient.getMessages(
-                        baseUrl = baseUrl,
-                        token = token,
-                        username = creds.neptunCode,
-                        password = password,
-                        isModern = isModern
-                    )
-                }
+                fetchSucceeded = true
             } catch (e: Exception) {
                 e.printStackTrace()
             }
         }
 
-        if (messagesToInsert.isEmpty()) {
+        val isDemo = creds?.neptunCode == "DEMO01"
+        if (!fetchSucceeded || (isDemo && messagesToInsert.isEmpty())) {
             val existing = database.messagesDao().getAllMessages().first()
             if (existing.isEmpty()) {
                 messagesToInsert = MockNeptunDataSource.getMockMessages()
             }
         }
 
-        if (messagesToInsert.isNotEmpty()) {
+        if (fetchSucceeded || messagesToInsert.isNotEmpty()) {
             val existingEntities = database.messagesDao().getAllMessages().first()
             val existingById = existingEntities.associateBy { it.id }
             val existingByKey = existingEntities.associateBy { "${it.sender}_${it.subject}_${it.sendDate}" }
@@ -256,7 +248,9 @@ class NeptunRepositoryImpl(
                 )
             }
             database.messagesDao().clearAll()
-            database.messagesDao().insertMessages(entitiesToSave)
+            if (entitiesToSave.isNotEmpty()) {
+                database.messagesDao().insertMessages(entitiesToSave)
+            }
         }
 
         Result.success(Unit)
@@ -265,11 +259,12 @@ class NeptunRepositoryImpl(
     override suspend fun refreshFinances(): Result<Unit> = withContext(Dispatchers.IO) {
         val creds = prefsManager.loadCredentials()
         var financesToInsert = emptyList<FinanceItem>()
+        var fetchSucceeded = false
 
         if (creds != null && creds.neptunUrl.isNotEmpty()) {
             try {
                 val baseUrl = prefsManager.getBaseUrl().ifEmpty { creds.neptunUrl }
-                var token = ensureValidToken()
+                val token = ensureValidToken()
                 val isModern = prefsManager.isModernApi()
                 val password = prefsManager.getPassword()
 
@@ -280,32 +275,25 @@ class NeptunRepositoryImpl(
                     password = password,
                     isModern = isModern
                 )
-
-                if (financesToInsert.isEmpty() && password.isNotEmpty()) {
-                    token = ensureValidToken(forceRefresh = true)
-                    financesToInsert = neptunApiClient.getFinances(
-                        baseUrl = baseUrl,
-                        token = token,
-                        username = creds.neptunCode,
-                        password = password,
-                        isModern = isModern
-                    )
-                }
+                fetchSucceeded = true
             } catch (e: Exception) {
                 e.printStackTrace()
             }
         }
 
-        if (financesToInsert.isEmpty()) {
+        val isDemo = creds?.neptunCode == "DEMO01"
+        if (!fetchSucceeded || (isDemo && financesToInsert.isEmpty())) {
             val existing = database.financesDao().getAllFinances().first()
             if (existing.isEmpty()) {
                 financesToInsert = MockNeptunDataSource.getMockFinances()
             }
         }
 
-        if (financesToInsert.isNotEmpty()) {
+        if (fetchSucceeded || financesToInsert.isNotEmpty()) {
             database.financesDao().clearAll()
-            database.financesDao().insertFinances(financesToInsert.map { FinanceItemEntity.fromDomain(it) })
+            if (financesToInsert.isNotEmpty()) {
+                database.financesDao().insertFinances(financesToInsert.map { FinanceItemEntity.fromDomain(it) })
+            }
         }
 
         Result.success(Unit)

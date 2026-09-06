@@ -387,15 +387,7 @@ class NeptunApiClient {
 
                 return@withContext NeptunAuthResult.TwoFactorSessionRequired(session)
             } else {
-                return@withContext NeptunAuthResult.Success(
-                    accessToken = "aspnet-session-$username",
-                    refreshToken = null,
-                    deviceCookie = cookieHeaderString(cookieMap),
-                    studentName = "Hallgató ($username)",
-                    trainingProgram = "ELTE Egyetemi Képzés",
-                    isModernApi = false,
-                    normalizedBaseUrl = cleanBase
-                )
+                return@withContext exchangeAspSessionToModernToken(cleanBase, cookieMap, username)
             }
         }
 
@@ -514,19 +506,15 @@ class NeptunApiClient {
             val locationHeader = resp.header("Location") ?: ""
 
             if (statusCode in 300..399) {
-                return@withContext NeptunAuthResult.Success(
-                    accessToken = "aspnet-verified-${session.neptunCode}",
-                    refreshToken = null,
-                    deviceCookie = cookieHeaderString(cookieMap),
-                    studentName = "Hallgató (${session.neptunCode})",
-                    trainingProgram = "ELTE Egyetemi Képzés",
-                    isModernApi = false,
-                    normalizedBaseUrl = session.baseUrl
-                )
+                return@withContext exchangeAspSessionToModernToken(session.baseUrl, cookieMap, session.neptunCode)
             }
 
             val html = resp.body?.string() ?: ""
             val errors = extractValidationErrors(html)
+            if (errors.isEmpty() && (html.contains("ToNeptunWeb", ignoreCase = true) || html.contains("Kijelentkezés", ignoreCase = true) || locationHeader.isNotEmpty() || resp.isSuccessful)) {
+                return@withContext exchangeAspSessionToModernToken(session.baseUrl, cookieMap, session.neptunCode)
+            }
+
             val errorMsg = if (errors.isNotEmpty()) {
                 errors.joinToString(" | ")
             } else {
@@ -536,6 +524,163 @@ class NeptunApiClient {
             NeptunAuthResult.Failure(errorMsg)
         } catch (e: Exception) {
             NeptunAuthResult.Failure("Hiba a biztonsági kód ellenőrzésekor: ${e.localizedMessage}")
+        }
+    }
+
+    private suspend fun exchangeAspSessionToModernToken(
+        aspBaseUrl: String,
+        cookies: Map<String, String>,
+        username: String
+    ): NeptunAuthResult = withContext(Dispatchers.IO) {
+        try {
+            val cookieHeader = cookieHeaderString(cookies)
+            val cleanBase = normalizeBaseUrl(aspBaseUrl)
+
+            // Step 1: Request /ToNeptunWeb/ToNeptunHWeb
+            val bridgeUrl = "$cleanBase/ToNeptunWeb/ToNeptunHWeb"
+            val bridgeReq = Request.Builder()
+                .url(bridgeUrl)
+                .get()
+                .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36")
+                .addHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+                .addHeader("Accept-Language", "hu-HU,hu;q=0.9,en-US;q=0.8,en;q=0.7")
+                .addHeader("Referer", "$cleanBase/")
+                .addHeader("Cookie", cookieHeader)
+                .build()
+
+            val noRedirectClient = okHttpClient.newBuilder().followRedirects(false).followSslRedirects(false).build()
+            val bridgeResp = noRedirectClient.newCall(bridgeReq).execute()
+            var locationHeader = bridgeResp.header("Location") ?: ""
+            var modernCookies = bridgeResp.headers("Set-Cookie")
+            var modernCookieMap = mergeCookies(cookies, parseCookiesFromHeaders(modernCookies)).toMutableMap()
+
+            // If it returned 200 instead of 302, inspect HTML or form submission
+            if (locationHeader.isEmpty() && bridgeResp.code == 200) {
+                val html = bridgeResp.body?.string() ?: ""
+                val outerLoginMatch = Regex("""(https?://[^\s"'<>]*/outerlogin[^\s"'<>]*)""", RegexOption.IGNORE_CASE).find(html)
+                if (outerLoginMatch != null) {
+                    locationHeader = outerLoginMatch.groupValues[1]
+                } else {
+                    val inputs = parseFormInputs(html)
+                    if (inputs.isNotEmpty()) {
+                        val formBuilder = FormBody.Builder()
+                        for ((k, v) in inputs) {
+                            formBuilder.add(k, v)
+                        }
+                        val formReq = Request.Builder()
+                            .url(bridgeUrl)
+                            .post(formBuilder.build())
+                            .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36")
+                            .addHeader("Cookie", cookieHeaderString(modernCookieMap))
+                            .build()
+                        val formResp = noRedirectClient.newCall(formReq).execute()
+                        locationHeader = formResp.header("Location") ?: ""
+                        modernCookieMap = mergeCookies(modernCookieMap, parseCookiesFromHeaders(formResp.headers("Set-Cookie"))).toMutableMap()
+                    }
+                }
+            }
+
+            if (locationHeader.isEmpty()) {
+                val homeReq = Request.Builder()
+                    .url("$cleanBase/")
+                    .get()
+                    .addHeader("Cookie", cookieHeaderString(modernCookieMap))
+                    .build()
+                val homeResp = okHttpClient.newCall(homeReq).execute()
+                val homeHtml = homeResp.body?.string() ?: ""
+                val m = Regex("""(https?://[^\s"'<>]*/outerlogin[^\s"'<>]*)""", RegexOption.IGNORE_CASE).find(homeHtml)
+                if (m != null) {
+                    locationHeader = m.groupValues[1]
+                }
+            }
+
+            Log.d(tag, "exchangeAspSessionToModernToken locationHeader: $locationHeader")
+
+            var guid = ""
+            var languageId = 1038
+            var modernBaseUrl = "https://hallgato1.neptun.elte.hu"
+
+            if (locationHeader.isNotEmpty()) {
+                try {
+                    val uri = java.net.URI(locationHeader)
+                    modernBaseUrl = "${uri.scheme}://${uri.host}" + if (uri.port > 0 && uri.port != 80 && uri.port != 443) ":${uri.port}" else ""
+                    val query = uri.query ?: ""
+                    for (param in query.split("&")) {
+                        val parts = param.split("=", limit = 2)
+                        if (parts.size == 2) {
+                            if (parts[0].equals("GUID", ignoreCase = true)) {
+                                guid = parts[1]
+                            } else if (parts[0].equals("languageid", ignoreCase = true) || parts[0].equals("lcid", ignoreCase = true)) {
+                                languageId = parts[1].toIntOrNull() ?: 1038
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e(tag, "Failed parsing redirect URL: ${e.message}")
+                }
+            }
+
+            if (guid.isNotEmpty()) {
+                val outerLoginEndpoint = "$modernBaseUrl/api/Account/OuterLogin"
+                val outerPayload = """{"guid":"$guid","languageId":$languageId}"""
+
+                val outerReq = Request.Builder()
+                    .url(outerLoginEndpoint)
+                    .post(outerPayload.toRequestBody("application/json".toMediaType()))
+                    .addHeader("Content-Type", "application/json")
+                    .addHeader("Accept", "application/json, text/plain, */*")
+                    .addHeader("Origin", modernBaseUrl)
+                    .addHeader("Referer", locationHeader)
+                    .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36")
+                    .build()
+
+                val outerResp = okHttpClient.newCall(outerReq).execute()
+                if (outerResp.isSuccessful) {
+                    val outerBody = outerResp.body?.string() ?: ""
+                    val outerJson = safeParseJsonObject(outerBody)
+                    val dataObj = outerJson?.get("data")?.jsonObject
+                    val accessToken = dataObj?.get("accessToken")?.jsonPrimitive?.contentOrNull
+                        ?: dataObj?.get("token")?.jsonPrimitive?.contentOrNull
+                        ?: ""
+                    val tokenUser = dataObj?.get("userName")?.jsonPrimitive?.contentOrNull ?: username
+
+                    if (accessToken.isNotEmpty()) {
+                        val trainingInfo = getStudentTrainingInfo(modernBaseUrl, accessToken)
+                        val trainingName = trainingInfo?.second ?: "ELTE Felsőoktatási Képzés"
+
+                        return@withContext NeptunAuthResult.Success(
+                            accessToken = accessToken,
+                            refreshToken = null,
+                            deviceCookie = cookieHeaderString(modernCookieMap),
+                            studentName = "Hallgató ($tokenUser)",
+                            trainingProgram = trainingName,
+                            isModernApi = true,
+                            normalizedBaseUrl = modernBaseUrl
+                        )
+                    }
+                }
+            }
+
+            return@withContext NeptunAuthResult.Success(
+                accessToken = "aspnet-session-$username",
+                refreshToken = null,
+                deviceCookie = cookieHeaderString(modernCookieMap),
+                studentName = "Hallgató ($username)",
+                trainingProgram = "ELTE Egyetemi Képzés",
+                isModernApi = false,
+                normalizedBaseUrl = cleanBase
+            )
+        } catch (e: Exception) {
+            Log.e(tag, "exchangeAspSessionToModernToken error: ${e.message}")
+            return@withContext NeptunAuthResult.Success(
+                accessToken = "aspnet-session-$username",
+                refreshToken = null,
+                deviceCookie = cookieHeaderString(cookies),
+                studentName = "Hallgató ($username)",
+                trainingProgram = "ELTE Egyetemi Képzés",
+                isModernApi = false,
+                normalizedBaseUrl = aspBaseUrl
+            )
         }
     }
 
