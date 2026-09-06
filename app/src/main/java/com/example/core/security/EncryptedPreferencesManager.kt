@@ -180,6 +180,10 @@ class EncryptedPreferencesManager(context: Context) {
         return prefs.getString(KEY_PASSWORD, "") ?: ""
     }
 
+    fun setPassword(password: String) {
+        prefs.edit().putString(KEY_PASSWORD, password).apply()
+    }
+
     fun loadThemeSettings(): ThemeSettings {
         val modeStr = prefs.getString(KEY_THEME_MODE, ThemeMode.SYSTEM.name) ?: ThemeMode.SYSTEM.name
         val themeMode = try {
