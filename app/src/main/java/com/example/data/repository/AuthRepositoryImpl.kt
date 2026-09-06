@@ -164,11 +164,13 @@ class AuthRepositoryImpl(
         val authResult = neptunApiClient.verify2FACode(session, code, isTotp)
         when (authResult) {
             is NeptunAuthResult.Success -> {
+                val savedUniName = prefsManager.getSelectedUniversityName().ifEmpty { "Egyetem" }
+                val savedUniId = prefsManager.getSelectedUniversityId().ifEmpty { "custom_uni" }
                 val uni = lastAttemptedUniversity ?: University(
-                    id = "elte",
-                    name = "Eötvös Loránd Tudományegyetem",
-                    shortName = "ELTE",
-                    city = "Budapest",
+                    id = savedUniId,
+                    name = savedUniName,
+                    shortName = savedUniName,
+                    city = "Magyarország",
                     neptunUrl = session.baseUrl
                 )
 
@@ -217,5 +219,31 @@ class AuthRepositoryImpl(
 
     override suspend fun isOfflineModeAvailable(): Boolean = withContext(Dispatchers.IO) {
         prefsManager.loadCredentials() != null
+    }
+
+    override fun getSavedUniversityId(): String {
+        return prefsManager.getSelectedUniversityId()
+    }
+
+    override fun getSavedUniversityUrl(): String {
+        return prefsManager.getSelectedUniversityUrl()
+    }
+
+    override fun getSavedUniversityName(): String {
+        return prefsManager.getSelectedUniversityName()
+    }
+
+    override fun saveSelectedUniversity(university: University) {
+        lastAttemptedUniversity = university
+        prefsManager.saveSelectedUniversity(university.id, university.name, university.neptunUrl)
+        prefsManager.setBaseUrl(university.neptunUrl)
+    }
+
+    override fun getSavedNeptunCode(): String {
+        return prefsManager.getLastNeptunCode()
+    }
+
+    override fun saveNeptunCode(code: String) {
+        prefsManager.saveLastNeptunCode(code)
     }
 }

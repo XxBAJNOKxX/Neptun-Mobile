@@ -57,12 +57,25 @@ class AuthViewModel(
         viewModelScope.launch {
             val list = authRepository.loadUniversitiesFromAssets()
             val offlineAvailable = authRepository.isOfflineModeAvailable()
+            val savedUniId = authRepository.getSavedUniversityId()
+            val savedUniUrl = authRepository.getSavedUniversityUrl()
+            val savedUniName = authRepository.getSavedUniversityName()
+            val savedNeptunCode = authRepository.getSavedNeptunCode()
+
+            // Match previously selected / saved university
+            val matchedUni = list.firstOrNull { uni ->
+                (savedUniId.isNotEmpty() && uni.id.equals(savedUniId, ignoreCase = true)) ||
+                (savedUniUrl.isNotEmpty() && uni.neptunUrl.trimEnd('/').equals(savedUniUrl.trimEnd('/'), ignoreCase = true)) ||
+                (savedUniName.isNotEmpty() && uni.name.equals(savedUniName, ignoreCase = true))
+            } ?: list.firstOrNull { uni -> uni.id == "etvslorndtud" || uni.id == "elte" || uni.neptunUrl.contains("elte.hu") }
+              ?: list.firstOrNull()
+
             _uiState.update {
                 it.copy(
                     universities = list,
                     filteredUniversities = list,
-                    selectedUniversity = list.firstOrNull { uni -> uni.id == "etvslorndtud" || uni.id == "elte" || uni.neptunUrl.contains("elte.hu") } ?: list.firstOrNull(),
-                    neptunCode = it.neptunCode.ifEmpty { "I7ZBE7" },
+                    selectedUniversity = matchedUni,
+                    neptunCode = it.neptunCode.ifEmpty { savedNeptunCode },
                     isOfflineModeAvailable = offlineAvailable
                 )
             }
@@ -70,10 +83,19 @@ class AuthViewModel(
 
         viewModelScope.launch {
             authRepository.getCredentials().collect { creds ->
-                _uiState.update {
-                    it.copy(
+                _uiState.update { state ->
+                    val matchedUni = if (creds != null) {
+                        state.universities.firstOrNull { uni ->
+                            (creds.universityId.isNotEmpty() && uni.id.equals(creds.universityId, ignoreCase = true)) ||
+                            (creds.neptunUrl.isNotEmpty() && uni.neptunUrl.trimEnd('/').equals(creds.neptunUrl.trimEnd('/'), ignoreCase = true)) ||
+                            (creds.universityName.isNotEmpty() && uni.name.equals(creds.universityName, ignoreCase = true))
+                        } ?: state.selectedUniversity
+                    } else state.selectedUniversity
+
+                    state.copy(
                         credentials = creds,
-                        neptunCode = creds?.neptunCode ?: it.neptunCode
+                        selectedUniversity = matchedUni ?: state.selectedUniversity,
+                        neptunCode = creds?.neptunCode ?: state.neptunCode.ifEmpty { authRepository.getSavedNeptunCode() }
                     )
                 }
             }
@@ -96,6 +118,7 @@ class AuthViewModel(
     }
 
     fun onSelectUniversity(university: University) {
+        authRepository.saveSelectedUniversity(university)
         _uiState.update {
             it.copy(
                 selectedUniversity = university,
@@ -111,7 +134,9 @@ class AuthViewModel(
 
     fun onNeptunCodeChange(code: String) {
         if (code.length <= 6) {
-            _uiState.update { it.copy(neptunCode = code.uppercase(), errorMessage = null) }
+            val upper = code.uppercase()
+            authRepository.saveNeptunCode(upper)
+            _uiState.update { it.copy(neptunCode = upper, errorMessage = null) }
         }
     }
 
@@ -156,6 +181,10 @@ class AuthViewModel(
             ?: _uiState.value.universities.firstOrNull { it.neptunUrl.contains("elte.hu") }
             ?: _uiState.value.selectedUniversity
 
+        if (elte != null) {
+            authRepository.saveSelectedUniversity(elte)
+        }
+        authRepository.saveNeptunCode("I7ZBE7")
         _uiState.update {
             it.copy(
                 selectedUniversity = elte,
@@ -167,6 +196,7 @@ class AuthViewModel(
     }
 
     fun quickDemoFill() {
+        authRepository.saveNeptunCode("DEMO01")
         _uiState.update {
             it.copy(
                 neptunCode = "DEMO01",
@@ -225,6 +255,9 @@ class AuthViewModel(
             _uiState.update { it.copy(errorMessage = "Kérjük, add meg a jelszavadat!") }
             return
         }
+
+        authRepository.saveSelectedUniversity(university)
+        authRepository.saveNeptunCode(state.neptunCode)
 
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }

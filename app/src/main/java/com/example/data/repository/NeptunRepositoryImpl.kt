@@ -151,11 +151,9 @@ class NeptunRepositoryImpl(
             }
         }
 
-        if (fetchSucceeded || eventsToInsert.isNotEmpty()) {
+        if (eventsToInsert.isNotEmpty()) {
             database.calendarDao().clearAll()
-            if (eventsToInsert.isNotEmpty()) {
-                database.calendarDao().insertEvents(eventsToInsert.map { CalendarEventEntity.fromDomain(it) })
-            }
+            database.calendarDao().insertEvents(eventsToInsert.map { CalendarEventEntity.fromDomain(it) })
         }
 
         Result.success(Unit)
@@ -194,11 +192,9 @@ class NeptunRepositoryImpl(
             }
         }
 
-        if (fetchSucceeded || gradesToInsert.isNotEmpty()) {
+        if (gradesToInsert.isNotEmpty()) {
             database.gradesDao().clearAll()
-            if (gradesToInsert.isNotEmpty()) {
-                database.gradesDao().insertGrades(gradesToInsert.map { SubjectGradeEntity.fromDomain(it) })
-            }
+            database.gradesDao().insertGrades(gradesToInsert.map { SubjectGradeEntity.fromDomain(it) })
         }
 
         Result.success(Unit)
@@ -304,11 +300,9 @@ class NeptunRepositoryImpl(
             }
         }
 
-        if (fetchSucceeded || financesToInsert.isNotEmpty()) {
+        if (financesToInsert.isNotEmpty()) {
             database.financesDao().clearAll()
-            if (financesToInsert.isNotEmpty()) {
-                database.financesDao().insertFinances(financesToInsert.map { FinanceItemEntity.fromDomain(it) })
-            }
+            database.financesDao().insertFinances(financesToInsert.map { FinanceItemEntity.fromDomain(it) })
         }
 
         Result.success(Unit)
