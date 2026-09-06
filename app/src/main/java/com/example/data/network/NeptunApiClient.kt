@@ -520,7 +520,7 @@ class NeptunApiClient {
                     deviceCookie = cookieHeaderString(cookieMap),
                     studentName = "Hallgató (${session.neptunCode})",
                     trainingProgram = "ELTE Egyetemi Képzés",
-                    isModernApi = false,
+                    isModernApi = true,
                     normalizedBaseUrl = session.baseUrl
                 )
             }
@@ -780,14 +780,35 @@ class NeptunApiClient {
         false
     }
 
+    private fun Request.Builder.withNeptunHeaders(
+        baseUrl: String,
+        token: String = "",
+        cookie: String = ""
+    ): Request.Builder {
+        addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36")
+        addHeader("Accept", "application/json, text/plain, */*")
+        addHeader("Referer", "$baseUrl/")
+        if (token.isNotBlank() && !token.startsWith("aspnet") && !token.startsWith("legacy")) {
+            addHeader("Authorization", "Bearer $token")
+        }
+        if (cookie.isNotBlank()) {
+            addHeader("Cookie", cookie)
+        }
+        return this
+    }
+
     // --- STUDENT TRAINING INFO ---
-    suspend fun getStudentTrainingInfo(baseUrl: String, token: String): Pair<String, String>? = withContext(Dispatchers.IO) {
+    suspend fun getStudentTrainingInfo(
+        baseUrl: String,
+        token: String,
+        cookie: String = ""
+    ): Pair<String, String>? = withContext(Dispatchers.IO) {
         try {
             val url = "$baseUrl/api/Calendar/GetStudentTrainings"
             val req = Request.Builder()
                 .url(url)
                 .get()
-                .addHeader("Authorization", "Bearer $token")
+                .withNeptunHeaders(baseUrl, token, cookie)
                 .addHeader("Content-Type", "application/json")
                 .build()
 
@@ -823,10 +844,11 @@ class NeptunApiClient {
         trainingId: String?,
         username: String,
         password: String,
-        isModern: Boolean
+        isModern: Boolean,
+        cookie: String = ""
     ): List<CalendarEvent> = withContext(Dispatchers.IO) {
-        if (!isModern) {
-            return@withContext getLegacyCalendarEvents(baseUrl, username, password)
+        if (!isModern && cookie.isBlank()) {
+            return@withContext getLegacyCalendarEvents(baseUrl, username, password, cookie)
         }
 
         try {
@@ -837,23 +859,23 @@ class NeptunApiClient {
             val startIso = startWindow.atStartOfDay().format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'00:00:00"))
             val endIso = endWindow.atTime(23, 59, 59).format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'23:59:59"))
 
-            val trainId = trainingId ?: getStudentTrainingInfo(baseUrl, token)?.first ?: ""
+            val trainId = trainingId ?: getStudentTrainingInfo(baseUrl, token, cookie)?.first ?: ""
 
-            var events = fetchModernCalendarEvents(baseUrl, token, trainId, startIso, endIso)
+            var events = fetchModernCalendarEvents(baseUrl, token, trainId, startIso, endIso, cookie)
 
             if (events.isEmpty() && trainId.isNotEmpty()) {
-                events = fetchModernCalendarEvents(baseUrl, token, "", startIso, endIso)
+                events = fetchModernCalendarEvents(baseUrl, token, "", startIso, endIso, cookie)
             }
 
-            if (events.isEmpty() && username.isNotEmpty() && password.isNotEmpty()) {
-                events = getLegacyCalendarEvents(baseUrl, username, password)
+            if (events.isEmpty() && (cookie.isNotEmpty() || (username.isNotEmpty() && password.isNotEmpty()))) {
+                events = getLegacyCalendarEvents(baseUrl, username, password, cookie)
             }
 
             return@withContext events
         } catch (e: Exception) {
             Log.e(tag, "Failed to get modern calendar events: ${e.message}")
-            if (username.isNotEmpty() && password.isNotEmpty()) {
-                return@withContext getLegacyCalendarEvents(baseUrl, username, password)
+            if (cookie.isNotEmpty() || (username.isNotEmpty() && password.isNotEmpty())) {
+                return@withContext getLegacyCalendarEvents(baseUrl, username, password, cookie)
             }
             return@withContext emptyList()
         }
@@ -890,7 +912,8 @@ class NeptunApiClient {
         token: String,
         trainId: String,
         startIso: String,
-        endIso: String
+        endIso: String,
+        cookie: String = ""
     ): List<CalendarEvent> = withContext(Dispatchers.IO) {
         try {
             val urlBuilder = StringBuilder("$baseUrl/api/Calendar/GetCalendarEvents")
@@ -915,7 +938,7 @@ class NeptunApiClient {
             val req = Request.Builder()
                 .url(urlBuilder.toString())
                 .get()
-                .addHeader("Authorization", "Bearer $token")
+                .withNeptunHeaders(baseUrl, token, cookie)
                 .addHeader("Content-Type", "application/json")
                 .build()
 
@@ -995,7 +1018,12 @@ class NeptunApiClient {
         }
     }
 
-    private suspend fun getLegacyCalendarEvents(baseUrl: String, user: String, pass: String): List<CalendarEvent> = withContext(Dispatchers.IO) {
+    private suspend fun getLegacyCalendarEvents(
+        baseUrl: String,
+        user: String,
+        pass: String,
+        cookie: String = ""
+    ): List<CalendarEvent> = withContext(Dispatchers.IO) {
         try {
             val now = System.currentTimeMillis()
             val startEpoch = now - 7 * 86400000L
@@ -1017,6 +1045,7 @@ class NeptunApiClient {
             val req = Request.Builder()
                 .url(url)
                 .post(body.toRequestBody("application/json".toMediaType()))
+                .withNeptunHeaders(baseUrl, "", cookie)
                 .addHeader("Content-Type", "application/json")
                 .build()
 
@@ -1076,10 +1105,11 @@ class NeptunApiClient {
         token: String,
         username: String,
         password: String,
-        isModern: Boolean
+        isModern: Boolean,
+        cookie: String = ""
     ): List<SubjectGrade> = withContext(Dispatchers.IO) {
-        if (!isModern) {
-            return@withContext getLegacyGrades(baseUrl, username, password)
+        if (!isModern && cookie.isBlank()) {
+            return@withContext getLegacyGrades(baseUrl, username, password, cookie)
         }
 
         try {
@@ -1091,7 +1121,7 @@ class NeptunApiClient {
                 val termsReq = Request.Builder()
                     .url(termsUrl)
                     .get()
-                    .addHeader("Authorization", "Bearer $token")
+                    .withNeptunHeaders(baseUrl, token, cookie)
                     .addHeader("Content-Type", "application/json")
                     .build()
 
@@ -1151,7 +1181,7 @@ class NeptunApiClient {
                         val subReq = Request.Builder()
                             .url(subjectsUrl)
                             .get()
-                            .addHeader("Authorization", "Bearer $token")
+                            .withNeptunHeaders(baseUrl, token, cookie)
                             .addHeader("Content-Type", "application/json")
                             .build()
 
@@ -1259,7 +1289,7 @@ class NeptunApiClient {
                 val offReq = Request.Builder()
                     .url(offeredUrl)
                     .get()
-                    .addHeader("Authorization", "Bearer $token")
+                    .withNeptunHeaders(baseUrl, token, cookie)
                     .addHeader("Content-Type", "application/json")
                     .build()
                 val offResp = okHttpClient.newCall(offReq).execute()
@@ -1290,28 +1320,34 @@ class NeptunApiClient {
                 Log.e(tag, "OfferedGrades optional check: ${e.message}")
             }
 
-            if (allGrades.isEmpty() && username.isNotEmpty() && password.isNotEmpty()) {
-                getLegacyGrades(baseUrl, username, password)
+            if (allGrades.isEmpty() && (cookie.isNotEmpty() || (username.isNotEmpty() && password.isNotEmpty()))) {
+                getLegacyGrades(baseUrl, username, password, cookie)
             } else {
                 allGrades
             }
         } catch (e: Exception) {
             Log.e(tag, "Modern grades fetch error: ${e.message}")
-            if (username.isNotEmpty() && password.isNotEmpty()) {
-                getLegacyGrades(baseUrl, username, password)
+            if (cookie.isNotEmpty() || (username.isNotEmpty() && password.isNotEmpty())) {
+                getLegacyGrades(baseUrl, username, password, cookie)
             } else {
                 emptyList()
             }
         }
     }
 
-    private suspend fun getLegacyGrades(baseUrl: String, user: String, pass: String): List<SubjectGrade> = withContext(Dispatchers.IO) {
+    private suspend fun getLegacyGrades(
+        baseUrl: String,
+        user: String,
+        pass: String,
+        cookie: String = ""
+    ): List<SubjectGrade> = withContext(Dispatchers.IO) {
         try {
             val body = """{"UserLogin":"$user","Password":"$pass","CurrentPage":1,"filter":{"TermID":0},"TotalRowCount":-1}"""
             val url = getLegacyServiceUrl(baseUrl, "GetMarkbookData")
             val req = Request.Builder()
                 .url(url)
                 .post(body.toRequestBody("application/json".toMediaType()))
+                .withNeptunHeaders(baseUrl, "", cookie)
                 .addHeader("Content-Type", "application/json")
                 .build()
 
@@ -1386,10 +1422,11 @@ class NeptunApiClient {
         username: String,
         password: String,
         isModern: Boolean,
-        page: Int = 1
+        page: Int = 1,
+        cookie: String = ""
     ): List<NeptunMessage> = withContext(Dispatchers.IO) {
-        if (!isModern) {
-            return@withContext getLegacyMessages(baseUrl, username, password, page)
+        if (!isModern && cookie.isBlank()) {
+            return@withContext getLegacyMessages(baseUrl, username, password, page, cookie)
         }
 
         try {
@@ -1400,7 +1437,7 @@ class NeptunApiClient {
             val req = Request.Builder()
                 .url(url)
                 .get()
-                .addHeader("Authorization", "Bearer $token")
+                .withNeptunHeaders(baseUrl, token, cookie)
                 .addHeader("Content-Type", "application/json")
                 .build()
 
@@ -1447,7 +1484,11 @@ class NeptunApiClient {
             return@withContext list
         } catch (e: Exception) {
             Log.e(tag, "Modern messages error: ${e.message}")
-            emptyList()
+            if (cookie.isNotEmpty() || (username.isNotEmpty() && password.isNotEmpty())) {
+                getLegacyMessages(baseUrl, username, password, page, cookie)
+            } else {
+                emptyList()
+            }
         }
     }
 
@@ -1457,9 +1498,10 @@ class NeptunApiClient {
         messageId: String,
         isModern: Boolean,
         username: String = "",
-        password: String = ""
+        password: String = "",
+        cookie: String = ""
     ): String = withContext(Dispatchers.IO) {
-        if (isModern && token.isNotBlank()) {
+        if (isModern || cookie.isNotBlank()) {
             val candidateUrls = listOf(
                 "$baseUrl/api/Messages/$messageId/Posts?messageId=$messageId",
                 "$baseUrl/api/Message/GetMessagePosts?messageId=$messageId",
@@ -1474,7 +1516,7 @@ class NeptunApiClient {
                     val req = Request.Builder()
                         .url(url)
                         .get()
-                        .addHeader("Authorization", "Bearer $token")
+                        .withNeptunHeaders(baseUrl, token, cookie)
                         .addHeader("Content-Type", "application/json")
                         .build()
 
@@ -1541,7 +1583,7 @@ class NeptunApiClient {
         }
 
         // If legacy or modern failed, try legacy /GetMessages with message ID
-        if (username.isNotBlank() && password.isNotBlank()) {
+        if (cookie.isNotBlank() || (username.isNotBlank() && password.isNotBlank())) {
             try {
                 val numId = messageId.toLongOrNull() ?: 0L
                 val body = """{"UserLogin":"$username","Password":"$password","CurrentPage":0,"TotalRowCount":-1,"MessageID":$numId,"MessageSortEnum":0}"""
@@ -1549,6 +1591,7 @@ class NeptunApiClient {
                 val req = Request.Builder()
                     .url(url)
                     .post(body.toRequestBody("application/json".toMediaType()))
+                    .withNeptunHeaders(baseUrl, "", cookie)
                     .addHeader("Content-Type", "application/json")
                     .build()
 
@@ -1578,13 +1621,20 @@ class NeptunApiClient {
         ""
     }
 
-    private suspend fun getLegacyMessages(baseUrl: String, user: String, pass: String, page: Int): List<NeptunMessage> = withContext(Dispatchers.IO) {
+    private suspend fun getLegacyMessages(
+        baseUrl: String,
+        user: String,
+        pass: String,
+        page: Int,
+        cookie: String = ""
+    ): List<NeptunMessage> = withContext(Dispatchers.IO) {
         try {
             val body = """{"UserLogin":"$user","Password":"$pass","CurrentPage":$page,"TotalRowCount":-1,"MessageID":0,"MessageSortEnum":0}"""
             val url = getLegacyServiceUrl(baseUrl, "GetMessages")
             val req = Request.Builder()
                 .url(url)
                 .post(body.toRequestBody("application/json".toMediaType()))
+                .withNeptunHeaders(baseUrl, "", cookie)
                 .addHeader("Content-Type", "application/json")
                 .build()
 
@@ -1647,11 +1697,12 @@ class NeptunApiClient {
         messageId: String,
         isModern: Boolean,
         username: String = "",
-        password: String = ""
+        password: String = "",
+        cookie: String = ""
     ): Boolean = withContext(Dispatchers.IO) {
         var success = false
         try {
-            if (isModern && token.isNotBlank()) {
+            if (isModern || cookie.isNotBlank()) {
                 val urls = listOf(
                     "$baseUrl/api/Message/SetMessageRead?messageId=$messageId",
                     "$baseUrl/api/Message/SetReadState?messageId=$messageId",
@@ -1663,7 +1714,7 @@ class NeptunApiClient {
                         val req = Request.Builder()
                             .url(url)
                             .post("""{"messageId":"$messageId","isRead":true}""".toRequestBody("application/json".toMediaType()))
-                            .addHeader("Authorization", "Bearer $token")
+                            .withNeptunHeaders(baseUrl, token, cookie)
                             .addHeader("Content-Type", "application/json")
                             .build()
                         val resp = okHttpClient.newCall(req).execute()
@@ -1674,7 +1725,7 @@ class NeptunApiClient {
                 }
             }
 
-            if (username.isNotBlank() && password.isNotBlank()) {
+            if (cookie.isNotBlank() || (username.isNotBlank() && password.isNotBlank())) {
                 val numId = messageId.toLongOrNull() ?: 0L
                 val legacyServices = listOf("SetMessageRead", "ReadMessage", "GetMessageDetail")
                 for (svc in legacyServices) {
@@ -1684,6 +1735,7 @@ class NeptunApiClient {
                         val req = Request.Builder()
                             .url(url)
                             .post(body.toRequestBody("application/json".toMediaType()))
+                            .withNeptunHeaders(baseUrl, "", cookie)
                             .addHeader("Content-Type", "application/json")
                             .build()
                         val resp = okHttpClient.newCall(req).execute()
@@ -1719,10 +1771,11 @@ class NeptunApiClient {
         token: String,
         username: String,
         password: String,
-        isModern: Boolean
+        isModern: Boolean,
+        cookie: String = ""
     ): List<FinanceItem> = withContext(Dispatchers.IO) {
-        if (!isModern) {
-            return@withContext getLegacyFinances(baseUrl, username, password)
+        if (!isModern && cookie.isBlank()) {
+            return@withContext getLegacyFinances(baseUrl, username, password, cookie)
         }
 
         val list = mutableListOf<FinanceItem>()
@@ -1733,7 +1786,7 @@ class NeptunApiClient {
             val toPayReq = Request.Builder()
                 .url(toPayUrl)
                 .get()
-                .addHeader("Authorization", "Bearer $token")
+                .withNeptunHeaders(baseUrl, token, cookie)
                 .addHeader("Content-Type", "application/json")
                 .build()
             val toPayResp = okHttpClient.newCall(toPayReq).execute()
@@ -1789,7 +1842,7 @@ class NeptunApiClient {
             val impReq = Request.Builder()
                 .url(impositionsUrl)
                 .get()
-                .addHeader("Authorization", "Bearer $token")
+                .withNeptunHeaders(baseUrl, token, cookie)
                 .addHeader("Content-Type", "application/json")
                 .build()
             val impResp = okHttpClient.newCall(impReq).execute()
@@ -1856,7 +1909,7 @@ class NeptunApiClient {
             val req = Request.Builder()
                 .url(url)
                 .get()
-                .addHeader("Authorization", "Bearer $token")
+                .withNeptunHeaders(baseUrl, token, cookie)
                 .addHeader("Content-Type", "application/json")
                 .build()
 
@@ -1913,20 +1966,26 @@ class NeptunApiClient {
             Log.e(tag, "Modern transactions error: ${e.message}")
         }
 
-        if (list.isEmpty() && username.isNotEmpty() && password.isNotEmpty()) {
-            getLegacyFinances(baseUrl, username, password)
+        if (list.isEmpty() && (cookie.isNotEmpty() || (username.isNotEmpty() && password.isNotEmpty()))) {
+            getLegacyFinances(baseUrl, username, password, cookie)
         } else {
             list
         }
     }
 
-    private suspend fun getLegacyFinances(baseUrl: String, user: String, pass: String): List<FinanceItem> = withContext(Dispatchers.IO) {
+    private suspend fun getLegacyFinances(
+        baseUrl: String,
+        user: String,
+        pass: String,
+        cookie: String = ""
+    ): List<FinanceItem> = withContext(Dispatchers.IO) {
         try {
             val body = """{"UserLogin":"$user","Password":"$pass","TotalRowCount":-1}"""
             val url = getLegacyServiceUrl(baseUrl, "GetCashinData")
             val req = Request.Builder()
                 .url(url)
                 .post(body.toRequestBody("application/json".toMediaType()))
+                .withNeptunHeaders(baseUrl, "", cookie)
                 .addHeader("Content-Type", "application/json")
                 .build()
 
