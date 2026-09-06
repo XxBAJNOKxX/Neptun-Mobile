@@ -1,0 +1,57 @@
+name: Build & Release APK
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build & Create Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - name: Grant Execute Permission for Gradlew
+        run: chmod +x gradlew
+
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: Generate Version Tag
+        id: versioning
+        run: |
+          VERSION_TAG="v1.0.${{ github.run_number }}"
+          echo "VERSION_TAG=$VERSION_TAG" >> $GITHUB_OUTPUT
+          echo "Generated version tag: $VERSION_TAG"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.versioning.outputs.VERSION_TAG }}
+          name: "Neptun Mobile ${{ steps.versioning.outputs.VERSION_TAG }}"
+          body: |
+            Automatikusan lefordított verzió a `${{ github.sha }}` commitból.
+            
+            ### Változtatások / Információk:
+            - **Commit SHA:** `${{ github.sha }}`
+            - **Build száma:** `${{ github.run_number }}`
+            - **Telepíthető APK:** `app-debug.apk`
+          files: |
+            app/build/outputs/apk/debug/app-debug.apk
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
