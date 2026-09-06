@@ -108,8 +108,13 @@ class NeptunApiClient {
         while (url.endsWith("/")) {
             url = url.substring(0, url.length - 1)
         }
+        url = url.replace(Regex("""/Account/Login2FA(\?.*)?$""", RegexOption.IGNORE_CASE), "")
+        url = url.replace(Regex("""/Account/Login(\?.*)?$""", RegexOption.IGNORE_CASE), "")
         url = url.replace(Regex("""/login(\.aspx)?$""", RegexOption.IGNORE_CASE), "")
         url = url.replace(Regex("""/MobileService\.svc$""", RegexOption.IGNORE_CASE), "")
+        while (url.endsWith("/")) {
+            url = url.substring(0, url.length - 1)
+        }
         return url
     }
 
@@ -207,18 +212,25 @@ class NeptunApiClient {
 
     fun parseFormInputs(formHtml: String): Map<String, String> {
         val inputs = mutableMapOf<String, String>()
-        val inputRegex = Regex("""<input\s+([^>]+)>""", RegexOption.IGNORE_CASE)
-        val nameRegex = Regex("""name="([^"]+)"""", RegexOption.IGNORE_CASE)
-        val valueRegex = Regex("""value="([^"]*)"""", RegexOption.IGNORE_CASE)
+        val inputTagRegex = Regex("""<input\b([^>]*)>""", RegexOption.IGNORE_CASE)
+        val nameRegex = Regex("""\bname\s*=\s*["']?([^"' >]+)["']?""", RegexOption.IGNORE_CASE)
+        val valueRegex = Regex("""\bvalue\s*=\s*["']([^"']*)["']|\bvalue\s*=\s*([^\s>]+)""", RegexOption.IGNORE_CASE)
 
-        for (match in inputRegex.findAll(formHtml)) {
+        for (match in inputTagRegex.findAll(formHtml)) {
             val attrs = match.groupValues[1]
             val nameMatch = nameRegex.find(attrs)
-            val valueMatch = valueRegex.find(attrs)
             if (nameMatch != null) {
                 val name = nameMatch.groupValues[1]
-                val value = valueMatch?.groupValues?.get(1) ?: ""
-                inputs[name] = value
+                val valueMatch = valueRegex.find(attrs)
+                val rawValue = valueMatch?.let {
+                    if (it.groupValues[1].isNotEmpty() || attrs.contains("value=\"\"") || attrs.contains("value=''")) {
+                        it.groupValues[1]
+                    } else {
+                        it.groupValues[2]
+                    }
+                } ?: ""
+
+                inputs[name] = rawValue
                     .replace("&#x2B;", "+")
                     .replace("&amp;", "&")
                     .replace("&quot;", "\"")
@@ -230,13 +242,6 @@ class NeptunApiClient {
 
     fun extractValidationErrors(html: String): List<String> {
         val errors = mutableListOf<String>()
-        val dangerRegex = Regex("""class="[^"]*text-danger[^"]*"[^>]*>([\s\S]*?)<\/""", RegexOption.IGNORE_CASE)
-        for (match in dangerRegex.findAll(html)) {
-            val clean = match.groupValues[1].replace(Regex("""<[^>]+>"""), "").trim()
-            if (clean.isNotBlank() && !errors.contains(clean)) {
-                errors.add(clean)
-            }
-        }
 
         val summaryRegex = Regex("""class="[^"]*validation-summary-errors[^"]*"[^>]*>([\s\S]*?)<\/div>""", RegexOption.IGNORE_CASE)
         val summaryMatch = summaryRegex.find(html)
@@ -249,6 +254,15 @@ class NeptunApiClient {
                 }
             }
         }
+
+        val dangerRegex = Regex("""class="[^"]*text-danger[^"]*"[^>]*>([\s\S]*?)<\/(?:span|div|p|h\d)>""", RegexOption.IGNORE_CASE)
+        for (match in dangerRegex.findAll(html)) {
+            val clean = match.groupValues[1].replace(Regex("""<[^>]+>"""), "").trim()
+            if (clean.isNotBlank() && !clean.equals("Hiba", ignoreCase = true) && !errors.contains(clean)) {
+                errors.add(clean)
+            }
+        }
+
         return errors
     }
 
@@ -265,8 +279,9 @@ class NeptunApiClient {
         val getReq = Request.Builder()
             .url(loginPageUrl)
             .get()
-            .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+            .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36")
             .addHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+            .addHeader("Accept-Language", "hu-HU,hu;q=0.9,en-US;q=0.8,en;q=0.7")
             .build()
 
         val getResp: okhttp3.Response
@@ -280,25 +295,31 @@ class NeptunApiClient {
         cookieMap = mergeCookies(cookieMap, parseCookiesFromHeaders(getCookies)).toMutableMap()
         val getHtml = getResp.body?.string() ?: ""
 
-        val formMatch = getHtml.split(Regex("""<form [^>]*action="/Account/Login"""", RegexOption.IGNORE_CASE)).getOrNull(1)
-            ?.split("</form>")?.getOrNull(0) ?: getHtml
-        val formInputs = parseFormInputs(formMatch)
+        val formInputs = parseFormInputs(getHtml)
         val token = formInputs["__RequestVerificationToken"] ?: ""
 
         // 2. POST /Account/Login with credentials and token
         val postParams = FormBody.Builder()
             .add("LoginName", username)
             .add("Password", password)
-            .add("ReturnUrl", "")
+            .add("ReturnUrl", formInputs["ReturnUrl"] ?: "")
 
         if (token.isNotEmpty()) {
             postParams.add("__RequestVerificationToken", token)
         }
 
+        for ((k, v) in formInputs) {
+            if (k != "LoginName" && k != "Password" && k != "ReturnUrl" && k != "__RequestVerificationToken") {
+                postParams.add(k, v)
+            }
+        }
+
         val postReq = Request.Builder()
             .url(loginPageUrl)
             .post(postParams.build())
-            .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+            .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36")
+            .addHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+            .addHeader("Accept-Language", "hu-HU,hu;q=0.9,en-US;q=0.8,en;q=0.7")
             .addHeader("Referer", loginPageUrl)
             .addHeader("Origin", cleanBase)
             .addHeader("Cookie", cookieHeaderString(cookieMap))
@@ -316,7 +337,7 @@ class NeptunApiClient {
         val locationHeader = postResp.header("Location") ?: ""
         val statusCode = postResp.code
 
-        if ((statusCode == 302 || statusCode == 301 || statusCode == 303 || statusCode == 307) && locationHeader.isNotEmpty()) {
+        if ((statusCode in 300..399) && locationHeader.isNotEmpty()) {
             val redirectUrl = if (locationHeader.startsWith("http")) locationHeader else "$cleanBase${if (locationHeader.startsWith("/")) "" else "/"}$locationHeader"
             
             if (locationHeader.contains("Login2FA", ignoreCase = true) || locationHeader.contains("Key=", ignoreCase = true)) {
@@ -324,7 +345,9 @@ class NeptunApiClient {
                 val get2FaReq = Request.Builder()
                     .url(redirectUrl)
                     .get()
-                    .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                    .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36")
+                    .addHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+                    .addHeader("Accept-Language", "hu-HU,hu;q=0.9,en-US;q=0.8,en;q=0.7")
                     .addHeader("Referer", loginPageUrl)
                     .addHeader("Cookie", cookieHeaderString(cookieMap))
                     .build()
@@ -339,20 +362,18 @@ class NeptunApiClient {
                 cookieMap = mergeCookies(cookieMap, parseCookiesFromHeaders(res2FaCookies)).toMutableMap()
                 val html2Fa = res2Fa.body?.string() ?: ""
 
-                val form2FaMatch = html2Fa.split(Regex("""<form [^>]*action="/Account/Login2FA"""", RegexOption.IGNORE_CASE)).getOrNull(1)
-                    ?.split("</form>")?.getOrNull(0) ?: html2Fa
-                val inputs2Fa = parseFormInputs(form2FaMatch)
+                val inputs2Fa = parseFormInputs(html2Fa)
 
                 val uriKey = try {
                     val uri = java.net.URI(redirectUrl)
                     val query = uri.query ?: ""
-                    query.split("&").firstOrNull { it.startsWith("Key=") }?.substringAfter("Key=") ?: ""
+                    query.split("&").firstOrNull { it.startsWith("Key=", ignoreCase = true) }?.substringAfter("=") ?: ""
                 } catch (e: Exception) {
                     ""
                 }
 
                 val session = Neptun2FASession(
-                    neptunCode = inputs2Fa["NeptunCode"] ?: username,
+                    neptunCode = inputs2Fa["NeptunCode"]?.ifEmpty { username } ?: username,
                     key = inputs2Fa["Key"]?.ifEmpty { uriKey } ?: uriKey,
                     phase = inputs2Fa["Phase"] ?: "RequestTOTP",
                     rendered = inputs2Fa["Rendered"] ?: "",
@@ -411,7 +432,9 @@ class NeptunApiClient {
             val req = Request.Builder()
                 .url(postUrl)
                 .post(formBuilder.build())
-                .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36")
+                .addHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+                .addHeader("Accept-Language", "hu-HU,hu;q=0.9,en-US;q=0.8,en;q=0.7")
                 .addHeader("Referer", "$postUrl?NeptunCode=${session.neptunCode}&Key=${session.key}")
                 .addHeader("Origin", session.baseUrl)
                 .addHeader("Cookie", cookieHeaderString(cookieMap))
@@ -427,16 +450,14 @@ class NeptunApiClient {
                 return@withContext Result.failure(Exception(errors.joinToString(" | ")))
             }
 
-            val formMatch = html.split(Regex("""<form [^>]*action="/Account/Login2FA"""", RegexOption.IGNORE_CASE)).getOrNull(1)
-                ?.split("</form>")?.getOrNull(0) ?: html
-            val inputs = parseFormInputs(formMatch)
+            val inputs = parseFormInputs(html)
 
             val updatedSession = session.copy(
                 phase = inputs["Phase"] ?: "RequestEmailCode",
                 codePrefix = inputs["CodePrefix"] ?: "",
                 rendered = inputs["Rendered"] ?: session.rendered,
                 verificationToken = inputs["__RequestVerificationToken"] ?: session.verificationToken,
-                key = inputs["Key"] ?: session.key,
+                key = inputs["Key"]?.ifEmpty { session.key } ?: session.key,
                 cookies = cookieMap
             )
             Result.success(updatedSession)
@@ -452,8 +473,9 @@ class NeptunApiClient {
     ): NeptunAuthResult = withContext(Dispatchers.IO) {
         try {
             val postUrl = "${session.baseUrl}/Account/Login2FA"
+            val effectivePhase = if (isTotp) "RequestTOTP" else "RequestEmailCode"
             val formBuilder = FormBody.Builder()
-                .add("Phase", session.phase)
+                .add("Phase", effectivePhase)
                 .add("Rendered", session.rendered)
                 .add("NeptunCode", session.neptunCode)
                 .add("Key", session.key)
@@ -462,7 +484,7 @@ class NeptunApiClient {
                 .add("HasEmail", if (session.hasEmail) "True" else "False")
                 .add("CodePrefix", session.codePrefix)
 
-            if (isTotp || session.phase.equals("RequestTOTP", ignoreCase = true)) {
+            if (isTotp) {
                 formBuilder.add("TOTPCode", code.trim())
             } else {
                 formBuilder.add("EmailCode", code.trim())
@@ -476,8 +498,10 @@ class NeptunApiClient {
             val req = Request.Builder()
                 .url(postUrl)
                 .post(formBuilder.build())
-                .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-                .addHeader("Referer", postUrl)
+                .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36")
+                .addHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+                .addHeader("Accept-Language", "hu-HU,hu;q=0.9,en-US;q=0.8,en;q=0.7")
+                .addHeader("Referer", "$postUrl?NeptunCode=${session.neptunCode}&Key=${session.key}")
                 .addHeader("Origin", session.baseUrl)
                 .addHeader("Cookie", cookieHeaderString(cookieMap))
                 .build()
@@ -489,7 +513,7 @@ class NeptunApiClient {
             val statusCode = resp.code
             val locationHeader = resp.header("Location") ?: ""
 
-            if (statusCode == 302 || statusCode == 301 || statusCode == 303 || statusCode == 307) {
+            if (statusCode in 300..399) {
                 return@withContext NeptunAuthResult.Success(
                     accessToken = "aspnet-verified-${session.neptunCode}",
                     refreshToken = null,
