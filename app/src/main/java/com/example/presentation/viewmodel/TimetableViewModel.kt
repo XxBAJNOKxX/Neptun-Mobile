@@ -40,15 +40,14 @@ data class TimetableUiState(
 )
 
 private fun currentOrNextSchoolDay(): Int {
-    val day = Calendar.getInstance().get(Calendar.DAY_OF_WEEK)
-    // Calendar: Sun = 1, Mon = 2, Tue = 3, Wed = 4, Thu = 5, Fri = 6, Sat = 7
-    return when (day) {
-        Calendar.MONDAY -> 1
-        Calendar.TUESDAY -> 2
-        Calendar.WEDNESDAY -> 3
-        Calendar.THURSDAY -> 4
-        Calendar.FRIDAY -> 5
-        else -> 1 // Weekend defaults to Monday
+    val dayOfWeek = LocalDate.now().dayOfWeek
+    return when (dayOfWeek) {
+        DayOfWeek.MONDAY -> 1
+        DayOfWeek.TUESDAY -> 2
+        DayOfWeek.WEDNESDAY -> 3
+        DayOfWeek.THURSDAY -> 4
+        DayOfWeek.FRIDAY -> 5
+        DayOfWeek.SATURDAY, DayOfWeek.SUNDAY -> 1
     }
 }
 
@@ -68,6 +67,7 @@ class TimetableViewModel(
     private fun buildInitialUiState(): TimetableUiState {
         val (weekDays, weekLabel) = calculateWeekInfo(0)
         return TimetableUiState(
+            selectedDayOfWeek = currentOrNextSchoolDay(),
             selectedWeekOffset = 0,
             weekLabel = weekLabel,
             weekDays = weekDays
@@ -76,7 +76,13 @@ class TimetableViewModel(
 
     private fun calculateWeekInfo(offset: Int): Pair<List<WeekDayInfo>, String> {
         val today = LocalDate.now()
-        val monday = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).plusWeeks(offset.toLong())
+        val isWeekend = today.dayOfWeek == DayOfWeek.SATURDAY || today.dayOfWeek == DayOfWeek.SUNDAY
+        val baseMonday = if (isWeekend) {
+            today.with(TemporalAdjusters.next(DayOfWeek.MONDAY))
+        } else {
+            today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+        }
+        val monday = baseMonday.plusWeeks(offset.toLong())
         val dayNames = listOf("Hétfő", "Kedd", "Szerda", "Csütörtök", "Péntek")
 
         val days = (0..4).map { i ->
