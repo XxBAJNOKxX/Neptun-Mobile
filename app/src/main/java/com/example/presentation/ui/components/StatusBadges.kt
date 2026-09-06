@@ -27,13 +27,14 @@ import com.example.ui.theme.NeptunRed
 
 @Composable
 fun CourseTypeBadge(courseType: CourseType, modifier: Modifier = Modifier) {
-    val (bgColor, textColor) = when (courseType) {
-        CourseType.LECTURE -> Color(0xFFEFF6FF) to Color(0xFF1D4ED8)
-        CourseType.PRACTICE -> Color(0xFFF0FDF4) to Color(0xFF15803D)
-        CourseType.LAB -> Color(0xFFFAF5FF) to Color(0xFF7E22CE)
-        CourseType.SEMINAR -> Color(0xFFFFFBEB) to Color(0xFFB45309)
-        CourseType.EXAM -> Color(0xFFFEF2F2) to Color(0xFFB91C1C)
+    val textColor = when (courseType) {
+        CourseType.LECTURE -> Color(0xFF3B82F6)
+        CourseType.PRACTICE -> NeptunGreen
+        CourseType.LAB -> NeptunPurple
+        CourseType.SEMINAR -> NeptunGold
+        CourseType.EXAM -> NeptunRed
     }
+    val bgColor = textColor.copy(alpha = 0.15f)
 
     Surface(
         color = bgColor,
@@ -52,18 +53,19 @@ fun CourseTypeBadge(courseType: CourseType, modifier: Modifier = Modifier) {
 
 @Composable
 fun GradeBadge(grade: Int?, gradeText: String, isGhost: Boolean = false, modifier: Modifier = Modifier) {
-    val (bgColor, textColor) = if (isGhost) {
-        Color(0xFFEDE9FE) to NeptunPurple
+    val textColor = if (isGhost) {
+        NeptunPurple
     } else {
         when (grade) {
-            5 -> Color(0xFFDCFCE7) to NeptunGreen
-            4 -> Color(0xFFE0F2FE) to Color(0xFF0369A1)
-            3 -> Color(0xFFFEF3C7) to NeptunGold
-            2 -> Color(0xFFFFEDD5) to Color(0xFFC2410C)
-            1 -> Color(0xFFFEE2E2) to NeptunRed
-            else -> Color(0xFFF1F5F9) to Color(0xFF64748B)
+            5 -> NeptunGreen
+            4 -> Color(0xFF0284C7)
+            3 -> NeptunGold
+            2 -> Color(0xFFEA580C)
+            1 -> NeptunRed
+            else -> MaterialTheme.colorScheme.onSurfaceVariant
         }
     }
+    val bgColor = textColor.copy(alpha = 0.15f)
 
     Surface(
         color = bgColor,
@@ -100,11 +102,12 @@ fun GradeBadge(grade: Int?, gradeText: String, isGhost: Boolean = false, modifie
 
 @Composable
 fun FinanceStatusBadge(status: FinanceStatus, modifier: Modifier = Modifier) {
-    val (bgColor, textColor) = when (status) {
-        FinanceStatus.COMPLETED -> Color(0xFFDCFCE7) to NeptunGreen
-        FinanceStatus.PENDING -> Color(0xFFFEF3C7) to Color(0xFFD97706)
-        FinanceStatus.OVERDUE -> Color(0xFFFEE2E2) to NeptunRed
+    val textColor = when (status) {
+        FinanceStatus.COMPLETED -> NeptunGreen
+        FinanceStatus.PENDING -> Color(0xFFD97706)
+        FinanceStatus.OVERDUE -> NeptunRed
     }
+    val bgColor = textColor.copy(alpha = 0.15f)
 
     Surface(
         color = bgColor,
