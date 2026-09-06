@@ -13,6 +13,9 @@ class AlarmScheduler(private val context: Context) {
     private val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
     fun scheduleClassAlarm(event: CalendarEvent) {
+        if (!event.isActualAttendedClass) return
+        if (event.startHour == 0 && event.startMinute == 0) return
+
         val calendar = Calendar.getInstance().apply {
             // Set to event day of week (Monday is 1 in domain, Calendar.MONDAY is 2)
             val calDayOfWeek = when (event.dayOfWeek) {

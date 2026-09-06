@@ -135,8 +135,8 @@ class TimetableViewModel(
 
         val todayIso = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
         val todayEvents = events.filter {
-            if (it.dateString.isNotBlank()) it.dateString.startsWith(todayIso)
-            else it.dayOfWeek == currentDayOfWeek
+            it.isActualAttendedClass &&
+            (if (it.dateString.isNotBlank()) it.dateString.startsWith(todayIso) else it.dayOfWeek == currentDayOfWeek)
         }
 
         val ongoing = todayEvents.firstOrNull { event ->
