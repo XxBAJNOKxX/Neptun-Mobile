@@ -370,7 +370,7 @@ fun LoginScreen(
                             )
                         } else {
                             Text(
-                                text = "1. Bejelentkezés (Elsődleges)",
+                                text = "Bejelentkezés",
                                 fontSize = 15.sp,
                                 fontWeight = FontWeight.Bold
                             )
@@ -684,7 +684,7 @@ fun LoginScreen(
                                         modifier = Modifier.size(16.dp)
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Text("2. E-mail kód kérése")
+                                    Text("E-mail kód kérése")
                                 }
                             }
                         } else {
