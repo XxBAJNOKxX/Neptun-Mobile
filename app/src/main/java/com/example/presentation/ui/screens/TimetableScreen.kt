@@ -414,9 +414,9 @@ private fun LiveHighlightBanner(
     Card(
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (isOngoing) Color(0xFFF0FDF4) else Color(0xFFEFF6FF)
+            containerColor = badgeColor.copy(alpha = 0.12f)
         ),
-        border = BorderStroke(1.5.dp, badgeColor),
+        border = BorderStroke(1.5.dp, badgeColor.copy(alpha = 0.5f)),
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
@@ -540,7 +540,7 @@ fun TimetableEventCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (isOngoing) {
                         Surface(
-                            color = Color(0xFFDCFCE7),
+                            color = NeptunGreen.copy(alpha = 0.15f),
                             shape = RoundedCornerShape(6.dp),
                             modifier = Modifier.padding(end = 6.dp)
                         ) {
@@ -554,7 +554,7 @@ fun TimetableEventCard(
                         }
                     } else if (isNextUpcoming) {
                         Surface(
-                            color = Color(0xFFE0F2FE),
+                            color = NeptunCyan40.copy(alpha = 0.15f),
                             shape = RoundedCornerShape(6.dp),
                             modifier = Modifier.padding(end = 6.dp)
                         ) {

@@ -60,6 +60,7 @@ import com.example.ui.theme.NeptunCyan40
 import com.example.ui.theme.NeptunGold
 import com.example.ui.theme.NeptunGreen
 import com.example.ui.theme.NeptunPurple
+import com.example.ui.theme.NeptunRed
 
 @Composable
 fun GradesScreen(
@@ -346,7 +347,7 @@ private fun AcademicSummaryCard(
             if (hasGhost) {
                 Spacer(modifier = Modifier.height(14.dp))
                 Surface(
-                    color = Color(0xFFFAF5FF),
+                    color = NeptunPurple.copy(alpha = 0.12f),
                     shape = RoundedCornerShape(12.dp),
                     border = BorderStroke(1.dp, NeptunPurple.copy(alpha = 0.4f)),
                     modifier = Modifier.fillMaxWidth()
@@ -374,7 +375,7 @@ private fun AcademicSummaryCard(
                                 Text(
                                     text = "Szimulált kreditindex: ${calc?.ghostCreditIndex ?: 0.0}",
                                     fontSize = 11.sp,
-                                    color = Color(0xFF6B21A8)
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
@@ -389,12 +390,12 @@ private fun AcademicSummaryCard(
                             Spacer(modifier = Modifier.width(4.dp))
                             if (ghostDiff != 0.0) {
                                 Surface(
-                                    color = if (ghostDiff > 0) Color(0xFFDCFCE7) else Color(0xFFFEE2E2),
+                                    color = if (ghostDiff > 0) NeptunGreen.copy(alpha = 0.15f) else NeptunRed.copy(alpha = 0.15f),
                                     shape = RoundedCornerShape(4.dp)
                                 ) {
                                     Text(
                                         text = if (ghostDiff > 0) "+%.2f".format(ghostDiff) else "%.2f".format(ghostDiff),
-                                        color = if (ghostDiff > 0) NeptunGreen else Color(0xFFDC2626),
+                                        color = if (ghostDiff > 0) NeptunGreen else NeptunRed,
                                         fontSize = 10.sp,
                                         fontWeight = FontWeight.ExtraBold,
                                         modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
