@@ -97,6 +97,13 @@ fun TimetableScreen(
     )
     val snackbarHostState = remember { SnackbarHostState() }
 
+    LaunchedEffect(uiState.selectedDayOfWeek) {
+        val targetPage = (uiState.selectedDayOfWeek - 1).coerceIn(0, 4)
+        if (pagerState.currentPage != targetPage && !pagerState.isScrollInProgress) {
+            pagerState.scrollToPage(targetPage)
+        }
+    }
+
     LaunchedEffect(pagerState.currentPage) {
         val day = pagerState.currentPage + 1
         if (day != uiState.selectedDayOfWeek) {
