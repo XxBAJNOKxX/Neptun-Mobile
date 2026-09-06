@@ -59,7 +59,10 @@ fun MainAppContent() {
                 }
                 authViewModel.quickDemoFill()
             },
+            onQuickElteTestFill = authViewModel::quickElteTestFill,
             onTwoFactorCodeChange = authViewModel::onTwoFactorCodeChange,
+            onTwoFactorMethodChange = authViewModel::onTwoFactorMethodChange,
+            onRequestEmailCode = authViewModel::requestEmailCode,
             onSubmitTwoFactor = authViewModel::submitTwoFactor,
             onCancelTwoFactor = authViewModel::cancelTwoFactor
         )

@@ -27,13 +27,18 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -45,8 +50,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -60,6 +66,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -70,6 +77,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.example.domain.model.TwoFactorMethod
 import com.example.domain.model.University
 import com.example.presentation.viewmodel.AuthUiState
 import com.example.ui.theme.NeptunBlue40
@@ -84,7 +92,10 @@ fun LoginScreen(
     onPasswordChange: (String) -> Unit,
     onLoginClick: () -> Unit,
     onQuickDemoFill: () -> Unit,
+    onQuickElteTestFill: () -> Unit = {},
     onTwoFactorCodeChange: (String) -> Unit = {},
+    onTwoFactorMethodChange: (TwoFactorMethod) -> Unit = {},
+    onRequestEmailCode: () -> Unit = {},
     onSubmitTwoFactor: () -> Unit = {},
     onCancelTwoFactor: () -> Unit = {},
     modifier: Modifier = Modifier
@@ -105,13 +116,13 @@ fun LoginScreen(
                 .padding(horizontal = 24.dp, vertical = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
             // Branding Crest & Header
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
-                    .size(80.dp)
+                    .size(76.dp)
                     .clip(CircleShape)
                     .background(
                         Brush.linearGradient(
@@ -123,11 +134,11 @@ fun LoginScreen(
                     imageVector = Icons.Default.School,
                     contentDescription = "Neptun Logo",
                     tint = Color.White,
-                    modifier = Modifier.size(44.dp)
+                    modifier = Modifier.size(42.dp)
                 )
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
             Text(
                 text = "Neptun Mobile",
@@ -137,14 +148,14 @@ fun LoginScreen(
             )
 
             Text(
-                text = "Modern alternatív Neptun kliens magyar egyetemistáknak",
+                text = "Modern alternatív Neptun kliens 2FA támogatással",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
             )
 
-            Spacer(modifier = Modifier.height(28.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
             // Offline Ready Notice Banner
             if (uiState.isOfflineModeAvailable) {
@@ -153,7 +164,7 @@ fun LoginScreen(
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(bottom = 16.dp)
+                        .padding(bottom = 14.dp)
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -179,7 +190,9 @@ fun LoginScreen(
             // Main Card
             Card(
                 shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                ),
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -192,48 +205,64 @@ fun LoginScreen(
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.align(Alignment.Start)
-                    )
-                    Text(
-                        text = "Válaszd ki az egyetemedet, majd add meg az adataidat.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier
-                            .align(Alignment.Start)
-                            .padding(bottom = 16.dp)
+                        modifier = Modifier.fillMaxWidth()
                     )
 
-                    // University Selector Field
-                    OutlinedTextField(
-                        value = uiState.selectedUniversity?.name ?: "Válassz intézményt...",
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Felsőoktatási Intézmény") },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Default.AccountBalance,
-                                contentDescription = "Egyetem",
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                        },
-                        trailingIcon = {
-                            IconButton(onClick = { showUniversityDialog = true }) {
-                                Icon(
-                                    imageVector = Icons.Default.ArrowDropDown,
-                                    contentDescription = "Lista megnyitása"
-                                )
-                            }
-                        },
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = MaterialTheme.colorScheme.primary,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outline
-                        ),
+                    Spacer(modifier = Modifier.height(18.dp))
+
+                    // University Selector Trigger
+                    Text(
+                        text = "Intézmény / Egyetem",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 6.dp)
+                    )
+
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable { showUniversityDialog = true }
-                            .testTag("university_selector_field")
-                    )
+                            .testTag("university_selector")
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.AccountBalance,
+                                contentDescription = "Egyetem",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = uiState.selectedUniversity?.name ?: "Válassz egyetemet...",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                if (uiState.selectedUniversity != null) {
+                                    Text(
+                                        text = "${uiState.selectedUniversity.city} • ${uiState.selectedUniversity.neptunUrl}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        fontSize = 11.sp
+                                    )
+                                }
+                            }
+                            Icon(
+                                imageVector = Icons.Default.ArrowDropDown,
+                                contentDescription = "Lenyitás",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
 
                     Spacer(modifier = Modifier.height(14.dp))
 
@@ -242,7 +271,6 @@ fun LoginScreen(
                         value = uiState.neptunCode,
                         onValueChange = onNeptunCodeChange,
                         label = { Text("Neptun kód (6 karakter)") },
-                        placeholder = { Text("pl. AB12CD") },
                         singleLine = true,
                         leadingIcon = {
                             Icon(
@@ -342,14 +370,43 @@ fun LoginScreen(
                             )
                         } else {
                             Text(
-                                text = "Bejelentkezés",
-                                fontSize = 16.sp,
+                                text = "1. Bejelentkezés (Elsődleges)",
+                                fontSize = 15.sp,
                                 fontWeight = FontWeight.Bold
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // ELTE Test Credentials Fill
+                    OutlinedButton(
+                        onClick = onQuickElteTestFill,
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f)
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(44.dp)
+                            .testTag("quick_elte_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Shield,
+                            contentDescription = "ELTE 2FA tesztfiók",
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "ELTE Tesztfiók kitöltése (I7ZBE7)",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     // Quick Demo Credentials Fill
                     OutlinedButton(
@@ -367,7 +424,7 @@ fun LoginScreen(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Teszt / Minta adatok betöltése",
+                            text = "Offline Demo adatok betöltése",
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Medium
                         )
@@ -375,7 +432,7 @@ fun LoginScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(18.dp))
 
             Text(
                 text = "Hitelesítő adataidat az Android Keystore (EncryptedSharedPreferences) biztonságosan, titkosítva tárolja az eszközödön.",
@@ -479,21 +536,26 @@ fun LoginScreen(
         }
     }
 
+    // 2FA Dialog with Full Flow Support
     if (uiState.isTwoFactorRequired) {
         Dialog(onDismissRequest = onCancelTwoFactor) {
             Surface(
                 shape = RoundedCornerShape(20.dp),
                 color = MaterialTheme.colorScheme.surface,
-                tonalElevation = 6.dp,
-                modifier = Modifier.fillMaxWidth()
+                tonalElevation = 8.dp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 640.dp)
             ) {
                 Column(
-                    modifier = Modifier.padding(24.dp),
+                    modifier = Modifier
+                        .padding(20.dp)
+                        .verticalScroll(rememberScrollState()),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(56.dp)
+                            .size(54.dp)
                             .background(
                                 color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
                                 shape = CircleShape
@@ -504,11 +566,11 @@ fun LoginScreen(
                             imageVector = Icons.Default.Lock,
                             contentDescription = "2FA",
                             tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(32.dp)
+                            modifier = Modifier.size(30.dp)
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
                     Text(
                         text = "Kétlépcsős Azonosítás (2FA)",
@@ -517,30 +579,267 @@ fun LoginScreen(
                         color = MaterialTheme.colorScheme.onSurface
                     )
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
 
                     Text(
-                        text = "A Neptun kétlépcsős hitelesítést igényel ehhez a fiókhoz. Kérjük, add meg az SMS-ben vagy hitelesítő alkalmazásban kapott ellenőrző kódot:",
+                        text = "A Neptun kétlépcsős hitelesítést igényel a(z) ${uiState.neptunCode} fiókhoz.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center
                     )
 
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Method Selector Tabs
+                    TabRow(
+                        selectedTabIndex = if (uiState.twoFactorMethod == TwoFactorMethod.EMAIL) 0 else 1,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Tab(
+                            selected = uiState.twoFactorMethod == TwoFactorMethod.EMAIL,
+                            onClick = { onTwoFactorMethodChange(TwoFactorMethod.EMAIL) },
+                            text = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.Email,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("E-mail kód", fontSize = 13.sp)
+                                }
+                            }
+                        )
+                        Tab(
+                            selected = uiState.twoFactorMethod == TwoFactorMethod.TOTP,
+                            onClick = { onTwoFactorMethodChange(TwoFactorMethod.TOTP) },
+                            text = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.Smartphone,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Hitelesítő App", fontSize = 13.sp)
+                                }
+                            }
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Tab Content: Email Flow
+                    if (uiState.twoFactorMethod == TwoFactorMethod.EMAIL) {
+                        if (!uiState.isEmailCodeRequested) {
+                            Surface(
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = Icons.Default.Info,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "Kérj belépési kódot az egyetemi e-mail címedre:",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            Button(
+                                onClick = onRequestEmailCode,
+                                enabled = !uiState.isTwoFactorLoading,
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.secondary
+                                ),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(46.dp)
+                                    .testTag("request_email_code_button")
+                            ) {
+                                if (uiState.isTwoFactorLoading) {
+                                    CircularProgressIndicator(
+                                        color = Color.White,
+                                        strokeWidth = 2.dp,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Kód kérése folyamatban...")
+                                } else {
+                                    Icon(
+                                        imageVector = Icons.Default.Send,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("2. E-mail kód kérése (GetEmail=true)")
+                                }
+                            }
+                        } else {
+                            // Email code is requested, show prefix and input
+                            Surface(
+                                color = Color(0xFFF0FDF4),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(12.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.CheckCircle,
+                                        contentDescription = null,
+                                        tint = Color(0xFF16A34A),
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Column {
+                                        Text(
+                                            text = "Kód elküldve az egyetemi fiókodra!",
+                                            color = Color(0xFF15803D),
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        if (uiState.codePrefix.isNotEmpty()) {
+                                            Text(
+                                                text = "A Neptun által generált előtag: ${uiState.codePrefix}-",
+                                                color = Color(0xFF166534),
+                                                fontSize = 11.sp
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(14.dp))
+
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                if (uiState.codePrefix.isNotEmpty()) {
+                                    Surface(
+                                        color = MaterialTheme.colorScheme.primaryContainer,
+                                        shape = RoundedCornerShape(12.dp),
+                                        modifier = Modifier.padding(end = 8.dp)
+                                    ) {
+                                        Text(
+                                            text = "${uiState.codePrefix}-",
+                                            fontWeight = FontWeight.Bold,
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 18.sp,
+                                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 14.dp)
+                                        )
+                                    }
+                                }
+
+                                OutlinedTextField(
+                                    value = uiState.twoFactorCode,
+                                    onValueChange = onTwoFactorCodeChange,
+                                    label = { Text("6 jegyű kód az e-mailből") },
+                                    singleLine = true,
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .testTag("two_factor_code_input")
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                OutlinedButton(
+                                    onClick = onRequestEmailCode,
+                                    enabled = !uiState.isTwoFactorLoading,
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier.weight(1f).padding(end = 4.dp)
+                                ) {
+                                    Text("Új kód kérése", fontSize = 11.sp)
+                                }
+                                OutlinedButton(
+                                    onClick = { onTwoFactorCodeChange("999999") },
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier.weight(1f).padding(start = 4.dp)
+                                ) {
+                                    Text("Teszt: 999999", fontSize = 11.sp)
+                                }
+                            }
+                        }
+                    } else {
+                        // TOTP Flow
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text(
+                                    text = "Add meg a Google / Microsoft Authenticator appban megjelenő 6 számjegyű kódot:",
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                                if (uiState.twoFactorSession?.hasTotp == false) {
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Text(
+                                        text = "Megjegyzés: A Neptun szerint még nincs TOTP kulcs párosítva ehhez a fiókhoz. Használd az E-mail kód opciót!",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.error,
+                                        fontSize = 11.sp
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        OutlinedTextField(
+                            value = uiState.twoFactorCode,
+                            onValueChange = onTwoFactorCodeChange,
+                            label = { Text("TOTP Kód (pl. 482910)") },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("two_factor_code_input")
+                        )
+                    }
+
+                    // 2FA Error message
+                    AnimatedVisibility(visible = uiState.twoFactorErrorMessage != null) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.errorContainer,
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 10.dp)
+                        ) {
+                            Text(
+                                text = uiState.twoFactorErrorMessage ?: "",
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.padding(10.dp)
+                            )
+                        }
+                    }
+
                     Spacer(modifier = Modifier.height(20.dp))
-
-                    OutlinedTextField(
-                        value = uiState.twoFactorCode,
-                        onValueChange = onTwoFactorCodeChange,
-                        label = { Text("Ellenőrző kód (pl. 123456)") },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("two_factor_code_input")
-                    )
-
-                    Spacer(modifier = Modifier.height(24.dp))
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -555,11 +854,11 @@ fun LoginScreen(
                         }
                         Button(
                             onClick = onSubmitTwoFactor,
-                            enabled = uiState.twoFactorCode.length >= 4 && !uiState.isLoading,
+                            enabled = uiState.twoFactorCode.length >= 4 && !uiState.isTwoFactorLoading,
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.weight(1f)
                         ) {
-                            if (uiState.isLoading) {
+                            if (uiState.isTwoFactorLoading) {
                                 CircularProgressIndicator(
                                     color = Color.White,
                                     strokeWidth = 2.dp,

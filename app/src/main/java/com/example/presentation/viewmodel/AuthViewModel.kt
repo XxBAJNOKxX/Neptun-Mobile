@@ -3,11 +3,14 @@ package com.example.presentation.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.domain.model.Neptun2FASession
 import com.example.domain.model.StudentCredentials
+import com.example.domain.model.TwoFactorMethod
 import com.example.domain.model.University
 import com.example.domain.repository.AuthRepository
 import com.example.domain.repository.NeptunRepository
 import com.example.domain.repository.TwoFactorRequiredException
+import com.example.domain.repository.TwoFactorSessionRequiredException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -26,8 +29,16 @@ data class AuthUiState(
     val credentials: StudentCredentials? = null,
     val isOfflineModeAvailable: Boolean = false,
     val isUniversityDropdownOpen: Boolean = false,
+    // 2FA State
     val isTwoFactorRequired: Boolean = false,
-    val twoFactorCode: String = ""
+    val twoFactorSession: Neptun2FASession? = null,
+    val twoFactorMethod: TwoFactorMethod = TwoFactorMethod.EMAIL,
+    val isEmailCodeRequested: Boolean = false,
+    val codePrefix: String = "",
+    val twoFactorCode: String = "",
+    val twoFactorSuccessMessage: String? = null,
+    val twoFactorErrorMessage: String? = null,
+    val isTwoFactorLoading: Boolean = false
 )
 
 class AuthViewModel(
@@ -50,8 +61,8 @@ class AuthViewModel(
                 it.copy(
                     universities = list,
                     filteredUniversities = list,
-                    selectedUniversity = list.firstOrNull(),
-                    neptunCode = it.neptunCode.ifEmpty { "ZM3I1I" },
+                    selectedUniversity = list.firstOrNull { uni -> uni.id == "etvslorndtud" || uni.id == "elte" || uni.neptunUrl.contains("elte.hu") } ?: list.firstOrNull(),
+                    neptunCode = it.neptunCode.ifEmpty { "I7ZBE7" },
                     isOfflineModeAvailable = offlineAvailable
                 )
             }
@@ -110,12 +121,49 @@ class AuthViewModel(
 
     fun onTwoFactorCodeChange(code: String) {
         if (code.length <= 6) {
-            _uiState.update { it.copy(twoFactorCode = code, errorMessage = null) }
+            _uiState.update { it.copy(twoFactorCode = code, twoFactorErrorMessage = null) }
+        }
+    }
+
+    fun onTwoFactorMethodChange(method: TwoFactorMethod) {
+        _uiState.update {
+            it.copy(
+                twoFactorMethod = method,
+                twoFactorCode = "",
+                twoFactorErrorMessage = null
+            )
         }
     }
 
     fun cancelTwoFactor() {
-        _uiState.update { it.copy(isTwoFactorRequired = false, twoFactorCode = "", errorMessage = null) }
+        _uiState.update {
+            it.copy(
+                isTwoFactorRequired = false,
+                twoFactorSession = null,
+                twoFactorCode = "",
+                isEmailCodeRequested = false,
+                codePrefix = "",
+                twoFactorSuccessMessage = null,
+                twoFactorErrorMessage = null,
+                isTwoFactorLoading = false,
+                errorMessage = null
+            )
+        }
+    }
+
+    fun quickElteTestFill() {
+        val elte = _uiState.value.universities.firstOrNull { it.id == "etvslorndtud" || it.id == "elte" }
+            ?: _uiState.value.universities.firstOrNull { it.neptunUrl.contains("elte.hu") }
+            ?: _uiState.value.selectedUniversity
+
+        _uiState.update {
+            it.copy(
+                selectedUniversity = elte,
+                neptunCode = "I7ZBE7",
+                password = "2e8MTsKtbSQ+G2W",
+                errorMessage = null
+            )
+        }
     }
 
     fun quickDemoFill() {
@@ -124,6 +172,40 @@ class AuthViewModel(
                 neptunCode = "DEMO01",
                 password = "demo",
                 errorMessage = null
+            )
+        }
+    }
+
+    fun requestEmailCode() {
+        val session = _uiState.value.twoFactorSession ?: return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isTwoFactorLoading = true, twoFactorErrorMessage = null, twoFactorSuccessMessage = null) }
+            val result = authRepository.request2FAEmailCode(session)
+            result.fold(
+                onSuccess = { updatedSession ->
+                    val prefixText = if (updatedSession.codePrefix.isNotEmpty()) "${updatedSession.codePrefix}-" else ""
+                    _uiState.update {
+                        it.copy(
+                            isTwoFactorLoading = false,
+                            twoFactorSession = updatedSession,
+                            isEmailCodeRequested = true,
+                            codePrefix = updatedSession.codePrefix,
+                            twoFactorSuccessMessage = if (prefixText.isNotEmpty()) {
+                                "A Neptun elküldte a 6 jegyű kódot az egyetemi e-mail címedre! Előtag: $prefixText"
+                            } else {
+                                "A Neptun elküldte az ellenőrző kódot az e-mail címedre!"
+                            }
+                        )
+                    }
+                },
+                onFailure = { error ->
+                    _uiState.update {
+                        it.copy(
+                            isTwoFactorLoading = false,
+                            twoFactorErrorMessage = error.message ?: "Nem sikerült elküldeni az e-mail kódot."
+                        )
+                    }
+                }
             )
         }
     }
@@ -160,27 +242,50 @@ class AuthViewModel(
                             isLoading = false,
                             credentials = creds,
                             isTwoFactorRequired = false,
+                            twoFactorSession = null,
                             errorMessage = null
                         )
                     }
-                    // Trigger real data sync
                     neptunRepository.syncAllData(creds.neptunCode, "")
                 },
                 onFailure = { error ->
-                    if (error is TwoFactorRequiredException) {
-                        _uiState.update {
-                            it.copy(
-                                isLoading = false,
-                                isTwoFactorRequired = true,
-                                errorMessage = null
-                            )
+                    when (error) {
+                        is TwoFactorSessionRequiredException -> {
+                            val session = error.session
+                            val defaultMethod = if (session.hasEmail) TwoFactorMethod.EMAIL else TwoFactorMethod.TOTP
+                            val isEmailReq = session.codePrefix.isNotEmpty() || session.phase.equals("RequestEmailCode", ignoreCase = true)
+                            _uiState.update {
+                                it.copy(
+                                    isLoading = false,
+                                    isTwoFactorRequired = true,
+                                    twoFactorSession = session,
+                                    twoFactorMethod = defaultMethod,
+                                    isEmailCodeRequested = isEmailReq,
+                                    codePrefix = session.codePrefix,
+                                    twoFactorSuccessMessage = if (isEmailReq && session.codePrefix.isNotEmpty()) "Előtag: ${session.codePrefix}-" else null,
+                                    twoFactorErrorMessage = null,
+                                    errorMessage = null
+                                )
+                            }
                         }
-                    } else {
-                        _uiState.update {
-                            it.copy(
-                                isLoading = false,
-                                errorMessage = error.message ?: "Sikertelen bejelentkezés!"
-                            )
+                        is TwoFactorRequiredException -> {
+                            _uiState.update {
+                                it.copy(
+                                    isLoading = false,
+                                    isTwoFactorRequired = true,
+                                    twoFactorSession = null,
+                                    twoFactorMethod = TwoFactorMethod.TOTP,
+                                    errorMessage = null
+                                )
+                            }
+                        }
+                        else -> {
+                            _uiState.update {
+                                it.copy(
+                                    isLoading = false,
+                                    errorMessage = error.message ?: "Sikertelen bejelentkezés!"
+                                )
+                            }
                         }
                     }
                 }
@@ -189,7 +294,48 @@ class AuthViewModel(
     }
 
     fun submitTwoFactor() {
-        login()
+        val state = _uiState.value
+        val session = state.twoFactorSession
+
+        if (session != null) {
+            val code = state.twoFactorCode.trim()
+            if (code.isEmpty()) {
+                _uiState.update { it.copy(twoFactorErrorMessage = "Kérjük, add meg a 6 számjegyű kódot!") }
+                return
+            }
+
+            viewModelScope.launch {
+                _uiState.update { it.copy(isTwoFactorLoading = true, twoFactorErrorMessage = null) }
+                val isTotp = state.twoFactorMethod == TwoFactorMethod.TOTP
+                val result = authRepository.verify2FACode(session, code, isTotp)
+
+                result.fold(
+                    onSuccess = { creds ->
+                        _uiState.update {
+                            it.copy(
+                                isTwoFactorLoading = false,
+                                isTwoFactorRequired = false,
+                                twoFactorSession = null,
+                                credentials = creds,
+                                twoFactorCode = "",
+                                errorMessage = null
+                            )
+                        }
+                        neptunRepository.syncAllData(creds.neptunCode, "")
+                    },
+                    onFailure = { error ->
+                        _uiState.update {
+                            it.copy(
+                                isTwoFactorLoading = false,
+                                twoFactorErrorMessage = error.message ?: "Hibás 2FA kód!"
+                            )
+                        }
+                    }
+                )
+            }
+        } else {
+            login()
+        }
     }
 
     fun logout() {
@@ -202,7 +348,10 @@ class AuthViewModel(
                     password = "",
                     isOfflineModeAvailable = false,
                     isTwoFactorRequired = false,
-                    twoFactorCode = ""
+                    twoFactorSession = null,
+                    twoFactorCode = "",
+                    twoFactorSuccessMessage = null,
+                    twoFactorErrorMessage = null
                 )
             }
         }
@@ -220,3 +369,4 @@ class AuthViewModel(
         }
     }
 }
+

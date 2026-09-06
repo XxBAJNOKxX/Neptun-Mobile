@@ -6,6 +6,7 @@ import com.example.domain.model.CalendarEvent
 import com.example.domain.model.CourseType
 import com.example.domain.model.FinanceItem
 import com.example.domain.model.FinanceStatus
+import com.example.domain.model.Neptun2FASession
 import com.example.domain.model.NeptunMessage
 import com.example.domain.model.SubjectGrade
 import kotlinx.coroutines.Dispatchers
@@ -22,6 +23,7 @@ import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import okhttp3.FormBody
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -55,6 +57,10 @@ sealed class NeptunAuthResult {
         val normalizedBaseUrl: String
     ) : NeptunAuthResult()
 
+    data class TwoFactorSessionRequired(
+        val session: Neptun2FASession
+    ) : NeptunAuthResult()
+
     data class Failure(val message: String) : NeptunAuthResult()
 }
 
@@ -81,16 +87,16 @@ class NeptunApiClient {
         OkHttpClient.Builder()
             .sslSocketFactory(sslContext.socketFactory, trustAllCerts[0] as X509TrustManager)
             .hostnameVerifier(HostnameVerifier { _, _ -> true })
-            .connectTimeout(20, TimeUnit.SECONDS)
-            .readTimeout(25, TimeUnit.SECONDS)
-            .writeTimeout(20, TimeUnit.SECONDS)
+            .connectTimeout(7, TimeUnit.SECONDS)
+            .readTimeout(9, TimeUnit.SECONDS)
+            .writeTimeout(7, TimeUnit.SECONDS)
             .followRedirects(true)
             .followSslRedirects(true)
             .build()
     } catch (e: Exception) {
         OkHttpClient.Builder()
-            .connectTimeout(20, TimeUnit.SECONDS)
-            .readTimeout(25, TimeUnit.SECONDS)
+            .connectTimeout(7, TimeUnit.SECONDS)
+            .readTimeout(9, TimeUnit.SECONDS)
             .build()
     }
 
@@ -102,9 +108,37 @@ class NeptunApiClient {
         while (url.endsWith("/")) {
             url = url.substring(0, url.length - 1)
         }
+        url = url.replace(Regex("""/Account/Login2FA(\?.*)?$""", RegexOption.IGNORE_CASE), "")
+        url = url.replace(Regex("""/Account/Login(\?.*)?$""", RegexOption.IGNORE_CASE), "")
         url = url.replace(Regex("""/login(\.aspx)?$""", RegexOption.IGNORE_CASE), "")
         url = url.replace(Regex("""/MobileService\.svc$""", RegexOption.IGNORE_CASE), "")
+        while (url.endsWith("/")) {
+            url = url.substring(0, url.length - 1)
+        }
         return url
+    }
+
+    fun getCandidateBaseUrls(baseUrl: String): List<String> {
+        val clean = normalizeBaseUrl(baseUrl)
+        val list = mutableListOf<String>()
+        if (clean.contains("elte.hu", ignoreCase = true)) {
+            list.add("https://hallgato.neptun.elte.hu")
+            list.add("https://neptun.elte.hu/hallgato")
+            if (clean != "https://hallgato.neptun.elte.hu" && clean != "https://neptun.elte.hu/hallgato") {
+                list.add(clean)
+            }
+        } else if (clean.contains("ppke.hu", ignoreCase = true)) {
+            list.addAll(listOf(
+                "https://neptun2.ppke.hu/hallgato_uj",
+                "https://neptun3.ppke.hu/hallgato_uj",
+                "https://neptun3.ppke.hu/hallgato3_uj",
+                "https://neptun3.ppke.hu/hallgato2_uj",
+                clean
+            ))
+        } else {
+            list.add(clean)
+        }
+        return list.distinct()
     }
 
     fun getLegacyBaseUrl(baseUrl: String): String {
@@ -157,6 +191,13 @@ class NeptunApiClient {
                 "https://neptun3.ppke.hu/hallgato3_uj",
                 "https://neptun3.ppke.hu/hallgato2_uj"
             ).distinct()
+        } else if (rawUrl.contains("elte.hu", ignoreCase = true)) {
+            listOf(
+                "https://neptun.elte.hu/Account/Login",
+                "https://hallgato.neptun.elte.hu/Account/Login",
+                "https://neptun.elte.hu",
+                "https://hallgato.neptun.elte.hu"
+            ).distinct()
         } else {
             listOf(rawUrl)
         }
@@ -164,12 +205,418 @@ class NeptunApiClient {
         var lastFailure: NeptunAuthResult? = null
         for (targetUrl in candidateUrls) {
             val result = authenticateSingle(targetUrl, neptunCode, password, twoFactorCode, savedDeviceCookie)
-            if (result is NeptunAuthResult.Success || result is NeptunAuthResult.TwoFactorRequired) {
+            if (result is NeptunAuthResult.Success || result is NeptunAuthResult.TwoFactorRequired || result is NeptunAuthResult.TwoFactorSessionRequired) {
                 return@withContext result
             }
             lastFailure = result
         }
         return@withContext lastFailure ?: NeptunAuthResult.Failure("Nem sikerült kapcsolódni a Neptun szerverhez!")
+    }
+
+    fun parseCookiesFromHeaders(setCookieHeaders: List<String>): Map<String, String> {
+        val cookies = mutableMapOf<String, String>()
+        for (header in setCookieHeaders) {
+            val parts = header.split(";")
+            if (parts.isNotEmpty()) {
+                val nameVal = parts[0]
+                val eqIdx = nameVal.indexOf('=')
+                if (eqIdx > -1) {
+                    val name = nameVal.substring(0, eqIdx).trim()
+                    val value = nameVal.substring(eqIdx + 1).trim()
+                    cookies[name] = value
+                }
+            }
+        }
+        return cookies
+    }
+
+    fun mergeCookies(existing: Map<String, String>, updates: Map<String, String>): Map<String, String> {
+        return existing + updates
+    }
+
+    fun cookieHeaderString(cookies: Map<String, String>): String {
+        return cookies.entries
+            .filter { it.value.isNotBlank() }
+            .joinToString("; ") { "${it.key}=${it.value}" }
+    }
+
+    fun parseFormInputs(formHtml: String): Map<String, String> {
+        val inputs = mutableMapOf<String, String>()
+        val inputTagRegex = Regex("""<input\b([^>]*)>""", RegexOption.IGNORE_CASE)
+        val nameRegex = Regex("""\bname\s*=\s*["']?([^"' >]+)["']?""", RegexOption.IGNORE_CASE)
+        val valueRegex = Regex("""\bvalue\s*=\s*["']([^"']*)["']|\bvalue\s*=\s*([^\s>]+)""", RegexOption.IGNORE_CASE)
+
+        for (match in inputTagRegex.findAll(formHtml)) {
+            val attrs = match.groupValues[1]
+            val nameMatch = nameRegex.find(attrs)
+            if (nameMatch != null) {
+                val name = nameMatch.groupValues[1]
+                val valueMatch = valueRegex.find(attrs)
+                val rawValue = valueMatch?.let {
+                    if (it.groupValues[1].isNotEmpty() || attrs.contains("value=\"\"") || attrs.contains("value=''")) {
+                        it.groupValues[1]
+                    } else {
+                        it.groupValues[2]
+                    }
+                } ?: ""
+
+                inputs[name] = rawValue
+                    .replace("&#x2B;", "+")
+                    .replace("&amp;", "&")
+                    .replace("&quot;", "\"")
+                    .replace("&#39;", "'")
+            }
+        }
+        return inputs
+    }
+
+    fun extractValidationErrors(html: String): List<String> {
+        val errors = mutableListOf<String>()
+
+        val summaryRegex = Regex("""class="[^"]*validation-summary-errors[^"]*"[^>]*>([\s\S]*?)<\/div>""", RegexOption.IGNORE_CASE)
+        val summaryMatch = summaryRegex.find(html)
+        if (summaryMatch != null) {
+            val liRegex = Regex("""<li>([\s\S]*?)<\/li>""", RegexOption.IGNORE_CASE)
+            for (li in liRegex.findAll(summaryMatch.groupValues[1])) {
+                val text = li.groupValues[1].replace(Regex("""<[^>]+>"""), "").trim()
+                if (text.isNotBlank() && !errors.contains(text)) {
+                    errors.add(text)
+                }
+            }
+        }
+
+        val dangerRegex = Regex("""class="[^"]*text-danger[^"]*"[^>]*>([\s\S]*?)<\/(?:span|div|p|h\d)>""", RegexOption.IGNORE_CASE)
+        for (match in dangerRegex.findAll(html)) {
+            val clean = match.groupValues[1].replace(Regex("""<[^>]+>"""), "").trim()
+            if (clean.isNotBlank() && !clean.equals("Hiba", ignoreCase = true) && !errors.contains(clean)) {
+                errors.add(clean)
+            }
+        }
+
+        return errors
+    }
+
+    suspend fun authenticateAspDotNet(
+        baseUrl: String,
+        username: String,
+        password: String
+    ): NeptunAuthResult = withContext(Dispatchers.IO) {
+        val cleanBase = normalizeBaseUrl(baseUrl)
+        val loginPageUrl = "$cleanBase/Account/Login"
+        var cookieMap = mutableMapOf<String, String>()
+
+        // 1. GET /Account/Login to obtain __RequestVerificationToken and anti-forgery cookies
+        val getReq = Request.Builder()
+            .url(loginPageUrl)
+            .get()
+            .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36")
+            .addHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+            .addHeader("Accept-Language", "hu-HU,hu;q=0.9,en-US;q=0.8,en;q=0.7")
+            .build()
+
+        val getResp: okhttp3.Response
+        try {
+            getResp = okHttpClient.newBuilder().followRedirects(false).build().newCall(getReq).execute()
+        } catch (e: Exception) {
+            return@withContext NeptunAuthResult.Failure("Nem sikerült elérni a Neptun bejelentkezési oldalt (${e.localizedMessage})")
+        }
+
+        val getCookies = getResp.headers("Set-Cookie")
+        cookieMap = mergeCookies(cookieMap, parseCookiesFromHeaders(getCookies)).toMutableMap()
+        val getHtml = getResp.body?.string() ?: ""
+
+        val formInputs = parseFormInputs(getHtml)
+        val token = formInputs["__RequestVerificationToken"] ?: ""
+
+        // 2. POST /Account/Login with credentials and token
+        val postParams = FormBody.Builder()
+            .add("LoginName", username)
+            .add("Password", password)
+            .add("ReturnUrl", formInputs["ReturnUrl"] ?: "")
+
+        if (token.isNotEmpty()) {
+            postParams.add("__RequestVerificationToken", token)
+        }
+
+        for ((k, v) in formInputs) {
+            if (k != "LoginName" && k != "Password" && k != "ReturnUrl" && k != "__RequestVerificationToken") {
+                postParams.add(k, v)
+            }
+        }
+
+        val postReq = Request.Builder()
+            .url(loginPageUrl)
+            .post(postParams.build())
+            .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36")
+            .addHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+            .addHeader("Accept-Language", "hu-HU,hu;q=0.9,en-US;q=0.8,en;q=0.7")
+            .addHeader("Referer", loginPageUrl)
+            .addHeader("Origin", cleanBase)
+            .addHeader("Cookie", cookieHeaderString(cookieMap))
+            .build()
+
+        val postResp = try {
+            okHttpClient.newBuilder().followRedirects(false).build().newCall(postReq).execute()
+        } catch (e: Exception) {
+            return@withContext NeptunAuthResult.Failure("Hiba a hitelesítési adatok elküldésekor: ${e.localizedMessage}")
+        }
+
+        val postCookies = postResp.headers("Set-Cookie")
+        cookieMap = mergeCookies(cookieMap, parseCookiesFromHeaders(postCookies)).toMutableMap()
+
+        val locationHeader = postResp.header("Location") ?: ""
+        val statusCode = postResp.code
+
+        if ((statusCode in 300..399) && locationHeader.isNotEmpty()) {
+            val redirectUrl = if (locationHeader.startsWith("http")) locationHeader else "$cleanBase${if (locationHeader.startsWith("/")) "" else "/"}$locationHeader"
+            
+            if (locationHeader.contains("Login2FA", ignoreCase = true) || locationHeader.contains("Key=", ignoreCase = true)) {
+                // Fetch the 2FA page to extract session key and form inputs
+                val get2FaReq = Request.Builder()
+                    .url(redirectUrl)
+                    .get()
+                    .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36")
+                    .addHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+                    .addHeader("Accept-Language", "hu-HU,hu;q=0.9,en-US;q=0.8,en;q=0.7")
+                    .addHeader("Referer", loginPageUrl)
+                    .addHeader("Cookie", cookieHeaderString(cookieMap))
+                    .build()
+
+                val res2Fa = try {
+                    okHttpClient.newBuilder().followRedirects(false).build().newCall(get2FaReq).execute()
+                } catch (e: Exception) {
+                    return@withContext NeptunAuthResult.Failure("Hiba a 2FA oldal betöltésekor: ${e.localizedMessage}")
+                }
+
+                val res2FaCookies = res2Fa.headers("Set-Cookie")
+                cookieMap = mergeCookies(cookieMap, parseCookiesFromHeaders(res2FaCookies)).toMutableMap()
+                val html2Fa = res2Fa.body?.string() ?: ""
+
+                val inputs2Fa = parseFormInputs(html2Fa)
+
+                val uriKey = try {
+                    val uri = java.net.URI(redirectUrl)
+                    val query = uri.query ?: ""
+                    query.split("&").firstOrNull { it.startsWith("Key=", ignoreCase = true) }?.substringAfter("=") ?: ""
+                } catch (e: Exception) {
+                    ""
+                }
+
+                val session = Neptun2FASession(
+                    neptunCode = inputs2Fa["NeptunCode"]?.ifEmpty { username } ?: username,
+                    key = inputs2Fa["Key"]?.ifEmpty { uriKey } ?: uriKey,
+                    phase = inputs2Fa["Phase"] ?: "RequestTOTP",
+                    rendered = inputs2Fa["Rendered"] ?: "",
+                    verificationToken = inputs2Fa["__RequestVerificationToken"] ?: token,
+                    hasTotp = inputs2Fa["HasTOTP"]?.equals("True", ignoreCase = true) == true,
+                    hasEmail = inputs2Fa["HasEmail"]?.equals("False", ignoreCase = true) != true,
+                    codePrefix = inputs2Fa["CodePrefix"] ?: "",
+                    cookies = cookieMap,
+                    baseUrl = cleanBase
+                )
+
+                return@withContext NeptunAuthResult.TwoFactorSessionRequired(session)
+            } else {
+                var finalBaseUrl = cleanBase
+                if (locationHeader.isNotEmpty()) {
+                    val redirectTarget = if (locationHeader.startsWith("http")) locationHeader else "$cleanBase${if (locationHeader.startsWith("/")) "" else "/"}$locationHeader"
+                    try {
+                        val followReq = Request.Builder()
+                            .url(redirectTarget)
+                            .get()
+                            .withNeptunHeaders(cleanBase, "", cookieHeaderString(cookieMap))
+                            .build()
+                        val followResp = okHttpClient.newBuilder().followRedirects(true).build().newCall(followReq).execute()
+                        val followCookies = followResp.headers("Set-Cookie")
+                        cookieMap = mergeCookies(cookieMap, parseCookiesFromHeaders(followCookies)).toMutableMap()
+                        val finalUrl = followResp.request.url.toString()
+                        finalBaseUrl = normalizeBaseUrl(finalUrl)
+                    } catch (e: Exception) {
+                        Log.w(tag, "Follow redirect error: ${e.message}")
+                        if (locationHeader.startsWith("http")) {
+                            finalBaseUrl = normalizeBaseUrl(locationHeader)
+                        }
+                    }
+                }
+                if (finalBaseUrl.contains("elte.hu", ignoreCase = true) && !finalBaseUrl.contains("hallgato", ignoreCase = true)) {
+                    finalBaseUrl = "https://hallgato.neptun.elte.hu"
+                }
+
+                return@withContext NeptunAuthResult.Success(
+                    accessToken = "aspnet-session-$username",
+                    refreshToken = null,
+                    deviceCookie = cookieHeaderString(cookieMap),
+                    studentName = "Hallgató ($username)",
+                    trainingProgram = "ELTE Egyetemi Képzés",
+                    isModernApi = false,
+                    normalizedBaseUrl = finalBaseUrl
+                )
+            }
+        }
+
+        val postBody = postResp.body?.string() ?: ""
+        val errors = extractValidationErrors(postBody)
+        val errorMsg = if (errors.isNotEmpty()) {
+            errors.joinToString(" | ")
+        } else {
+            "Sikertelen bejelentkezés: hibás Neptun kód vagy jelszó!"
+        }
+
+        NeptunAuthResult.Failure(errorMsg)
+    }
+
+    suspend fun request2FAEmailCode(session: Neptun2FASession): Result<Neptun2FASession> = withContext(Dispatchers.IO) {
+        try {
+            val postUrl = "${session.baseUrl}/Account/Login2FA"
+            val formBuilder = FormBody.Builder()
+                .add("Phase", session.phase)
+                .add("Rendered", session.rendered)
+                .add("NeptunCode", session.neptunCode)
+                .add("Key", session.key)
+                .add("ReturnUrl", "")
+                .add("HasTOTP", if (session.hasTotp) "True" else "False")
+                .add("HasEmail", "True")
+                .add("CodePrefix", "")
+                .add("GetEmail", "true")
+
+            if (session.verificationToken.isNotEmpty()) {
+                formBuilder.add("__RequestVerificationToken", session.verificationToken)
+            }
+
+            var cookieMap = session.cookies.toMutableMap()
+            val req = Request.Builder()
+                .url(postUrl)
+                .post(formBuilder.build())
+                .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36")
+                .addHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+                .addHeader("Accept-Language", "hu-HU,hu;q=0.9,en-US;q=0.8,en;q=0.7")
+                .addHeader("Referer", "$postUrl?NeptunCode=${session.neptunCode}&Key=${session.key}")
+                .addHeader("Origin", session.baseUrl)
+                .addHeader("Cookie", cookieHeaderString(cookieMap))
+                .build()
+
+            val resp = okHttpClient.newBuilder().followRedirects(false).build().newCall(req).execute()
+            val newCookies = resp.headers("Set-Cookie")
+            cookieMap = mergeCookies(cookieMap, parseCookiesFromHeaders(newCookies)).toMutableMap()
+
+            val html = resp.body?.string() ?: ""
+            val errors = extractValidationErrors(html)
+            if (errors.isNotEmpty()) {
+                return@withContext Result.failure(Exception(errors.joinToString(" | ")))
+            }
+
+            val inputs = parseFormInputs(html)
+
+            val updatedSession = session.copy(
+                phase = inputs["Phase"] ?: "RequestEmailCode",
+                codePrefix = inputs["CodePrefix"] ?: "",
+                rendered = inputs["Rendered"] ?: session.rendered,
+                verificationToken = inputs["__RequestVerificationToken"] ?: session.verificationToken,
+                key = inputs["Key"]?.ifEmpty { session.key } ?: session.key,
+                cookies = cookieMap
+            )
+            Result.success(updatedSession)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    suspend fun verify2FACode(
+        session: Neptun2FASession,
+        code: String,
+        isTotp: Boolean
+    ): NeptunAuthResult = withContext(Dispatchers.IO) {
+        try {
+            val postUrl = "${session.baseUrl}/Account/Login2FA"
+            val effectivePhase = if (isTotp) "RequestTOTP" else "RequestEmailCode"
+            val formBuilder = FormBody.Builder()
+                .add("Phase", effectivePhase)
+                .add("Rendered", session.rendered)
+                .add("NeptunCode", session.neptunCode)
+                .add("Key", session.key)
+                .add("ReturnUrl", "")
+                .add("HasTOTP", if (session.hasTotp) "True" else "False")
+                .add("HasEmail", if (session.hasEmail) "True" else "False")
+                .add("CodePrefix", session.codePrefix)
+
+            if (isTotp) {
+                formBuilder.add("TOTPCode", code.trim())
+            } else {
+                formBuilder.add("EmailCode", code.trim())
+            }
+
+            if (session.verificationToken.isNotEmpty()) {
+                formBuilder.add("__RequestVerificationToken", session.verificationToken)
+            }
+
+            var cookieMap = session.cookies.toMutableMap()
+            val req = Request.Builder()
+                .url(postUrl)
+                .post(formBuilder.build())
+                .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36")
+                .addHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+                .addHeader("Accept-Language", "hu-HU,hu;q=0.9,en-US;q=0.8,en;q=0.7")
+                .addHeader("Referer", "$postUrl?NeptunCode=${session.neptunCode}&Key=${session.key}")
+                .addHeader("Origin", session.baseUrl)
+                .addHeader("Cookie", cookieHeaderString(cookieMap))
+                .build()
+
+            val resp = okHttpClient.newBuilder().followRedirects(false).build().newCall(req).execute()
+            val newCookies = resp.headers("Set-Cookie")
+            cookieMap = mergeCookies(cookieMap, parseCookiesFromHeaders(newCookies)).toMutableMap()
+
+            val statusCode = resp.code
+            val locationHeader = resp.header("Location") ?: ""
+
+            if (statusCode in 300..399) {
+                var finalBaseUrl = session.baseUrl
+                if (locationHeader.isNotEmpty()) {
+                    val redirectTarget = if (locationHeader.startsWith("http")) locationHeader else "${session.baseUrl}${if (locationHeader.startsWith("/")) "" else "/"}$locationHeader"
+                    try {
+                        val followReq = Request.Builder()
+                            .url(redirectTarget)
+                            .get()
+                            .withNeptunHeaders(session.baseUrl, "", cookieHeaderString(cookieMap))
+                            .build()
+                        val followResp = okHttpClient.newBuilder().followRedirects(true).build().newCall(followReq).execute()
+                        val followCookies = followResp.headers("Set-Cookie")
+                        cookieMap = mergeCookies(cookieMap, parseCookiesFromHeaders(followCookies)).toMutableMap()
+                        val finalUrl = followResp.request.url.toString()
+                        finalBaseUrl = normalizeBaseUrl(finalUrl)
+                    } catch (e: Exception) {
+                        Log.w(tag, "Follow redirect error: ${e.message}")
+                        if (locationHeader.startsWith("http")) {
+                            finalBaseUrl = normalizeBaseUrl(locationHeader)
+                        }
+                    }
+                }
+                if (finalBaseUrl.contains("elte.hu", ignoreCase = true) && !finalBaseUrl.contains("hallgato", ignoreCase = true)) {
+                    finalBaseUrl = "https://hallgato.neptun.elte.hu"
+                }
+
+                return@withContext NeptunAuthResult.Success(
+                    accessToken = "aspnet-verified-${session.neptunCode}",
+                    refreshToken = null,
+                    deviceCookie = cookieHeaderString(cookieMap),
+                    studentName = "Hallgató (${session.neptunCode})",
+                    trainingProgram = "ELTE Egyetemi Képzés",
+                    isModernApi = true,
+                    normalizedBaseUrl = finalBaseUrl
+                )
+            }
+
+            val html = resp.body?.string() ?: ""
+            val errors = extractValidationErrors(html)
+            val errorMsg = if (errors.isNotEmpty()) {
+                errors.joinToString(" | ")
+            } else {
+                "A megadott biztonsági kód érvénytelen vagy lejárt!"
+            }
+
+            NeptunAuthResult.Failure(errorMsg)
+        } catch (e: Exception) {
+            NeptunAuthResult.Failure("Hiba a biztonsági kód ellenőrzésekor: ${e.localizedMessage}")
+        }
     }
 
     private suspend fun authenticateSingle(
@@ -183,6 +630,11 @@ class NeptunApiClient {
         val pwd = password.trim()
         val baseUrl = normalizeBaseUrl(rawUrl)
         val containsAspx = rawUrl.contains(".aspx", ignoreCase = true)
+        val isAspDotNetWeb = rawUrl.contains("Account/Login", ignoreCase = true) || rawUrl.contains("elte.hu", ignoreCase = true)
+
+        if (isAspDotNetWeb) {
+            return@withContext authenticateAspDotNet(baseUrl, username, pwd)
+        }
 
         if (containsAspx) {
             val legacySuccess = tryLegacyLogin(baseUrl, username, pwd)
@@ -233,7 +685,11 @@ class NeptunApiClient {
             val extractedRefreshToken = extractRefreshToken(setCookieHeader)
 
             if (responseBody.trim().startsWith("<")) {
-                // Fallback to legacy if modern API route returned webpage
+                // Fallback to ASP.NET Core login first, then legacy
+                val aspResult = authenticateAspDotNet(baseUrl, username, pwd)
+                if (aspResult is NeptunAuthResult.Success || aspResult is NeptunAuthResult.TwoFactorSessionRequired) {
+                    return@withContext aspResult
+                }
                 val fallbackLegacy = tryLegacyLogin(baseUrl, username, pwd)
                 if (fallbackLegacy) {
                     return@withContext NeptunAuthResult.Success(
@@ -246,11 +702,15 @@ class NeptunApiClient {
                         normalizedBaseUrl = getLegacyBaseUrl(baseUrl)
                     )
                 }
-                return@withContext NeptunAuthResult.Failure("A Neptun szervere nem elérhető (HTML válasz).")
+                return@withContext aspResult
             }
 
             val parsed = safeParseJsonObject(responseBody)
             if (parsed == null) {
+                val aspResult = authenticateAspDotNet(baseUrl, username, pwd)
+                if (aspResult is NeptunAuthResult.Success || aspResult is NeptunAuthResult.TwoFactorSessionRequired) {
+                    return@withContext aspResult
+                }
                 val fallbackLegacy = tryLegacyLogin(baseUrl, username, pwd)
                 if (fallbackLegacy) {
                     return@withContext NeptunAuthResult.Success(
@@ -305,6 +765,10 @@ class NeptunApiClient {
                 ?: "Hibás felhasználónév vagy jelszó!"
 
             if (response.code == 404) {
+                val aspResult = authenticateAspDotNet(baseUrl, username, pwd)
+                if (aspResult is NeptunAuthResult.Success || aspResult is NeptunAuthResult.TwoFactorSessionRequired) {
+                    return@withContext aspResult
+                }
                 val legacySuccess = tryLegacyLogin(baseUrl, username, pwd)
                 if (legacySuccess) {
                     return@withContext NeptunAuthResult.Success(
@@ -321,7 +785,11 @@ class NeptunApiClient {
 
             NeptunAuthResult.Failure(errMsg)
         } catch (e: Exception) {
-            Log.e(tag, "Modern login failed, attempting legacy fallback: ${e.message}")
+            Log.e(tag, "Modern login failed, attempting ASP.NET and legacy fallbacks: ${e.message}")
+            val aspResult = authenticateAspDotNet(baseUrl, username, pwd)
+            if (aspResult is NeptunAuthResult.Success || aspResult is NeptunAuthResult.TwoFactorSessionRequired) {
+                return@withContext aspResult
+            }
             val fallbackLegacy = tryLegacyLogin(baseUrl, username, pwd)
             if (fallbackLegacy) {
                 NeptunAuthResult.Success(
@@ -392,14 +860,48 @@ class NeptunApiClient {
         false
     }
 
+    private fun Request.Builder.withNeptunHeaders(
+        baseUrl: String,
+        token: String = "",
+        cookie: String = ""
+    ): Request.Builder {
+        addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36")
+        addHeader("Accept", "application/json, text/plain, */*")
+        addHeader("Referer", "$baseUrl/")
+        if (token.isNotBlank() && !token.startsWith("aspnet") && !token.startsWith("legacy")) {
+            addHeader("Authorization", "Bearer $token")
+        }
+        if (cookie.isNotBlank()) {
+            addHeader("Cookie", cookie)
+        }
+        return this
+    }
+
     // --- STUDENT TRAINING INFO ---
-    suspend fun getStudentTrainingInfo(baseUrl: String, token: String): Pair<String, String>? = withContext(Dispatchers.IO) {
+    suspend fun getStudentTrainingInfo(
+        baseUrl: String,
+        token: String,
+        cookie: String = ""
+    ): Pair<String, String>? = withContext(Dispatchers.IO) {
+        val candidates = getCandidateBaseUrls(baseUrl)
+        for (targetBase in candidates) {
+            val result = getStudentTrainingInfoSingleBase(targetBase, token, cookie)
+            if (result != null) return@withContext result
+        }
+        null
+    }
+
+    private suspend fun getStudentTrainingInfoSingleBase(
+        baseUrl: String,
+        token: String,
+        cookie: String = ""
+    ): Pair<String, String>? = withContext(Dispatchers.IO) {
         try {
             val url = "$baseUrl/api/Calendar/GetStudentTrainings"
             val req = Request.Builder()
                 .url(url)
                 .get()
-                .addHeader("Authorization", "Bearer $token")
+                .withNeptunHeaders(baseUrl, token, cookie)
                 .addHeader("Content-Type", "application/json")
                 .build()
 
@@ -423,7 +925,7 @@ class NeptunApiClient {
                 }
             }
         } catch (e: Exception) {
-            Log.e(tag, "GetStudentTrainings error: ${e.message}")
+            Log.e(tag, "GetStudentTrainings error on $baseUrl: ${e.message}")
         }
         null
     }
@@ -435,10 +937,28 @@ class NeptunApiClient {
         trainingId: String?,
         username: String,
         password: String,
-        isModern: Boolean
+        isModern: Boolean,
+        cookie: String = ""
     ): List<CalendarEvent> = withContext(Dispatchers.IO) {
-        if (!isModern) {
-            return@withContext getLegacyCalendarEvents(baseUrl, username, password)
+        val candidates = getCandidateBaseUrls(baseUrl)
+        for (targetBase in candidates) {
+            val events = getCalendarEventsSingleBase(targetBase, token, trainingId, username, password, isModern, cookie)
+            if (events.isNotEmpty()) return@withContext events
+        }
+        emptyList()
+    }
+
+    private suspend fun getCalendarEventsSingleBase(
+        baseUrl: String,
+        token: String,
+        trainingId: String?,
+        username: String,
+        password: String,
+        isModern: Boolean,
+        cookie: String = ""
+    ): List<CalendarEvent> = withContext(Dispatchers.IO) {
+        if (!isModern && cookie.isBlank()) {
+            return@withContext getLegacyCalendarEvents(baseUrl, username, password, cookie)
         }
 
         try {
@@ -449,23 +969,23 @@ class NeptunApiClient {
             val startIso = startWindow.atStartOfDay().format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'00:00:00"))
             val endIso = endWindow.atTime(23, 59, 59).format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'23:59:59"))
 
-            val trainId = trainingId ?: getStudentTrainingInfo(baseUrl, token)?.first ?: ""
+            val trainId = trainingId ?: getStudentTrainingInfoSingleBase(baseUrl, token, cookie)?.first ?: ""
 
-            var events = fetchModernCalendarEvents(baseUrl, token, trainId, startIso, endIso)
+            var events = fetchModernCalendarEvents(baseUrl, token, trainId, startIso, endIso, cookie)
 
             if (events.isEmpty() && trainId.isNotEmpty()) {
-                events = fetchModernCalendarEvents(baseUrl, token, "", startIso, endIso)
+                events = fetchModernCalendarEvents(baseUrl, token, "", startIso, endIso, cookie)
             }
 
-            if (events.isEmpty() && username.isNotEmpty() && password.isNotEmpty()) {
-                events = getLegacyCalendarEvents(baseUrl, username, password)
+            if (events.isEmpty() && (cookie.isNotEmpty() || (username.isNotEmpty() && password.isNotEmpty()))) {
+                events = getLegacyCalendarEvents(baseUrl, username, password, cookie)
             }
 
             return@withContext events
         } catch (e: Exception) {
-            Log.e(tag, "Failed to get modern calendar events: ${e.message}")
-            if (username.isNotEmpty() && password.isNotEmpty()) {
-                return@withContext getLegacyCalendarEvents(baseUrl, username, password)
+            Log.e(tag, "Failed to get modern calendar events on $baseUrl: ${e.message}")
+            if (cookie.isNotEmpty() || (username.isNotEmpty() && password.isNotEmpty())) {
+                return@withContext getLegacyCalendarEvents(baseUrl, username, password, cookie)
             }
             return@withContext emptyList()
         }
@@ -502,7 +1022,8 @@ class NeptunApiClient {
         token: String,
         trainId: String,
         startIso: String,
-        endIso: String
+        endIso: String,
+        cookie: String = ""
     ): List<CalendarEvent> = withContext(Dispatchers.IO) {
         try {
             val urlBuilder = StringBuilder("$baseUrl/api/Calendar/GetCalendarEvents")
@@ -527,7 +1048,7 @@ class NeptunApiClient {
             val req = Request.Builder()
                 .url(urlBuilder.toString())
                 .get()
-                .addHeader("Authorization", "Bearer $token")
+                .withNeptunHeaders(baseUrl, token, cookie)
                 .addHeader("Content-Type", "application/json")
                 .build()
 
@@ -607,7 +1128,12 @@ class NeptunApiClient {
         }
     }
 
-    private suspend fun getLegacyCalendarEvents(baseUrl: String, user: String, pass: String): List<CalendarEvent> = withContext(Dispatchers.IO) {
+    private suspend fun getLegacyCalendarEvents(
+        baseUrl: String,
+        user: String,
+        pass: String,
+        cookie: String = ""
+    ): List<CalendarEvent> = withContext(Dispatchers.IO) {
         try {
             val now = System.currentTimeMillis()
             val startEpoch = now - 7 * 86400000L
@@ -629,6 +1155,7 @@ class NeptunApiClient {
             val req = Request.Builder()
                 .url(url)
                 .post(body.toRequestBody("application/json".toMediaType()))
+                .withNeptunHeaders(baseUrl, "", cookie)
                 .addHeader("Content-Type", "application/json")
                 .build()
 
@@ -688,10 +1215,27 @@ class NeptunApiClient {
         token: String,
         username: String,
         password: String,
-        isModern: Boolean
+        isModern: Boolean,
+        cookie: String = ""
     ): List<SubjectGrade> = withContext(Dispatchers.IO) {
-        if (!isModern) {
-            return@withContext getLegacyGrades(baseUrl, username, password)
+        val candidates = getCandidateBaseUrls(baseUrl)
+        for (targetBase in candidates) {
+            val grades = getGradesSingleBase(targetBase, token, username, password, isModern, cookie)
+            if (grades.isNotEmpty()) return@withContext grades
+        }
+        emptyList()
+    }
+
+    private suspend fun getGradesSingleBase(
+        baseUrl: String,
+        token: String,
+        username: String,
+        password: String,
+        isModern: Boolean,
+        cookie: String = ""
+    ): List<SubjectGrade> = withContext(Dispatchers.IO) {
+        if (!isModern && cookie.isBlank()) {
+            return@withContext getLegacyGrades(baseUrl, username, password, cookie)
         }
 
         try {
@@ -703,7 +1247,7 @@ class NeptunApiClient {
                 val termsReq = Request.Builder()
                     .url(termsUrl)
                     .get()
-                    .addHeader("Authorization", "Bearer $token")
+                    .withNeptunHeaders(baseUrl, token, cookie)
                     .addHeader("Content-Type", "application/json")
                     .build()
 
@@ -763,7 +1307,7 @@ class NeptunApiClient {
                         val subReq = Request.Builder()
                             .url(subjectsUrl)
                             .get()
-                            .addHeader("Authorization", "Bearer $token")
+                            .withNeptunHeaders(baseUrl, token, cookie)
                             .addHeader("Content-Type", "application/json")
                             .build()
 
@@ -871,7 +1415,7 @@ class NeptunApiClient {
                 val offReq = Request.Builder()
                     .url(offeredUrl)
                     .get()
-                    .addHeader("Authorization", "Bearer $token")
+                    .withNeptunHeaders(baseUrl, token, cookie)
                     .addHeader("Content-Type", "application/json")
                     .build()
                 val offResp = okHttpClient.newCall(offReq).execute()
@@ -902,28 +1446,34 @@ class NeptunApiClient {
                 Log.e(tag, "OfferedGrades optional check: ${e.message}")
             }
 
-            if (allGrades.isEmpty() && username.isNotEmpty() && password.isNotEmpty()) {
-                getLegacyGrades(baseUrl, username, password)
+            if (allGrades.isEmpty() && (cookie.isNotEmpty() || (username.isNotEmpty() && password.isNotEmpty()))) {
+                getLegacyGrades(baseUrl, username, password, cookie)
             } else {
                 allGrades
             }
         } catch (e: Exception) {
             Log.e(tag, "Modern grades fetch error: ${e.message}")
-            if (username.isNotEmpty() && password.isNotEmpty()) {
-                getLegacyGrades(baseUrl, username, password)
+            if (cookie.isNotEmpty() || (username.isNotEmpty() && password.isNotEmpty())) {
+                getLegacyGrades(baseUrl, username, password, cookie)
             } else {
                 emptyList()
             }
         }
     }
 
-    private suspend fun getLegacyGrades(baseUrl: String, user: String, pass: String): List<SubjectGrade> = withContext(Dispatchers.IO) {
+    private suspend fun getLegacyGrades(
+        baseUrl: String,
+        user: String,
+        pass: String,
+        cookie: String = ""
+    ): List<SubjectGrade> = withContext(Dispatchers.IO) {
         try {
             val body = """{"UserLogin":"$user","Password":"$pass","CurrentPage":1,"filter":{"TermID":0},"TotalRowCount":-1}"""
             val url = getLegacyServiceUrl(baseUrl, "GetMarkbookData")
             val req = Request.Builder()
                 .url(url)
                 .post(body.toRequestBody("application/json".toMediaType()))
+                .withNeptunHeaders(baseUrl, "", cookie)
                 .addHeader("Content-Type", "application/json")
                 .build()
 
@@ -998,10 +1548,28 @@ class NeptunApiClient {
         username: String,
         password: String,
         isModern: Boolean,
-        page: Int = 1
+        page: Int = 1,
+        cookie: String = ""
     ): List<NeptunMessage> = withContext(Dispatchers.IO) {
-        if (!isModern) {
-            return@withContext getLegacyMessages(baseUrl, username, password, page)
+        val candidates = getCandidateBaseUrls(baseUrl)
+        for (targetBase in candidates) {
+            val msgs = getMessagesSingleBase(targetBase, token, username, password, isModern, page, cookie)
+            if (msgs.isNotEmpty()) return@withContext msgs
+        }
+        emptyList()
+    }
+
+    private suspend fun getMessagesSingleBase(
+        baseUrl: String,
+        token: String,
+        username: String,
+        password: String,
+        isModern: Boolean,
+        page: Int = 1,
+        cookie: String = ""
+    ): List<NeptunMessage> = withContext(Dispatchers.IO) {
+        if (!isModern && cookie.isBlank()) {
+            return@withContext getLegacyMessages(baseUrl, username, password, page, cookie)
         }
 
         try {
@@ -1012,7 +1580,7 @@ class NeptunApiClient {
             val req = Request.Builder()
                 .url(url)
                 .get()
-                .addHeader("Authorization", "Bearer $token")
+                .withNeptunHeaders(baseUrl, token, cookie)
                 .addHeader("Content-Type", "application/json")
                 .build()
 
@@ -1059,7 +1627,11 @@ class NeptunApiClient {
             return@withContext list
         } catch (e: Exception) {
             Log.e(tag, "Modern messages error: ${e.message}")
-            emptyList()
+            if (cookie.isNotEmpty() || (username.isNotEmpty() && password.isNotEmpty())) {
+                getLegacyMessages(baseUrl, username, password, page, cookie)
+            } else {
+                emptyList()
+            }
         }
     }
 
@@ -1069,9 +1641,27 @@ class NeptunApiClient {
         messageId: String,
         isModern: Boolean,
         username: String = "",
-        password: String = ""
+        password: String = "",
+        cookie: String = ""
     ): String = withContext(Dispatchers.IO) {
-        if (isModern && token.isNotBlank()) {
+        val candidates = getCandidateBaseUrls(baseUrl)
+        for (targetBase in candidates) {
+            val content = getMessageContentSingleBase(targetBase, token, messageId, isModern, username, password, cookie)
+            if (content.isNotBlank()) return@withContext content
+        }
+        ""
+    }
+
+    private suspend fun getMessageContentSingleBase(
+        baseUrl: String,
+        token: String,
+        messageId: String,
+        isModern: Boolean,
+        username: String = "",
+        password: String = "",
+        cookie: String = ""
+    ): String = withContext(Dispatchers.IO) {
+        if (isModern || cookie.isNotBlank()) {
             val candidateUrls = listOf(
                 "$baseUrl/api/Messages/$messageId/Posts?messageId=$messageId",
                 "$baseUrl/api/Message/GetMessagePosts?messageId=$messageId",
@@ -1086,7 +1676,7 @@ class NeptunApiClient {
                     val req = Request.Builder()
                         .url(url)
                         .get()
-                        .addHeader("Authorization", "Bearer $token")
+                        .withNeptunHeaders(baseUrl, token, cookie)
                         .addHeader("Content-Type", "application/json")
                         .build()
 
@@ -1153,7 +1743,7 @@ class NeptunApiClient {
         }
 
         // If legacy or modern failed, try legacy /GetMessages with message ID
-        if (username.isNotBlank() && password.isNotBlank()) {
+        if (cookie.isNotBlank() || (username.isNotBlank() && password.isNotBlank())) {
             try {
                 val numId = messageId.toLongOrNull() ?: 0L
                 val body = """{"UserLogin":"$username","Password":"$password","CurrentPage":0,"TotalRowCount":-1,"MessageID":$numId,"MessageSortEnum":0}"""
@@ -1161,6 +1751,7 @@ class NeptunApiClient {
                 val req = Request.Builder()
                     .url(url)
                     .post(body.toRequestBody("application/json".toMediaType()))
+                    .withNeptunHeaders(baseUrl, "", cookie)
                     .addHeader("Content-Type", "application/json")
                     .build()
 
@@ -1190,13 +1781,20 @@ class NeptunApiClient {
         ""
     }
 
-    private suspend fun getLegacyMessages(baseUrl: String, user: String, pass: String, page: Int): List<NeptunMessage> = withContext(Dispatchers.IO) {
+    private suspend fun getLegacyMessages(
+        baseUrl: String,
+        user: String,
+        pass: String,
+        page: Int,
+        cookie: String = ""
+    ): List<NeptunMessage> = withContext(Dispatchers.IO) {
         try {
             val body = """{"UserLogin":"$user","Password":"$pass","CurrentPage":$page,"TotalRowCount":-1,"MessageID":0,"MessageSortEnum":0}"""
             val url = getLegacyServiceUrl(baseUrl, "GetMessages")
             val req = Request.Builder()
                 .url(url)
                 .post(body.toRequestBody("application/json".toMediaType()))
+                .withNeptunHeaders(baseUrl, "", cookie)
                 .addHeader("Content-Type", "application/json")
                 .build()
 
@@ -1259,11 +1857,29 @@ class NeptunApiClient {
         messageId: String,
         isModern: Boolean,
         username: String = "",
-        password: String = ""
+        password: String = "",
+        cookie: String = ""
+    ): Boolean = withContext(Dispatchers.IO) {
+        val candidates = getCandidateBaseUrls(baseUrl)
+        for (targetBase in candidates) {
+            val ok = markMessageAsReadOnServerSingleBase(targetBase, token, messageId, isModern, username, password, cookie)
+            if (ok) return@withContext true
+        }
+        false
+    }
+
+    private suspend fun markMessageAsReadOnServerSingleBase(
+        baseUrl: String,
+        token: String,
+        messageId: String,
+        isModern: Boolean,
+        username: String = "",
+        password: String = "",
+        cookie: String = ""
     ): Boolean = withContext(Dispatchers.IO) {
         var success = false
         try {
-            if (isModern && token.isNotBlank()) {
+            if (isModern || cookie.isNotBlank()) {
                 val urls = listOf(
                     "$baseUrl/api/Message/SetMessageRead?messageId=$messageId",
                     "$baseUrl/api/Message/SetReadState?messageId=$messageId",
@@ -1275,7 +1891,7 @@ class NeptunApiClient {
                         val req = Request.Builder()
                             .url(url)
                             .post("""{"messageId":"$messageId","isRead":true}""".toRequestBody("application/json".toMediaType()))
-                            .addHeader("Authorization", "Bearer $token")
+                            .withNeptunHeaders(baseUrl, token, cookie)
                             .addHeader("Content-Type", "application/json")
                             .build()
                         val resp = okHttpClient.newCall(req).execute()
@@ -1286,7 +1902,7 @@ class NeptunApiClient {
                 }
             }
 
-            if (username.isNotBlank() && password.isNotBlank()) {
+            if (cookie.isNotBlank() || (username.isNotBlank() && password.isNotBlank())) {
                 val numId = messageId.toLongOrNull() ?: 0L
                 val legacyServices = listOf("SetMessageRead", "ReadMessage", "GetMessageDetail")
                 for (svc in legacyServices) {
@@ -1296,6 +1912,7 @@ class NeptunApiClient {
                         val req = Request.Builder()
                             .url(url)
                             .post(body.toRequestBody("application/json".toMediaType()))
+                            .withNeptunHeaders(baseUrl, "", cookie)
                             .addHeader("Content-Type", "application/json")
                             .build()
                         val resp = okHttpClient.newCall(req).execute()
@@ -1306,7 +1923,7 @@ class NeptunApiClient {
                 }
             }
         } catch (e: Exception) {
-            Log.e(tag, "markMessageAsReadOnServer error: ${e.message}")
+            Log.e(tag, "markMessageAsReadOnServer error on $baseUrl: ${e.message}")
         }
         return@withContext success
     }
@@ -1331,10 +1948,27 @@ class NeptunApiClient {
         token: String,
         username: String,
         password: String,
-        isModern: Boolean
+        isModern: Boolean,
+        cookie: String = ""
     ): List<FinanceItem> = withContext(Dispatchers.IO) {
-        if (!isModern) {
-            return@withContext getLegacyFinances(baseUrl, username, password)
+        val candidates = getCandidateBaseUrls(baseUrl)
+        for (targetBase in candidates) {
+            val items = getFinancesSingleBase(targetBase, token, username, password, isModern, cookie)
+            if (items.isNotEmpty()) return@withContext items
+        }
+        emptyList()
+    }
+
+    private suspend fun getFinancesSingleBase(
+        baseUrl: String,
+        token: String,
+        username: String,
+        password: String,
+        isModern: Boolean,
+        cookie: String = ""
+    ): List<FinanceItem> = withContext(Dispatchers.IO) {
+        if (!isModern && cookie.isBlank()) {
+            return@withContext getLegacyFinances(baseUrl, username, password, cookie)
         }
 
         val list = mutableListOf<FinanceItem>()
@@ -1345,7 +1979,7 @@ class NeptunApiClient {
             val toPayReq = Request.Builder()
                 .url(toPayUrl)
                 .get()
-                .addHeader("Authorization", "Bearer $token")
+                .withNeptunHeaders(baseUrl, token, cookie)
                 .addHeader("Content-Type", "application/json")
                 .build()
             val toPayResp = okHttpClient.newCall(toPayReq).execute()
@@ -1401,7 +2035,7 @@ class NeptunApiClient {
             val impReq = Request.Builder()
                 .url(impositionsUrl)
                 .get()
-                .addHeader("Authorization", "Bearer $token")
+                .withNeptunHeaders(baseUrl, token, cookie)
                 .addHeader("Content-Type", "application/json")
                 .build()
             val impResp = okHttpClient.newCall(impReq).execute()
@@ -1468,7 +2102,7 @@ class NeptunApiClient {
             val req = Request.Builder()
                 .url(url)
                 .get()
-                .addHeader("Authorization", "Bearer $token")
+                .withNeptunHeaders(baseUrl, token, cookie)
                 .addHeader("Content-Type", "application/json")
                 .build()
 
@@ -1525,20 +2159,26 @@ class NeptunApiClient {
             Log.e(tag, "Modern transactions error: ${e.message}")
         }
 
-        if (list.isEmpty() && username.isNotEmpty() && password.isNotEmpty()) {
-            getLegacyFinances(baseUrl, username, password)
+        if (list.isEmpty() && (cookie.isNotEmpty() || (username.isNotEmpty() && password.isNotEmpty()))) {
+            getLegacyFinances(baseUrl, username, password, cookie)
         } else {
             list
         }
     }
 
-    private suspend fun getLegacyFinances(baseUrl: String, user: String, pass: String): List<FinanceItem> = withContext(Dispatchers.IO) {
+    private suspend fun getLegacyFinances(
+        baseUrl: String,
+        user: String,
+        pass: String,
+        cookie: String = ""
+    ): List<FinanceItem> = withContext(Dispatchers.IO) {
         try {
             val body = """{"UserLogin":"$user","Password":"$pass","TotalRowCount":-1}"""
             val url = getLegacyServiceUrl(baseUrl, "GetCashinData")
             val req = Request.Builder()
                 .url(url)
                 .post(body.toRequestBody("application/json".toMediaType()))
+                .withNeptunHeaders(baseUrl, "", cookie)
                 .addHeader("Content-Type", "application/json")
                 .build()
 

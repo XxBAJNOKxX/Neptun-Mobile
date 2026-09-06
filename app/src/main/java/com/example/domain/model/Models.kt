@@ -97,6 +97,24 @@ enum class FinanceStatus(val displayName: String) {
     OVERDUE("Késedelmes")
 }
 
+data class Neptun2FASession(
+    val neptunCode: String,
+    val key: String,
+    val phase: String = "RequestTOTP",
+    val rendered: String = "",
+    val verificationToken: String = "",
+    val hasTotp: Boolean = false,
+    val hasEmail: Boolean = true,
+    val codePrefix: String = "",
+    val cookies: Map<String, String> = emptyMap(),
+    val baseUrl: String = "https://neptun.elte.hu"
+)
+
+enum class TwoFactorMethod(val displayName: String) {
+    EMAIL("E-mail kód"),
+    TOTP("Hitelesítő App (TOTP)")
+}
+
 data class FinanceItem(
     val id: String,
     val title: String,
