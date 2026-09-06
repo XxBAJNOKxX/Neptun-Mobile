@@ -1700,29 +1700,46 @@ class NeptunApiClient {
 
                     val parsed = safeParseJson(bodyStr)
                     if (parsed is JsonObject) {
+                        val collectedPostIds = mutableListOf<String>()
                         val dataObj = parsed["data"]
                         if (dataObj is JsonObject) {
                             val posts = dataObj["posts"]?.jsonArray
                             if (!posts.isNullOrEmpty()) {
+                                var foundHtml = ""
                                 for (postItem in posts) {
                                     if (postItem is JsonObject) {
+                                        val pid = postItem["postId"]?.jsonPrimitive?.contentOrNull
+                                        if (!pid.isNullOrBlank()) {
+                                            collectedPostIds.add(pid)
+                                        }
                                         val html = postItem["htmlText"]?.jsonPrimitive?.contentOrNull
                                             ?: postItem["text"]?.jsonPrimitive?.contentOrNull
                                             ?: postItem["detail"]?.jsonPrimitive?.contentOrNull
                                             ?: postItem["body"]?.jsonPrimitive?.contentOrNull
-                                        if (!html.isNullOrBlank()) {
-                                            val cleaned = cleanHtml(html)
-                                            if (cleaned.isNotBlank()) return@withContext cleaned
+                                        if (!html.isNullOrBlank() && foundHtml.isBlank()) {
+                                            foundHtml = html
                                         }
                                     }
+                                }
+                                if (collectedPostIds.isNotEmpty()) {
+                                    markPostsProcessed(baseUrl, token, messageId, collectedPostIds)
+                                }
+                                if (foundHtml.isNotBlank()) {
+                                    val cleaned = cleanHtml(foundHtml)
+                                    if (cleaned.isNotBlank()) return@withContext cleaned
                                 }
                             }
                         } else if (dataObj is JsonArray) {
                             for (postItem in dataObj) {
                                 if (postItem is JsonObject) {
+                                    val pid = postItem["postId"]?.jsonPrimitive?.contentOrNull
+                                    if (!pid.isNullOrBlank()) collectedPostIds.add(pid)
                                     val html = postItem["htmlText"]?.jsonPrimitive?.contentOrNull
                                         ?: postItem["text"]?.jsonPrimitive?.contentOrNull
                                     if (!html.isNullOrBlank()) {
+                                        if (collectedPostIds.isNotEmpty()) {
+                                            markPostsProcessed(baseUrl, token, messageId, collectedPostIds)
+                                        }
                                         val cleaned = cleanHtml(html)
                                         if (cleaned.isNotBlank()) return@withContext cleaned
                                     }
@@ -1739,6 +1756,9 @@ class NeptunApiClient {
                         }
 
                         if (!directHtml.isNullOrBlank()) {
+                            if (collectedPostIds.isNotEmpty()) {
+                                markPostsProcessed(baseUrl, token, messageId, collectedPostIds)
+                            }
                             val cleaned = cleanHtml(directHtml)
                             if (cleaned.isNotBlank()) return@withContext cleaned
                         }
@@ -1850,6 +1870,30 @@ class NeptunApiClient {
         }
     }
 
+    private fun markPostsProcessed(
+        baseUrl: String,
+        token: String,
+        messageId: String,
+        postIds: List<String>
+    ) {
+        if (token.isBlank() || postIds.isEmpty()) return
+        try {
+            val processUrl = "$baseUrl/api/Messages/$messageId/Posts/Processed"
+            val postIdsJson = postIds.joinToString(separator = ",", prefix = "[", postfix = "]") { "\"$it\"" }
+            val body = """{"postIds":$postIdsJson}"""
+            val req = Request.Builder()
+                .url(processUrl)
+                .post(body.toRequestBody("application/json".toMediaType()))
+                .addHeader("Authorization", "Bearer $token")
+                .addHeader("Content-Type", "application/json")
+                .build()
+            val resp = okHttpClient.newCall(req).execute()
+            resp.close()
+        } catch (e: Exception) {
+            Log.e(tag, "markPostsProcessed error: ${e.message}")
+        }
+    }
+
     suspend fun markMessageAsReadOnServer(
         baseUrl: String,
         token: String,
@@ -1861,6 +1905,60 @@ class NeptunApiClient {
         var success = false
         try {
             if (isModern && token.isNotBlank()) {
+                // 1. Fetch posts for this message to discover exact postId(s)
+                val postIds = mutableListOf<String>()
+                try {
+                    val postsUrl = "$baseUrl/api/Messages/$messageId/Posts"
+                    val req = Request.Builder()
+                        .url(postsUrl)
+                        .get()
+                        .addHeader("Authorization", "Bearer $token")
+                        .addHeader("Content-Type", "application/json")
+                        .build()
+                    val resp = okHttpClient.newCall(req).execute()
+                    val bodyStr = resp.body?.string() ?: ""
+                    if (resp.isSuccessful && bodyStr.isNotBlank()) {
+                        val parsed = safeParseJson(bodyStr)
+                        if (parsed is JsonObject) {
+                            val posts = parsed["data"]?.jsonObject?.get("posts")?.jsonArray
+                            posts?.forEach { p ->
+                                if (p is JsonObject) {
+                                    val pid = p["postId"]?.jsonPrimitive?.contentOrNull
+                                    if (!pid.isNullOrBlank()) postIds.add(pid)
+                                }
+                            }
+                        }
+                    }
+                    resp.close()
+                } catch (e: Exception) {
+                    Log.e(tag, "Failed to fetch post IDs for read mark: ${e.message}")
+                }
+
+                if (postIds.isEmpty()) {
+                    postIds.add(messageId)
+                }
+
+                // 2. Call modern Neptun /Posts/Processed endpoint
+                try {
+                    val processUrl = "$baseUrl/api/Messages/$messageId/Posts/Processed"
+                    val postIdsJson = postIds.joinToString(separator = ",", prefix = "[", postfix = "]") { "\"$it\"" }
+                    val body = """{"postIds":$postIdsJson}"""
+                    val req = Request.Builder()
+                        .url(processUrl)
+                        .post(body.toRequestBody("application/json".toMediaType()))
+                        .addHeader("Authorization", "Bearer $token")
+                        .addHeader("Content-Type", "application/json")
+                        .build()
+                    val resp = okHttpClient.newCall(req).execute()
+                    if (resp.isSuccessful || resp.code == 204 || resp.code == 200) {
+                        success = true
+                    }
+                    resp.close()
+                } catch (e: Exception) {
+                    Log.e(tag, "Failed Posts/Processed: ${e.message}")
+                }
+
+                // 3. Hit other potential modern read endpoints as safety fallback
                 val urls = listOf(
                     "$baseUrl/api/Message/SetMessageRead?messageId=$messageId",
                     "$baseUrl/api/Message/SetReadState?messageId=$messageId",
@@ -1876,9 +1974,10 @@ class NeptunApiClient {
                             .addHeader("Content-Type", "application/json")
                             .build()
                         val resp = okHttpClient.newCall(req).execute()
-                        if (resp.isSuccessful) success = true
+                        if (resp.isSuccessful || resp.code == 204 || resp.code == 200) success = true
+                        resp.close()
                     } catch (e: Exception) {
-                        Log.e(tag, "Failed URL $url: ${e.message}")
+                        // ignore fallback errors
                     }
                 }
             }
@@ -1897,6 +1996,7 @@ class NeptunApiClient {
                             .build()
                         val resp = okHttpClient.newCall(req).execute()
                         if (resp.isSuccessful) success = true
+                        resp.close()
                     } catch (e: Exception) {
                         Log.e(tag, "Failed legacy $svc: ${e.message}")
                     }
