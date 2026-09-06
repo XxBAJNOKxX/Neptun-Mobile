@@ -80,6 +80,45 @@ class EncryptedPreferencesManager(context: Context) {
         _notificationPreferencesFlow.value = loadNotificationPreferences()
     }
 
+    fun saveSelectedUniversity(universityId: String, universityName: String, neptunUrl: String) {
+        prefs.edit()
+            .putString(KEY_SELECTED_UNIVERSITY_ID, universityId)
+            .putString(KEY_SELECTED_UNIVERSITY_NAME, universityName)
+            .putString(KEY_SELECTED_UNIVERSITY_URL, neptunUrl)
+            .putString(KEY_BASE_URL, neptunUrl)
+            .apply()
+    }
+
+    fun getSelectedUniversityId(): String {
+        val selectedId = prefs.getString(KEY_SELECTED_UNIVERSITY_ID, "") ?: ""
+        if (selectedId.isNotEmpty()) return selectedId
+        return prefs.getString(KEY_UNIVERSITY_ID, "") ?: ""
+    }
+
+    fun getSelectedUniversityName(): String {
+        val selectedName = prefs.getString(KEY_SELECTED_UNIVERSITY_NAME, "") ?: ""
+        if (selectedName.isNotEmpty()) return selectedName
+        return prefs.getString(KEY_UNIVERSITY_NAME, "") ?: ""
+    }
+
+    fun getSelectedUniversityUrl(): String {
+        val selectedUrl = prefs.getString(KEY_SELECTED_UNIVERSITY_URL, "") ?: ""
+        if (selectedUrl.isNotEmpty()) return selectedUrl
+        val uniUrl = prefs.getString(KEY_NEPTUN_URL, "") ?: ""
+        if (uniUrl.isNotEmpty()) return uniUrl
+        return prefs.getString(KEY_BASE_URL, "") ?: ""
+    }
+
+    fun saveLastNeptunCode(code: String) {
+        if (code.isNotBlank()) {
+            prefs.edit().putString(KEY_NEPTUN_CODE, code.trim().uppercase()).apply()
+        }
+    }
+
+    fun getLastNeptunCode(): String {
+        return prefs.getString(KEY_NEPTUN_CODE, "") ?: ""
+    }
+
     fun saveCredentials(
         neptunCode: String,
         password: String,
@@ -96,6 +135,10 @@ class EncryptedPreferencesManager(context: Context) {
             .putString(KEY_UNIVERSITY_ID, universityId)
             .putString(KEY_UNIVERSITY_NAME, universityName)
             .putString(KEY_NEPTUN_URL, neptunUrl)
+            .putString(KEY_BASE_URL, neptunUrl)
+            .putString(KEY_SELECTED_UNIVERSITY_ID, universityId)
+            .putString(KEY_SELECTED_UNIVERSITY_NAME, universityName)
+            .putString(KEY_SELECTED_UNIVERSITY_URL, neptunUrl)
             .putString(KEY_STUDENT_NAME, studentName)
             .putString(KEY_SESSION_TOKEN, sessionToken)
             .putString(KEY_TRAINING_PROGRAM, trainingProgram)
@@ -241,7 +284,38 @@ class EncryptedPreferencesManager(context: Context) {
     }
 
     fun clear() {
-        prefs.edit().clear().apply()
+        // Keep selected university and personalization across logouts so user does not need to re-select university
+        val savedUniId = getSelectedUniversityId()
+        val savedUniName = getSelectedUniversityName()
+        val savedUniUrl = getSelectedUniversityUrl()
+        val savedNeptunCode = prefs.getString(KEY_NEPTUN_CODE, "") ?: ""
+        val savedThemeMode = prefs.getString(KEY_THEME_MODE, ThemeMode.SYSTEM.name)
+        val savedDynamicColor = prefs.getBoolean(KEY_DYNAMIC_COLOR, true)
+        val savedAccent = prefs.getString(KEY_ACCENT_COLOR, AppAccentColor.BLUE.id)
+        val notifyClasses = prefs.getBoolean(KEY_NOTIFY_CLASSES, true)
+        val notifyGrades = prefs.getBoolean(KEY_NOTIFY_GRADES, true)
+        val notifyMessages = prefs.getBoolean(KEY_NOTIFY_MESSAGES, true)
+        val notifyFinances = prefs.getBoolean(KEY_NOTIFY_FINANCES, true)
+        val reminderMins = prefs.getInt(KEY_CLASS_REMINDER_MINUTES, 15)
+
+        prefs.edit()
+            .clear()
+            .putString(KEY_SELECTED_UNIVERSITY_ID, savedUniId)
+            .putString(KEY_SELECTED_UNIVERSITY_NAME, savedUniName)
+            .putString(KEY_SELECTED_UNIVERSITY_URL, savedUniUrl)
+            .putString(KEY_BASE_URL, savedUniUrl)
+            .putString(KEY_NEPTUN_CODE, savedNeptunCode)
+            .putString(KEY_THEME_MODE, savedThemeMode)
+            .putBoolean(KEY_DYNAMIC_COLOR, savedDynamicColor)
+            .putString(KEY_ACCENT_COLOR, savedAccent)
+            .putBoolean(KEY_NOTIFY_CLASSES, notifyClasses)
+            .putBoolean(KEY_NOTIFY_GRADES, notifyGrades)
+            .putBoolean(KEY_NOTIFY_MESSAGES, notifyMessages)
+            .putBoolean(KEY_NOTIFY_FINANCES, notifyFinances)
+            .putInt(KEY_CLASS_REMINDER_MINUTES, reminderMins)
+            .putBoolean(KEY_IS_LOGGED_IN, false)
+            .apply()
+
         _credentialsFlow.value = null
     }
 
@@ -251,6 +325,9 @@ class EncryptedPreferencesManager(context: Context) {
         private const val KEY_UNIVERSITY_ID = "key_uni_id"
         private const val KEY_UNIVERSITY_NAME = "key_uni_name"
         private const val KEY_NEPTUN_URL = "key_neptun_url"
+        private const val KEY_SELECTED_UNIVERSITY_ID = "key_selected_uni_id"
+        private const val KEY_SELECTED_UNIVERSITY_NAME = "key_selected_uni_name"
+        private const val KEY_SELECTED_UNIVERSITY_URL = "key_selected_uni_url"
         private const val KEY_STUDENT_NAME = "key_student_name"
         private const val KEY_SESSION_TOKEN = "key_session_token"
         private const val KEY_ACCESS_TOKEN = "key_access_token"
