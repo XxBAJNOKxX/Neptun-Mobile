@@ -124,11 +124,13 @@ class AuthRepositoryImpl(
                     universityName = university.name,
                     neptunUrl = authResult.normalizedBaseUrl,
                     studentName = authResult.studentName,
-                    sessionToken = authResult.accessToken
+                    sessionToken = authResult.accessToken,
+                    trainingProgram = authResult.trainingProgram
                 )
                 prefsManager.setAccessToken(authResult.accessToken)
                 authResult.refreshToken?.let { prefsManager.setRefreshToken(it) }
                 authResult.deviceCookie?.let { prefsManager.setDeviceCookie(trimmedCode, it) }
+                authResult.studentTrainingId?.let { prefsManager.setStudentTrainingId(it) }
                 prefsManager.setIsModernApi(authResult.isModernApi)
                 prefsManager.setBaseUrl(authResult.normalizedBaseUrl)
 
@@ -178,10 +180,13 @@ class AuthRepositoryImpl(
                     universityName = uni.name,
                     neptunUrl = authResult.normalizedBaseUrl,
                     studentName = authResult.studentName,
-                    sessionToken = authResult.accessToken
+                    sessionToken = authResult.accessToken,
+                    trainingProgram = authResult.trainingProgram
                 )
                 prefsManager.setAccessToken(authResult.accessToken)
+                authResult.refreshToken?.let { prefsManager.setRefreshToken(it) }
                 authResult.deviceCookie?.let { prefsManager.setDeviceCookie(session.neptunCode, it) }
+                authResult.studentTrainingId?.let { prefsManager.setStudentTrainingId(it) }
                 prefsManager.setIsModernApi(authResult.isModernApi)
                 prefsManager.setBaseUrl(authResult.normalizedBaseUrl)
 
