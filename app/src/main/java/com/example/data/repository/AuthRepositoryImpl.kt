@@ -33,7 +33,6 @@ class AuthRepositoryImpl(
 
     private val _universitiesFlow = MutableStateFlow<List<University>>(emptyList())
     private var lastAttemptedUniversity: University? = null
-    private var lastAttemptedPassword: String = ""
 
     override fun getUniversities(): Flow<List<University>> = _universitiesFlow.asStateFlow()
 
@@ -63,7 +62,6 @@ class AuthRepositoryImpl(
         val trimmedCode = neptunCode.trim().uppercase()
         val trimmedPassword = password.trim()
         lastAttemptedUniversity = university
-        lastAttemptedPassword = trimmedPassword
 
         if (trimmedCode.length != 6) {
             return@withContext Result.failure(IllegalArgumentException("A Neptun kódnak pontosan 6 karakterből kell állnia!"))
@@ -170,10 +168,9 @@ class AuthRepositoryImpl(
                     neptunUrl = session.baseUrl
                 )
 
-                val effectivePassword = lastAttemptedPassword.ifEmpty { prefsManager.getPassword() }
                 prefsManager.saveCredentials(
                     neptunCode = session.neptunCode,
-                    password = effectivePassword,
+                    password = "******",
                     universityId = uni.id,
                     universityName = uni.name,
                     neptunUrl = authResult.normalizedBaseUrl,
@@ -182,7 +179,7 @@ class AuthRepositoryImpl(
                 )
                 prefsManager.setAccessToken(authResult.accessToken)
                 authResult.deviceCookie?.let { prefsManager.setDeviceCookie(session.neptunCode, it) }
-                prefsManager.setIsModernApi(true)
+                prefsManager.setIsModernApi(authResult.isModernApi)
                 prefsManager.setBaseUrl(authResult.normalizedBaseUrl)
 
                 val creds = prefsManager.loadCredentials() ?: StudentCredentials(
