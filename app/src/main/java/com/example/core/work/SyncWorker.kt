@@ -56,47 +56,13 @@ class SyncWorker(
                 // 3. Check upcoming classes and remind student if enabled
                 if (notifPrefs.notifyClasses) {
                     val events = app.appContainer.neptunRepository.getCalendarEvents().first()
-                    // Reschedule exact alarms for upcoming week events
-                    events.forEach { event ->
+                    // Reschedule exact alarms for upcoming valid classes only (excluding holidays/breaks)
+                    events.filter { it.isActualAttendedClass }.forEach { event ->
                         try {
                             app.appContainer.alarmScheduler.scheduleClassAlarm(event)
                         } catch (e: Exception) {
                             // Handled if exact alarm permission is restricted
                         }
-                    }
-
-                    // Also check if any class is within the reminder window today
-                    val cal = Calendar.getInstance()
-                    val todayDayOfWeek = when (cal.get(Calendar.DAY_OF_WEEK)) {
-                        Calendar.MONDAY -> 1
-                        Calendar.TUESDAY -> 2
-                        Calendar.WEDNESDAY -> 3
-                        Calendar.THURSDAY -> 4
-                        Calendar.FRIDAY -> 5
-                        Calendar.SATURDAY -> 6
-                        else -> 7
-                    }
-                    val currentHour = cal.get(Calendar.HOUR_OF_DAY)
-                    val currentMin = cal.get(Calendar.MINUTE)
-                    val currentTimeInMinutes = currentHour * 60 + currentMin
-
-                    val todayEvents = events.filter { it.dayOfWeek == todayDayOfWeek }
-                    val upcomingSoon = todayEvents.firstOrNull { event ->
-                        val eventStartInMinutes = event.startHour * 60 + event.startMinute
-                        val diff = eventStartInMinutes - currentTimeInMinutes
-                        diff in 0..notifPrefs.reminderMinutesBefore + 10
-                    }
-
-                    if (upcomingSoon != null) {
-                        NotificationHelper.showClassReminder(
-                            context = applicationContext,
-                            notificationId = upcomingSoon.id.hashCode(),
-                            subjectName = upcomingSoon.subjectName,
-                            room = upcomingSoon.room,
-                            startTime = "%02d:%02d".format(upcomingSoon.startHour, upcomingSoon.startMinute),
-                            courseType = upcomingSoon.courseType.displayName,
-                            minutesBefore = notifPrefs.reminderMinutesBefore
-                        )
                     }
                 }
 

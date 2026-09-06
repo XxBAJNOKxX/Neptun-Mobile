@@ -87,6 +87,14 @@ object NotificationHelper {
         courseType: String,
         minutesBefore: Int = 15
     ) {
+        val lower = subjectName.lowercase()
+        if (lower.contains("szünnap") || lower.contains("szünet") || lower.contains("munkaszünet") ||
+            lower.contains("ünnep") || lower.contains("rektori") || lower.contains("dékáni") ||
+            startTime == "00:00" || startTime == "0:00"
+        ) {
+            return
+        }
+
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         }
