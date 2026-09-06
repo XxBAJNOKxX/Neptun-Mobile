@@ -48,6 +48,23 @@ data class CalendarEvent(
 ) {
     val timeFormatted: String
         get() = "%02d:%02d - %02d:%02d".format(startHour, startMinute, endHour, endMinute)
+
+    val isHolidayOrBreak: Boolean
+        get() {
+            val nameLower = subjectName.lowercase()
+            return nameLower.contains("szünnap") ||
+                   nameLower.contains("szünet") ||
+                   nameLower.contains("munkaszünet") ||
+                   nameLower.contains("ünnep") ||
+                   nameLower.contains("tanítás nélküli") ||
+                   nameLower.contains("oktatási szünet") ||
+                   nameLower.contains("rektori") ||
+                   nameLower.contains("dékáni") ||
+                   (startHour == 0 && startMinute == 0 && (endHour == 0 || endHour == 23 || endHour == 24))
+        }
+
+    val isActualAttendedClass: Boolean
+        get() = !isHolidayOrBreak && !(startHour == 0 && startMinute == 0 && endHour == 0 && endMinute == 0)
 }
 
 data class SubjectGrade(
