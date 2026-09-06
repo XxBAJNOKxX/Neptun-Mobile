@@ -684,7 +684,7 @@ fun LoginScreen(
                                         modifier = Modifier.size(16.dp)
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Text("2. E-mail kód kérése (GetEmail=true)")
+                                    Text("2. E-mail kód kérése")
                                 }
                             }
                         } else {
