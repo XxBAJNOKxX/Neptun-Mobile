@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.BuildConfig
 import com.example.core.notification.NotificationHelper
 import com.example.core.security.EncryptedPreferencesManager
 import com.example.core.security.NotificationPreferences
@@ -13,19 +14,33 @@ import com.example.domain.repository.NeptunRepository
 import com.example.ui.theme.AppAccentColor
 import com.example.ui.theme.ThemeMode
 import com.example.ui.theme.ThemeSettings
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import org.json.JSONObject
+import java.util.concurrent.TimeUnit
+
+data class UpdateCheckState(
+    val isChecking: Boolean = false,
+    val updateAvailable: Boolean = false,
+    val latestVersionName: String? = null,
+    val downloadUrl: String? = null,
+    val message: String? = null
+)
 
 data class SettingsUiState(
     val credentials: StudentCredentials? = null,
     val themeSettings: ThemeSettings = ThemeSettings(),
     val notificationPreferences: NotificationPreferences = NotificationPreferences(),
     val isSyncing: Boolean = false,
-    val syncSuccessMessage: String? = null
+    val syncSuccessMessage: String? = null,
+    val updateCheckState: UpdateCheckState = UpdateCheckState()
 )
 
 class SettingsViewModel(
@@ -179,6 +194,115 @@ class SettingsViewModel(
             amount = "14 500",
             dueDate = "2026. 09. 15"
         )
+    }
+
+    fun checkForUpdates() {
+        if (_uiState.value.updateCheckState.isChecking) return
+        viewModelScope.launch(Dispatchers.IO) {
+            _uiState.update {
+                it.copy(updateCheckState = UpdateCheckState(isChecking = true))
+            }
+            val repo = BuildConfig.GITHUB_REPO
+            try {
+                val client = OkHttpClient.Builder()
+                    .connectTimeout(6, TimeUnit.SECONDS)
+                    .readTimeout(6, TimeUnit.SECONDS)
+                    .build()
+
+                val request = Request.Builder()
+                    .url("https://api.github.com/repos/$repo/releases/latest")
+                    .header("Accept", "application/vnd.github.v3+json")
+                    .header("User-Agent", "NeptunMobileApp")
+                    .build()
+
+                client.newCall(request).execute().use { response ->
+                    if (response.isSuccessful) {
+                        val bodyString = response.body?.string() ?: ""
+                        val json = JSONObject(bodyString)
+                        val tagName = json.optString("tag_name", "")
+                        val htmlUrl = json.optString("html_url", "https://github.com/$repo/releases")
+                        var apkUrl: String? = null
+                        val assets = json.optJSONArray("assets")
+                        if (assets != null) {
+                            for (i in 0 until assets.length()) {
+                                val asset = assets.getJSONObject(i)
+                                val name = asset.optString("name", "")
+                                if (name.endsWith(".apk")) {
+                                    apkUrl = asset.optString("browser_download_url")
+                                    break
+                                }
+                            }
+                        }
+                        val finalDownloadUrl = apkUrl ?: htmlUrl
+                        val currentVersion = BuildConfig.VERSION_NAME
+                        val isNewer = isNewerVersion(tagName, currentVersion)
+
+                        if (isNewer) {
+                            _uiState.update {
+                                it.copy(
+                                    updateCheckState = UpdateCheckState(
+                                        isChecking = false,
+                                        updateAvailable = true,
+                                        latestVersionName = tagName,
+                                        downloadUrl = finalDownloadUrl,
+                                        message = "Új verzió elérhető: $tagName!"
+                                    )
+                                )
+                            }
+                        } else {
+                            _uiState.update {
+                                it.copy(
+                                    updateCheckState = UpdateCheckState(
+                                        isChecking = false,
+                                        updateAvailable = false,
+                                        latestVersionName = tagName,
+                                        downloadUrl = htmlUrl,
+                                        message = "A legfrissebb verziót használod (v$currentVersion)."
+                                    )
+                                )
+                            }
+                        }
+                    } else {
+                        val fallbackUrl = "https://github.com/$repo/releases"
+                        _uiState.update {
+                            it.copy(
+                                updateCheckState = UpdateCheckState(
+                                    isChecking = false,
+                                    downloadUrl = fallbackUrl,
+                                    message = "Nyisd meg a GitHub Releases oldalt a letöltéshez."
+                                )
+                            )
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                val fallbackUrl = "https://github.com/$repo/releases"
+                _uiState.update {
+                    it.copy(
+                        updateCheckState = UpdateCheckState(
+                            isChecking = false,
+                            downloadUrl = fallbackUrl,
+                            message = "Nyisd meg a GitHub Releases oldalt a letöltéshez."
+                        )
+                    )
+                }
+            }
+        }
+    }
+
+    private fun isNewerVersion(latest: String, current: String): Boolean {
+        val cleanLatest = latest.removePrefix("v").trim()
+        val cleanCurrent = current.removePrefix("v").trim()
+        val lParts = cleanLatest.split(".").mapNotNull { it.toIntOrNull() }
+        val cParts = cleanCurrent.split(".").mapNotNull { it.toIntOrNull() }
+        val maxLen = maxOf(lParts.size, cParts.size)
+        for (i in 0 until maxLen) {
+            val l = lParts.getOrElse(i) { 0 }
+            val c = cParts.getOrElse(i) { 0 }
+            if (l > c) return true
+            if (l < c) return false
+        }
+        return false
     }
 
     companion object {

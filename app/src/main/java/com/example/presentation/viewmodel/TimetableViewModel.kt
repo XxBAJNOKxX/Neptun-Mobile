@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.core.notification.AlarmScheduler
+import com.example.core.security.EncryptedPreferencesManager
 import com.example.domain.model.CalendarEvent
 import com.example.domain.repository.NeptunRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -53,7 +54,8 @@ private fun currentOrNextSchoolDay(): Int {
 
 class TimetableViewModel(
     private val neptunRepository: NeptunRepository,
-    private val alarmScheduler: AlarmScheduler
+    private val alarmScheduler: AlarmScheduler,
+    private val prefsManager: EncryptedPreferencesManager? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(buildInitialUiState())
@@ -212,18 +214,20 @@ class TimetableViewModel(
     }
 
     fun scheduleClassReminder(event: CalendarEvent) {
-        alarmScheduler.scheduleClassAlarm(event)
+        val reminderMins = prefsManager?.loadNotificationPreferences()?.reminderMinutesBefore ?: 15
+        alarmScheduler.scheduleClassAlarm(event, reminderMins)
         _uiState.update { it.copy(notificationScheduledId = event.id) }
     }
 
     companion object {
         fun provideFactory(
             neptunRepository: NeptunRepository,
-            alarmScheduler: AlarmScheduler
+            alarmScheduler: AlarmScheduler,
+            prefsManager: EncryptedPreferencesManager? = null
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                return TimetableViewModel(neptunRepository, alarmScheduler) as T
+                return TimetableViewModel(neptunRepository, alarmScheduler, prefsManager) as T
             }
         }
     }
