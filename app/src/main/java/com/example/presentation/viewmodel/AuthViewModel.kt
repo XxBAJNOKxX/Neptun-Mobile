@@ -176,25 +176,6 @@ class AuthViewModel(
         }
     }
 
-    fun quickElteTestFill() {
-        val elte = _uiState.value.universities.firstOrNull { it.id == "etvslorndtud" || it.id == "elte" }
-            ?: _uiState.value.universities.firstOrNull { it.neptunUrl.contains("elte.hu") }
-            ?: _uiState.value.selectedUniversity
-
-        if (elte != null) {
-            authRepository.saveSelectedUniversity(elte)
-        }
-        authRepository.saveNeptunCode("I7ZBE7")
-        _uiState.update {
-            it.copy(
-                selectedUniversity = elte,
-                neptunCode = "I7ZBE7",
-                password = "2e8MTsKtbSQ+G2W",
-                errorMessage = null
-            )
-        }
-    }
-
     fun quickDemoFill() {
         authRepository.saveNeptunCode("DEMO01")
         _uiState.update {
