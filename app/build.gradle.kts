@@ -40,7 +40,7 @@ android {
   }
 
   signingConfigs {
-    create("debugConfig") {
+    getByName("debug") {
       val ksFile = sequenceOf(
         file("${rootDir}/debug.keystore"),
         file("${projectDir}/debug.keystore"),
@@ -52,8 +52,6 @@ android {
         storePassword = "android"
         keyAlias = "androiddebugkey"
         keyPassword = "android"
-      } else {
-        initWith(getByName("debug"))
       }
     }
     create("release") {
@@ -66,7 +64,7 @@ android {
         keyPassword = System.getenv("KEY_PASSWORD")
       } else {
         // Fallback to stable debug keystore for consistent releases
-        initWith(getByName("debugConfig"))
+        initWith(getByName("debug"))
       }
     }
   }
@@ -78,7 +76,7 @@ android {
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
       signingConfig = signingConfigs.getByName("release")
     }
-    debug { signingConfig = signingConfigs.getByName("debugConfig") }
+    debug { signingConfig = signingConfigs.getByName("debug") }
   }
   compileOptions {
     sourceCompatibility = JavaVersion.VERSION_11
