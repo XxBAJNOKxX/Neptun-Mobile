@@ -31,16 +31,10 @@ jobs:
       - name: Restore Keystore for Consistent Signing
         run: |
           mkdir -p ~/.android
-          if [ -f debug.keystore.base64 ]; then
-            base64 -d debug.keystore.base64 > debug.keystore
-            cp debug.keystore app/debug.keystore
-            cp debug.keystore ~/.android/debug.keystore
-            echo "Successfully restored debug.keystore from debug.keystore.base64 to root, app/, and ~/.android/"
-          elif [ ! -f debug.keystore ]; then
-            keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
-            cp debug.keystore app/debug.keystore
-            cp debug.keystore ~/.android/debug.keystore
-          fi
+          echo "${{ secrets.DEBUG_KEYSTORE_BASE64 }}" | base64 -d > debug.keystore
+          cp debug.keystore app/debug.keystore
+          cp debug.keystore ~/.android/debug.keystore
+          echo "Successfully restored consistent debug.keystore to root, app/, and ~/.android/"
 
       - name: Determine App Version
         id: versioning
