@@ -1,38 +1,10 @@
 [
   {
     "id": "ppke_auto",
-    "name": "Pázmány Péter Katolikus Egyetem (Automatikus Terheléselosztó)",
-    "shortName": "PPKE (Auto)",
+    "name": "Pázmány Péter Katolikus Egyetem",
+    "shortName": "PPKE",
     "city": "Budapest",
     "neptunUrl": "https://neptun2.ppke.hu/hallgato_uj"
-  },
-  {
-    "id": "ppke_neptun2",
-    "name": "Pázmány Péter Katolikus Egyetem (Neptun 2)",
-    "shortName": "PPKE (neptun2)",
-    "city": "Budapest",
-    "neptunUrl": "https://neptun2.ppke.hu/hallgato_uj"
-  },
-  {
-    "id": "ppke_neptun3",
-    "name": "Pázmány Péter Katolikus Egyetem (Neptun 3)",
-    "shortName": "PPKE (neptun3)",
-    "city": "Budapest",
-    "neptunUrl": "https://neptun3.ppke.hu/hallgato_uj"
-  },
-  {
-    "id": "ppke_neptun3_3",
-    "name": "Pázmány Péter Katolikus Egyetem (Neptun 3 / hallgato3)",
-    "shortName": "PPKE (hallgato3)",
-    "city": "Budapest",
-    "neptunUrl": "https://neptun3.ppke.hu/hallgato3_uj"
-  },
-  {
-    "id": "ppke_neptun3_2",
-    "name": "Pázmány Péter Katolikus Egyetem (Neptun 3 / hallgato2)",
-    "shortName": "PPKE (hallgato2)",
-    "city": "Budapest",
-    "neptunUrl": "https://neptun3.ppke.hu/hallgato2_uj"
   },
   {
     "id": "atankapujabu",
