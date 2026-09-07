@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -27,21 +28,43 @@ jobs:
       - name: Grant Execute Permission for Gradlew
         run: chmod +x gradlew
 
-      - name: Ensure Debug Keystore
+      - name: Restore Keystore for Consistent Signing
         run: |
-          if [ ! -f debug.keystore ]; then
+          if [ -f debug.keystore.base64 ]; then
+            base64 -d debug.keystore.base64 > debug.keystore
+            echo "Successfully restored debug.keystore from debug.keystore.base64"
+          elif [ ! -f debug.keystore ]; then
             keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
           fi
 
-      - name: Build Debug APK
-        run: ./gradlew assembleDebug --stacktrace
-
-      - name: Generate Version Tag
+      - name: Determine App Version
         id: versioning
         run: |
-          VERSION_TAG="v1.0.${{ github.run_number }}"
+          VERSION_NAME="0.1.${{ github.run_number }}"
+          VERSION_CODE="${{ github.run_number }}"
+          VERSION_TAG="v${VERSION_NAME}"
+          echo "VERSION_NAME=$VERSION_NAME" >> $GITHUB_OUTPUT
+          echo "VERSION_CODE=$VERSION_CODE" >> $GITHUB_OUTPUT
           echo "VERSION_TAG=$VERSION_TAG" >> $GITHUB_OUTPUT
-          echo "Generated version tag: $VERSION_TAG"
+          echo "Generated version: $VERSION_NAME (Code: $VERSION_CODE, Tag: $VERSION_TAG)"
+
+      - name: Build Debug APK with Version
+        env:
+          APP_VERSION_NAME: ${{ steps.versioning.outputs.VERSION_NAME }}
+          APP_VERSION_CODE: ${{ steps.versioning.outputs.VERSION_CODE }}
+          GITHUB_REPO: ${{ github.repository }}
+        run: |
+          ./gradlew assembleDebug \
+            -PversionName="${{ steps.versioning.outputs.VERSION_NAME }}" \
+            -PversionCode="${{ steps.versioning.outputs.VERSION_CODE }}" \
+            -PgithubRepository="${{ github.repository }}" \
+            --stacktrace
+
+      - name: Prepare Release Artifacts
+        run: |
+          mkdir -p release-artifacts
+          cp app/build/outputs/apk/debug/app-debug.apk release-artifacts/neptun-mobile-${{ steps.versioning.outputs.VERSION_NAME }}.apk
+          cp app/build/outputs/apk/debug/app-debug.apk release-artifacts/app-debug.apk
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -49,14 +72,22 @@ jobs:
           tag_name: ${{ steps.versioning.outputs.VERSION_TAG }}
           name: "Neptun Mobile ${{ steps.versioning.outputs.VERSION_TAG }}"
           body: |
-            Automatikusan lefordított verzió a `${{ github.sha }}` commitból.
+            ## Neptun Mobile ${{ steps.versioning.outputs.VERSION_TAG }}
             
-            ### Változtatások / Információk:
-            - **Commit SHA:** `${{ github.sha }}`
-            - **Build száma:** `${{ github.run_number }}`
-            - **Telepíthető APK:** `app-debug.apk`
+            Automatikusan kiadott új verzió a(z) `${{ github.sha }}` commitból.
+            
+            ### Változtatások és Verzióinformációk:
+            - **Alkalmazás verzió (versionName):** `${{ steps.versioning.outputs.VERSION_NAME }}`
+            - **Build kód (versionCode):** `${{ steps.versioning.outputs.VERSION_CODE }}`
+            - **Csomagnév (package):** `app.neptun.mobile`
+            - **Commit:** `${{ github.sha }}`
+            
+            ### Letölthető telepítőfájlok:
+            - [`neptun-mobile-${{ steps.versioning.outputs.VERSION_NAME }}.apk`](https://github.com/${{ github.repository }}/releases/download/${{ steps.versioning.outputs.VERSION_TAG }}/neptun-mobile-${{ steps.versioning.outputs.VERSION_NAME }}.apk)
+            - [`app-debug.apk`](https://github.com/${{ github.repository }}/releases/download/${{ steps.versioning.outputs.VERSION_TAG }}/app-debug.apk)
           files: |
-            app/build/outputs/apk/debug/app-debug.apk
+            release-artifacts/neptun-mobile-${{ steps.versioning.outputs.VERSION_NAME }}.apk
+            release-artifacts/app-debug.apk
           draft: false
           prerelease: false
         env:

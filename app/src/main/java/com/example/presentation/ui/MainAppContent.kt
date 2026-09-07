@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -16,12 +17,14 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.NeptunApp
 import com.example.presentation.navigation.NavigationItem
+import com.example.presentation.ui.components.InAppUpdateDialog
 import com.example.presentation.ui.components.NeptunBottomBar
 import com.example.presentation.ui.screens.GradesScreen
 import com.example.presentation.ui.screens.LoginScreen
 import com.example.presentation.ui.screens.MessagesScreen
 import com.example.presentation.ui.screens.SettingsScreen
 import com.example.presentation.ui.screens.TimetableScreen
+import com.example.presentation.viewmodel.AppUpdateViewModel
 import com.example.presentation.viewmodel.AuthViewModel
 import com.example.presentation.viewmodel.GradesViewModel
 import com.example.presentation.viewmodel.MessagesViewModel
@@ -34,6 +37,14 @@ fun MainAppContent() {
     val app = context.applicationContext as NeptunApp
     val appContainer = app.appContainer
 
+    val appUpdateViewModel: AppUpdateViewModel = viewModel(factory = AppUpdateViewModel.Factory)
+    val updateState by appUpdateViewModel.updateState.collectAsStateWithLifecycle()
+
+    // Auto-check for update on app open
+    LaunchedEffect(Unit) {
+        appUpdateViewModel.checkForUpdatesOnLaunch()
+    }
+
     val authViewModel: AuthViewModel = viewModel(
         factory = AuthViewModel.provideFactory(
             authRepository = appContainer.authRepository,
@@ -42,6 +53,13 @@ fun MainAppContent() {
     )
 
     val authState by authViewModel.uiState.collectAsStateWithLifecycle()
+
+    InAppUpdateDialog(
+        updateState = updateState,
+        onStartUpdate = { info -> appUpdateViewModel.startInAppUpdate(context, info) },
+        onInstallApk = { appUpdateViewModel.installDownloadedApk(context) },
+        onDismiss = appUpdateViewModel::dismissUpdate
+    )
 
     if (authState.credentials == null || !authState.credentials!!.isLoggedIn) {
         LoginScreen(
@@ -69,7 +87,8 @@ fun MainAppContent() {
     } else {
         MainDashboard(
             app = app,
-            authViewModel = authViewModel
+            authViewModel = authViewModel,
+            appUpdateViewModel = appUpdateViewModel
         )
     }
 }
@@ -77,7 +96,8 @@ fun MainAppContent() {
 @Composable
 private fun MainDashboard(
     app: NeptunApp,
-    authViewModel: AuthViewModel
+    authViewModel: AuthViewModel,
+    appUpdateViewModel: AppUpdateViewModel
 ) {
     val context = LocalContext.current
     val appContainer = app.appContainer
@@ -86,7 +106,8 @@ private fun MainDashboard(
     val timetableViewModel: TimetableViewModel = viewModel(
         factory = TimetableViewModel.provideFactory(
             neptunRepository = appContainer.neptunRepository,
-            alarmScheduler = appContainer.alarmScheduler
+            alarmScheduler = appContainer.alarmScheduler,
+            prefsManager = appContainer.prefsManager
         )
     )
 
@@ -173,6 +194,7 @@ private fun MainDashboard(
                         notificationPreferences = settingsState.notificationPreferences,
                         isSyncing = settingsState.isSyncing,
                         syncSuccessMessage = settingsState.syncSuccessMessage,
+                        updateCheckState = settingsState.updateCheckState,
                         onThemeModeChange = settingsViewModel::setThemeMode,
                         onDynamicColorToggle = settingsViewModel::setDynamicColor,
                         onAccentColorSelect = settingsViewModel::setAccentColor,
@@ -184,6 +206,10 @@ private fun MainDashboard(
                         onSimulateMessageNotification = { settingsViewModel.simulateMessageNotification(context) },
                         onSimulateGradeNotification = { settingsViewModel.simulateGradeNotification(context) },
                         onSimulateFinanceNotification = { settingsViewModel.simulateFinanceNotification(context) },
+                        onCheckForUpdates = {
+                            settingsViewModel.checkForUpdates()
+                            appUpdateViewModel.checkForUpdatesOnLaunch()
+                        },
                         onLogoutClick = authViewModel::logout,
                         onManualSync = {
                             settingsViewModel.triggerManualSync()

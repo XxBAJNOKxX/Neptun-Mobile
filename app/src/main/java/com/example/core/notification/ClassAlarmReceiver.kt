@@ -12,6 +12,7 @@ class ClassAlarmReceiver : BroadcastReceiver() {
         val startTime = intent.getStringExtra(EXTRA_START_TIME) ?: ""
         val courseType = intent.getStringExtra(EXTRA_COURSE_TYPE) ?: "Óra"
         val notificationId = intent.getIntExtra(EXTRA_NOTIFICATION_ID, 1001)
+        val minutesBefore = intent.getIntExtra(EXTRA_MINUTES_BEFORE, 15)
 
         NotificationHelper.showClassReminder(
             context = context,
@@ -19,7 +20,8 @@ class ClassAlarmReceiver : BroadcastReceiver() {
             subjectName = subjectName,
             room = room,
             startTime = startTime,
-            courseType = courseType
+            courseType = courseType,
+            minutesBefore = minutesBefore
         )
     }
 
@@ -29,5 +31,6 @@ class ClassAlarmReceiver : BroadcastReceiver() {
         const val EXTRA_START_TIME = "extra_start_time"
         const val EXTRA_COURSE_TYPE = "extra_course_type"
         const val EXTRA_NOTIFICATION_ID = "extra_notification_id"
+        const val EXTRA_MINUTES_BEFORE = "extra_minutes_before"
     }
 }

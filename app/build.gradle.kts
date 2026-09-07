@@ -10,16 +10,31 @@ plugins {
   alias(libs.plugins.google.services)
 }
 
+val appVersionCode = (project.findProperty("versionCode") as? String)?.toIntOrNull()
+    ?: System.getenv("APP_VERSION_CODE")?.toIntOrNull()
+    ?: 1
+
+val appVersionName = (project.findProperty("versionName") as? String)
+    ?: System.getenv("APP_VERSION_NAME")
+    ?: "0.1.0"
+
+val githubRepo = (project.findProperty("githubRepository") as? String)
+    ?: System.getenv("GITHUB_REPO")
+    ?: System.getenv("GITHUB_REPOSITORY")
+    ?: "danitanki2005/neptun-mobile"
+
 android {
   namespace = "com.example"
   compileSdk { version = release(36) { minorApiLevel = 1 } }
 
   defaultConfig {
-    applicationId = "com.aistudio.neptun.mobile"
+    applicationId = "app.neptun.mobile"
     minSdk = 26
     targetSdk = 36
-    versionCode = 1
-    versionName = "1.0"
+    versionCode = appVersionCode
+    versionName = appVersionName
+
+    buildConfigField("String", "GITHUB_REPO", "\"$githubRepo\"")
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
