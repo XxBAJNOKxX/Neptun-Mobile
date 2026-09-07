@@ -1,10 +1,10 @@
 package com.example.presentation.ui.screens
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -19,17 +19,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
-import androidx.compose.material.icons.filled.CalendarToday
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.ErrorOutline
-import androidx.compose.material.icons.filled.ReceiptLong
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material.icons.filled.EventAvailable
+import androidx.compose.material.icons.filled.Paid
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -38,18 +31,28 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.example.domain.model.FinanceItem
 import com.example.domain.model.FinanceStatus
+import com.example.presentation.ui.components.FilcChip
+import com.example.presentation.ui.components.FilcDot
+import com.example.presentation.ui.components.FilcEmptyState
+import com.example.presentation.ui.components.FilcFilterBar
+import com.example.presentation.ui.components.FilcPanel
+import com.example.presentation.ui.components.FilcProgressBar
 import com.example.presentation.ui.components.FinanceStatusBadge
-import com.example.presentation.ui.components.NeptunTopBar
+import com.example.presentation.ui.components.filcCard
 import com.example.presentation.viewmodel.FinancesUiState
-import com.example.ui.theme.NeptunGreen
-import com.example.ui.theme.NeptunRed
+import com.example.ui.theme.filcColors
 import java.text.NumberFormat
 import java.util.Locale
+import kotlin.math.roundToInt
 
+/**
+ * Pénzügyek – Filc stílus. Összesítő kártya a fizetendő összeggel és a
+ * félév "előköltség" haladásával, alul a tételek listája státuszszűrővel.
+ */
 @Composable
 fun FinancesScreen(
     uiState: FinancesUiState,
@@ -57,177 +60,166 @@ fun FinancesScreen(
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val hungarianNumberFormat = NumberFormat.getNumberInstance(Locale("hu", "HU"))
+    val filc = filcColors()
+    val visibleItems = uiState.filteredFinances
+    val paid = uiState.allFinances.filter { it.status == FinanceStatus.COMPLETED }.sumOf { it.amountHuf }
+    val open = uiState.totalPendingHuf
+    val total = paid + open
+    val progress = if (total > 0) paid.toFloat() / total.toFloat() else 0f
+    val filterIndex = when (uiState.selectedStatusFilter) {
+        null -> 0
+        FinanceStatus.PENDING -> 1
+        FinanceStatus.OVERDUE -> 2
+        FinanceStatus.COMPLETED -> 3
+    }
 
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(filc.background)
     ) {
-        NeptunTopBar(
+        FilcScreenHeader(
             title = "Pénzügyek",
-            subtitle = "Tételek, befizetések és kötelezettségek",
+            subtitle = "Beadott költségek és befizetések",
             isRefreshing = uiState.isRefreshing,
             onRefresh = onRefresh
         )
 
         LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp),
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 28.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            item { Spacer(modifier = Modifier.height(4.dp)) }
-
-            // Summary Card
             item {
-                FinanceSummaryCard(
-                    pendingHuf = uiState.totalPendingHuf,
-                    completedHuf = uiState.totalCompletedHuf,
-                    numberFormat = hungarianNumberFormat
+                FinancesSummaryCard(
+                    openAmount = open,
+                    paidAmount = paid,
+                    progress = progress,
+                    modifier = Modifier.testTag("finances_summary_card")
                 )
             }
 
-            // Filter Chips
             item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    FilterChip(
-                        selected = uiState.selectedStatusFilter == null,
-                        onClick = { onFilterSelect(null) },
-                        label = { Text("Összes (${uiState.allFinances.size})") },
-                        modifier = Modifier.testTag("finance_filter_all")
-                    )
-
-                    FilterChip(
-                        selected = uiState.selectedStatusFilter == FinanceStatus.PENDING,
-                        onClick = { onFilterSelect(FinanceStatus.PENDING) },
-                        label = { Text("Kiírva / Fizetendő") },
-                        modifier = Modifier.testTag("finance_filter_pending")
-                    )
-
-                    FilterChip(
-                        selected = uiState.selectedStatusFilter == FinanceStatus.COMPLETED,
-                        onClick = { onFilterSelect(FinanceStatus.COMPLETED) },
-                        label = { Text("Teljesítve") },
-                        modifier = Modifier.testTag("finance_filter_completed")
-                    )
-                }
+                FilcFilterBar(
+                    options = listOf("Minden tétel", "Kiírva", "Késedelmes", "Teljesítve"),
+                    selectedIndex = filterIndex,
+                    onSelect = { index ->
+                        onFilterSelect(
+                            when (index) {
+                                1 -> FinanceStatus.PENDING
+                                2 -> FinanceStatus.OVERDUE
+                                3 -> FinanceStatus.COMPLETED
+                                else -> null
+                            }
+                        )
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("finances_filter")
+                )
             }
 
-            if (uiState.filteredFinances.isEmpty()) {
+            if (visibleItems.isEmpty()) {
                 item {
-                    Surface(
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(24.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.CheckCircle,
-                                contentDescription = null,
-                                tint = NeptunGreen,
-                                modifier = Modifier.size(36.dp)
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = "Nincs ilyen státuszú pénzügyi tétel!",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+                    FilcPanel {
+                        FilcEmptyState(
+                            icon = Icons.Default.AccountBalanceWallet,
+                            title = "Nincs megjeleníthető tétel",
+                            description = "Válts szűrőt, vagy frissítsd a Neptun adataidat."
+                        )
                     }
                 }
             } else {
-                items(uiState.filteredFinances) { item ->
-                    FinanceItemCard(
-                        item = item,
-                        formattedAmount = "${hungarianNumberFormat.format(item.amountHuf)} Ft"
-                    )
+                items(visibleItems, key = { it.id }) { financeItem ->
+                    FinanceTile(item = financeItem)
                 }
             }
-
-            item { Spacer(modifier = Modifier.height(20.dp)) }
         }
     }
 }
 
 @Composable
-private fun FinanceSummaryCard(
-    pendingHuf: Int,
-    completedHuf: Int,
-    numberFormat: NumberFormat
+private fun FinancesSummaryCard(
+    openAmount: Int,
+    paidAmount: Int,
+    progress: Float,
+    modifier: Modifier = Modifier
 ) {
-    Card(
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        modifier = Modifier.fillMaxWidth()
+    val filc = filcColors()
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .filcCard(shape = RoundedCornerShape(20.dp))
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Column(modifier = Modifier.padding(18.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.AccountBalanceWallet,
-                        contentDescription = "Pénzügyek",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-                Spacer(modifier = Modifier.width(10.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(
+                        if (openAmount > 0) filc.orange.copy(alpha = 0.18f) else filc.green.copy(alpha = 0.18f)
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = if (openAmount > 0) Icons.Default.Paid else Icons.Default.EventAvailable,
+                    contentDescription = null,
+                    tint = if (openAmount > 0) filc.orange else filc.green,
+                    modifier = Modifier.size(19.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Pénzügyi Egyenleg",
-                    style = MaterialTheme.typography.titleMedium,
+                    text = if (openAmount > 0) "Fizetendő összeg" else "Nincs tartozásod",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = filc.textMuted,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = formatHufAmount(openAmount),
+                    style = MaterialTheme.typography.displaySmall,
+                    color = if (openAmount > 0) filc.text else filc.green,
+                    maxLines = 1
+                )
+            }
+        }
+
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "Befizetve",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = filc.textMuted,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    text = "${(progress * 100).roundToInt()}%",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = filc.textSecondary,
                     fontWeight = FontWeight.Bold
                 )
             }
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                // Pending Amount
-                Column(modifier = Modifier.weight(1f)) {
+            FilcProgressBar(progress = progress, barHeight = 8.dp)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                FilcDot(color = filc.green, size = 7.dp)
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = formatHufAmount(paidAmount),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = filc.textMuted
+                )
+                if (openAmount > 0) {
+                    Spacer(modifier = Modifier.width(12.dp))
+                    FilcDot(color = filc.orange, size = 7.dp)
+                    Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "Fizetendő kötelezettség",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 12.sp
-                    )
-                    Text(
-                        text = "${numberFormat.format(pendingHuf)} Ft",
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = if (pendingHuf > 0) NeptunRed else MaterialTheme.colorScheme.onSurface
-                    )
-                }
-
-                // Completed Amount
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Rendezett tételek",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 12.sp
-                    )
-                    Text(
-                        text = "${numberFormat.format(completedHuf)} Ft",
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = NeptunGreen
+                        text = formatHufAmount(openAmount),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = filc.textMuted
                     )
                 }
             }
@@ -236,87 +228,77 @@ private fun FinanceSummaryCard(
 }
 
 @Composable
-private fun FinanceItemCard(
-    item: FinanceItem,
-    formattedAmount: String
-) {
-    Card(
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = BorderStroke(
-            1.dp,
-            if (item.status == FinanceStatus.PENDING) Color(0xFFF59E0B).copy(alpha = 0.5f)
-            else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+private fun FinanceTile(item: FinanceItem) {
+    val filc = filcColors()
+    val accentForStatus: Color = when (item.status) {
+        FinanceStatus.COMPLETED -> filc.green
+        FinanceStatus.PENDING -> filc.yellow
+        FinanceStatus.OVERDUE -> filc.red
+    }
+
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .testTag("finance_item_${item.id}")
+            .filcCard(shape = RoundedCornerShape(16.dp), elevation = 10.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                FinanceStatusBadge(status = item.status)
-
-                Text(
-                    text = formattedAmount,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = if (item.status == FinanceStatus.PENDING) NeptunRed else MaterialTheme.colorScheme.onSurface
-                )
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
+        Box(
+            modifier = Modifier
+                .width(3.dp)
+                .height(38.dp)
+                .clip(RoundedCornerShape(45.dp))
+                .background(accentForStatus)
+        )
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = item.title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = filc.text,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
             )
-
-            Text(
-                text = "Félév: ${item.termName} • Bizonylatszám: ${item.transactionId}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = 12.sp
-            )
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.CalendarToday,
-                        contentDescription = "Határidő",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(14.dp)
+            Spacer(modifier = Modifier.height(4.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = item.termName,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = filc.textMuted
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                if (item.status != FinanceStatus.COMPLETED) {
+                    FilcChip(
+                        text = "határidő: ${item.dueDate}",
+                        color = accentForStatus,
+                        background = accentForStatus.copy(alpha = 0.14f)
                     )
-                    Spacer(modifier = Modifier.width(4.dp))
+                } else if (!item.paymentDate.isNullOrBlank()) {
                     Text(
-                        text = "Határidő: ${item.dueDate}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-
-                if (item.paymentDate != null) {
-                    Text(
-                        text = "Fizetve: ${item.paymentDate}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = NeptunGreen,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 11.sp
+                        text = "befizetve: ${item.paymentDate}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = filc.textMuted,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
         }
+        Spacer(modifier = Modifier.width(8.dp))
+        Column(horizontalAlignment = Alignment.End) {
+            Text(
+                text = formatHufAmount(item.amountHuf),
+                style = MaterialTheme.typography.titleMedium,
+                color = filc.text,
+                maxLines = 1
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            FinanceStatusBadge(item.status)
+        }
     }
 }
+
+private fun formatHufAmount(amount: Int): String =
+    NumberFormat.getNumberInstance(Locale("hu", "HU")).format(amount.toLong()) + " Ft"

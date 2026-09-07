@@ -9,6 +9,7 @@ import com.example.data.repository.AuthRepositoryImpl
 import com.example.data.repository.NeptunRepositoryImpl
 import com.example.domain.repository.AuthRepository
 import com.example.domain.repository.NeptunRepository
+import com.example.domain.usecase.BuildStudyProfileUseCase
 import com.example.domain.usecase.CalculateAveragesUseCase
 
 interface AppContainer {
@@ -18,6 +19,7 @@ interface AppContainer {
     val authRepository: AuthRepository
     val neptunRepository: NeptunRepository
     val calculateAveragesUseCase: CalculateAveragesUseCase
+    val buildStudyProfileUseCase: BuildStudyProfileUseCase
     val alarmScheduler: AlarmScheduler
 }
 
@@ -45,6 +47,10 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
 
     override val calculateAveragesUseCase: CalculateAveragesUseCase by lazy {
         CalculateAveragesUseCase()
+    }
+
+    override val buildStudyProfileUseCase: BuildStudyProfileUseCase by lazy {
+        BuildStudyProfileUseCase()
     }
 
     override val alarmScheduler: AlarmScheduler by lazy {

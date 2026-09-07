@@ -1,31 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A Filc-filc vastag, kerek végű „N” betűje. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
     <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M54,30 L78,43 L54,56 L30,43 Z" />
-    <path
-        android:fillColor="#E0F2FE"
-        android:pathData="M38,47.5 L38,58 C38,65 70,65 70,58 L70,47.5 L54,56 Z" />
-    <path
-        android:strokeColor="#38BDF8"
-        android:strokeWidth="2.5"
-        android:strokeLineCap="round"
-        android:fillColor="#00000000"
-        android:pathData="M66,45 L76,57 L76,66" />
-    <path
-        android:fillColor="#38BDF8"
-        android:pathData="M73.5,66 C73.5,64.5 78.5,64.5 78.5,66 L77,74 L75,74 Z" />
-    <path
-        android:fillColor="#38BDF8"
-        android:pathData="M51.5,68 L56.5,68 L56.5,84 L51.5,84 Z" />
-    <path
-        android:strokeColor="#38BDF8"
-        android:strokeWidth="3.5"
+        android:pathData="M38,74 L38,38 L70,74 L70,38"
+        android:strokeColor="#FF141905"
+        android:strokeWidth="10"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
-        android:fillColor="#00000000"
-        android:pathData="M40,71 C40,78 68,78 68,71" />
+        android:fillColor="#00000000" />
+    <path
+        android:pathData="M33,84 L75,84"
+        android:strokeColor="#FFFAFFF0"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
 </vector>
