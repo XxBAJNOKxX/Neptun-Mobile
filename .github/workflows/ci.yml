@@ -72,23 +72,34 @@ jobs:
         shell: bash
         run: ./gradlew :app:testDebugUnitTest $GRADLE_ARGS --continue 2>&1 | tee "$LOG_DIR/tests.log"
 
-      # A futási naplót nem minden környezetből lehet letölteni, ezért a
-      # lényeget annotációként is visszairjuk – a "Checks" fülön azonnal látszik.
-      - name: Announce failures as annotations
+      # A nyers CI-naplót ebből a sandboxból nem lehet letölteni (a futási
+      # naplókat tároló távoli host el van vágva), ezért a lényeget
+      # annotációként és a commit kommentjeként is visszaírjuk: az
+      # `gh api .../commits/<sha>/comments` végpont így is elérhető.
+      - name: Report failures (annotations + commit comment)
         if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
-          for log in "$LOG_DIR"/*.log; do
-            [ -f "$log" ] || continue
-            grep -E "^e: |FAILED|error: |What went wrong|Caused by:" "$log" | head -40 > /tmp/hits.txt || true
-            if [ ! -s /tmp/hits.txt ]; then
-              tail -25 "$log" > /tmp/hits.txt
-            fi
-            while IFS= read -r line; do
-              safe=$(printf '%s' "$line" | tr -d '\r' | sed 's/%/%25/g; s/:/%3A/; s/#/%23/' | cut -c1-400)
-              printf '::error title=%s::%s\n' "gradle: $(basename "$log")" "$safe"
-            done < /tmp/hits.txt
+          grep -hE "^e: |^> Task .*FAILED|What went wrong|^Caused by:" "$LOG_DIR"/*.log 2>/dev/null \
+            | sed "s|file:///home/runner/work/[^ ]*/app/src/|app/src/|g" \
+            | sort -u > "$LOG_DIR/errors.txt" || true
+          if [ ! -s "$LOG_DIR/errors.txt" ]; then
+            tail -40 "$LOG_DIR"/*.log > "$LOG_DIR/errors.txt" 2>/dev/null || true
+          fi
+          echo '### Fordítási hibák'
+          cat "$LOG_DIR/errors.txt"
+          head -45 "$LOG_DIR/errors.txt" | while IFS= read -r line; do
+            printf '::error::%s\n' "$(printf '%s' "$line" | sed 's/%/%25/g' | cut -c1-300)"
           done
+          {
+            printf '## CI: fordítási hibák\n\ncommit %s\n\n```\n' "$GITHUB_SHA"
+            cut -c1-400 "$LOG_DIR/errors.txt" | head -200
+            printf '\n```\n'
+          } > "$LOG_DIR/comment.md"
+          gh api -X POST "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/comments" \
+            -F "body=@$LOG_DIR/comment.md" > /dev/null || echo "(commit comment nem ment)"
 
       - name: Upload raw gradle logs
         if: always()

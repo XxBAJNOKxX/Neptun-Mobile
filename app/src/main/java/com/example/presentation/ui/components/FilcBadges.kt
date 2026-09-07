@@ -1,6 +1,7 @@
 package com.example.presentation.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -20,13 +21,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.PathEffect
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -119,28 +114,17 @@ fun AveragePill(
                 .clip(shape)
                 .then(
                     when {
-                        bordered && dashed -> Modifier.drawBehind {
-                            val inset = 1.2.dp.toPx()
-                            drawRoundRect(
-                                color = color.copy(alpha = 0.55f),
-                                topLeft = Offset(inset, inset),
-                                size = Size(size.width - inset * 2, size.height - inset * 2),
-                                cornerRadius = CornerRadius(45.dp.toPx(), 45.dp.toPx()),
-                                style = Stroke(width = 1.4.dp.toPx()),
-                                pathEffect = PathEffect.dashPathEffect(
-                                    floatArrayOf(6.dp.toPx(), 5.dp.toPx()),
-                                    0f
-                                )
-                            )
-                        }
+                        bordered && dashed -> Modifier.border(
+                            width = 1.4.dp,
+                            color = color.copy(alpha = 0.55f),
+                            shape = shape
+                        )
 
-                        bordered -> Modifier.drawBehind {
-                            drawRoundRect(
-                                color = color.copy(alpha = 0.5f),
-                                cornerRadius = CornerRadius(45.dp.toPx(), 45.dp.toPx()),
-                                style = Stroke(width = 1.4.dp.toPx())
-                            )
-                        }
+                        bordered -> Modifier.border(
+                            width = 1.4.dp,
+                            color = color.copy(alpha = 0.5f),
+                            shape = shape
+                        )
 
                         else -> Modifier.background(color.copy(alpha = if (empty) 0.15f else 0.25f))
                     }

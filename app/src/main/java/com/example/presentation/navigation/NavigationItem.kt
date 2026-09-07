@@ -3,12 +3,12 @@ package com.example.presentation.navigation
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.Grades
+import androidx.compose.material.icons.filled.Grade
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Mail
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.CalendarMonth
-import androidx.compose.material.icons.outlined.Grades
+import androidx.compose.material.icons.outlined.Grade
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Mail
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -35,8 +35,8 @@ enum class NavigationItem(
     ),
     GRADES(
         title = "Jegyek",
-        selectedIcon = Icons.Filled.Grades,
-        unselectedIcon = Icons.Outlined.Grades
+        selectedIcon = Icons.Filled.Grade,
+        unselectedIcon = Icons.Outlined.Grade
     ),
     FINANCES(
         title = "Pénzügyek",
