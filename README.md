@@ -59,5 +59,29 @@ A magyar számformátum (tizedesvessző) a `formatHungarian()` segédből jön, 
 ./gradlew recordRoborazziDebug # golden screenshot felvétele
 ```
 
-A tesztaknák: `SettingsThemeTest` (téma/előzmény-beállítások, paletta-értékek),
-`StudyProfileTest` (a Kezdőlap profil-számításai), `GreetingScreenshotTest` (login screenshot).
+A tesztek: `SettingsThemeTest` (téma-beállítások tárolása és visszaolvasása,
+Filc-paletta értékek, régi accent-idk feloldása), `StudyProfileTest` (a Kezdőlap
+profil-számításai), `GreetingScreenshotTest` (login golden kép).
+
+## CI
+
+Minden push és PR lefordul a GitHub Actions `CI` munkafolyamatban:
+`:app:assembleDebug`, `:app:assembleDebugAndroidTest` (az androidTest forrásokat
+is ellenőrzi) és `:app:testDebugUnitTest`. A fordítási hibákat és a tesztbukásokat
+a workflow annotációként **és** a commit kommentjeként is visszaírja, így a napló
+letöltése nélkül is azonnal látszik, mi romlott el:
+
+```bash
+gh api repos/<owner>/<repo>/commits/<sha>/comments --jq '.[0].body'
+```
+
+Néhány dolog, amire figyelni kell:
+
+- a Robolectric 4.16 az SDK 36-hoz Java 21-et kér, ezért a CI JDK-ja 21
+  (az `android-release.yml` APK-építéséhez a 17 elég),
+- a CI felülírja a Kotlin fordító `in-process` stratégiáját (`daemon`), mert a
+  `gradle.properties` beállítása a KSP2-vel összeütközik – helyben nem változott semmi,
+- UI-váltás után a `app/src/test/screenshots/greeting.png` golden képet újra kell
+  rögzíteni: helyben `./gradlew :app:recordRoborazziDebug`, vagy az Actions
+  *Run workflow* űrlapján az `update_golden` bepipálása, ami a CI által rögzített
+  képet visszacommitolja a branchre.
