@@ -1,7 +1,7 @@
 name: CI
 
-# Every push and PR gets a real build + unit-test run, so the Filc redesign
-# (and anything after it) can never land in a non-compiling state.
+# Minden push és PR valódi buildet + unit teszt futást kap, hogy a Filc
+# arculat (és bármi utána) soha ne kerülhessen olyan állapotba, ami nem fordul.
 on:
   push:
     branches:
@@ -20,6 +20,16 @@ permissions:
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
+
+env:
+  # A gradle.properties-ben bekapcsolt in-process Kotlin fordító ütközik a
+  # KSP2-vel (ApplicationManager.getApplication() null), CI-n ezért a
+  # dokumentált daemon stratégiára váltunk, nagyobb heap-pel.
+  GRADLE_ARGS: >-
+    --stacktrace --no-configuration-cache --warning-mode=summary
+    -Pkotlin.compiler.execution.strategy=daemon
+    -Pkotlin.daemon.jvmargs=-Xmx3g
+  LOG_DIR: ci-logs
 
 jobs:
   build-and-test:
@@ -50,20 +60,48 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      # --no-configuration-cache: a Roborazzi + KSP feladat sorozat a
-      # konfigurációs gyorsítótárral CI-ben néha furán viselkedik; így a
-      # futtatás végig predictable marad.
       - name: Assemble debug APK
-        run: ./gradlew :app:assembleDebug --stacktrace --no-configuration-cache --warning-mode=summary
+        shell: bash
+        run: mkdir -p "$LOG_DIR" && ./gradlew :app:assembleDebug $GRADLE_ARGS 2>&1 | tee "$LOG_DIR/assemble.log"
 
       - name: Assemble instrumentation test APK (compile-only check)
-        run: ./gradlew :app:assembleDebugAndroidTest --stacktrace --no-configuration-cache
+        shell: bash
+        run: ./gradlew :app:assembleDebugAndroidTest $GRADLE_ARGS 2>&1 | tee "$LOG_DIR/androidtest.log"
 
       - name: Unit tests (Robolectric + Roborazzi)
-        run: ./gradlew :app:testDebugUnitTest --stacktrace --no-configuration-cache --continue
+        shell: bash
+        run: ./gradlew :app:testDebugUnitTest $GRADLE_ARGS --continue 2>&1 | tee "$LOG_DIR/tests.log"
+
+      # A futási naplót nem minden környezetből lehet letölteni, ezért a
+      # lényeget annotációként is visszairjuk – a "Checks" fülön azonnal látszik.
+      - name: Announce failures as annotations
+        if: failure()
+        shell: bash
+        run: |
+          for log in "$LOG_DIR"/*.log; do
+            [ -f "$log" ] || continue
+            grep -E "^e: |FAILED|error: |What went wrong|Caused by:" "$log" | head -40 > /tmp/hits.txt || true
+            if [ ! -s /tmp/hits.txt ]; then
+              tail -25 "$log" > /tmp/hits.txt
+            fi
+            while IFS= read -r line; do
+              safe=$(printf '%s' "$line" | tr -d '\r' | sed 's/%/%25/g; s/:/%3A/; s/#/%23/' | cut -c1-400)
+              printf '::error title=%s::%s\n' "gradle: $(basename "$log")" "$safe"
+            done < /tmp/hits.txt
+          done
+
+      - name: Upload raw gradle logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-logs
+          path: ci-logs/
+          if-no-files-found: ignore
+          retention-days: 14
 
       - name: Summarize test results
         if: always()
+        shell: bash
         run: |
           python3 - <<'PY'
           import glob, os, xml.etree.ElementTree as ET
@@ -83,10 +121,10 @@ jobs:
                           failed.append(f"**{root.get('name')}.{case.get('name')}** — {tag}: {msg}")
 
           lines = ['## Unit tesztek', '', '| Osztály | teszt | hiba | kihagyott |', '|---|---|---|---|', *rows, '']
-          if failed:
-              lines += ['### Bukások', *[f'- {entry}' for entry in failed]]
+          if rows:
+              lines += ['### Bukások', *[f'- {entry}' for entry in failed]] if failed else ['✅ Minden unit teszt zöld.']
           else:
-              lines += ['✅ Minden unit teszt zöld.']
+              lines += ['⚠️ Nem született tesztredmény (a build korábban elhasalt).']
 
           with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as handle:
               handle.write('\n'.join(lines) + '\n')
@@ -123,10 +161,11 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      # Csak kézi indításkor, explicit kéréskor: a felvett új golden kép
+      # Csak kézi indításkor, explicit kérésre: a felvett új golden kép
       # visszacommittolása a branchre.
       - name: Commit updated golden screenshot
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.update_golden && success() }}
+        shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -135,5 +174,5 @@ jobs:
           else
             git add app/src/test/screenshots
             git commit -m "test: frissített Roborazzi golden a Filc arculathoz"
-            git push origin HEAD:${{ github.ref_name }}
+            git push origin HEAD:"$GITHUB_REF_NAME"
           fi
