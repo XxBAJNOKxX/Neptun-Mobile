@@ -171,7 +171,7 @@ fun GradesScreen(
                         modifier = Modifier.padding(start = 14.dp, bottom = 0.dp)
                     )
                 }
-                items(subjects.entries.toList(), key = { it.first }) { entry ->
+                items(subjects.entries.toList(), key = { it.key }) { entry ->
                     SubjectGradesRow(
                         subjectName = entry.key,
                         grades = entry.value,

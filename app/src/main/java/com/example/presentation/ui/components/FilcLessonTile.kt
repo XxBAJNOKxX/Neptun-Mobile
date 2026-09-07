@@ -160,7 +160,7 @@ fun FilcKeyValue(
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (icon != null) {
-            Box(modifier = Modifier.padding(end = 10.dp), content = icon)
+            Box(modifier = Modifier.padding(end = 10.dp)) { icon() }
         }
         Text(
             text = label,
