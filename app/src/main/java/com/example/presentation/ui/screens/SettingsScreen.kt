@@ -891,39 +891,6 @@ fun SettingsScreen(
                 }
             }
 
-            // Sync Feedback Banner
-            AnimatedVisibility(
-                visible = syncSuccessMessage != null,
-                enter = fadeIn(),
-                exit = fadeOut()
-            ) {
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = NeptunGreen.copy(alpha = 0.15f),
-                    border = BorderStroke(1.dp, NeptunGreen.copy(alpha = 0.4f)),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier.padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.CheckCircle,
-                            contentDescription = null,
-                            tint = NeptunGreen,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(
-                            text = syncSuccessMessage ?: "",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = NeptunGreen
-                        )
-                    }
-                }
-            }
-
             // App Info & Version & Updates Card
             Card(
                 shape = RoundedCornerShape(20.dp),
@@ -1104,6 +1071,39 @@ fun SettingsScreen(
                     modifier = Modifier.padding(18.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
+                    // Sync Feedback Banner
+                    AnimatedVisibility(
+                        visible = syncSuccessMessage != null,
+                        enter = fadeIn(),
+                        exit = fadeOut()
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = NeptunGreen.copy(alpha = 0.15f),
+                            border = BorderStroke(1.dp, NeptunGreen.copy(alpha = 0.4f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CheckCircle,
+                                    contentDescription = null,
+                                    tint = NeptunGreen,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text(
+                                    text = syncSuccessMessage ?: "",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = NeptunGreen
+                                )
+                            }
+                        }
+                    }
+
                     OutlinedButton(
                         onClick = onManualSync,
                         enabled = !isSyncing,
