@@ -56,14 +56,23 @@ class SyncWorker(
                 // 3. Check upcoming classes and remind student if enabled
                 if (notifPrefs.notifyClasses) {
                     val events = app.appContainer.neptunRepository.getCalendarEvents().first()
-                    // Reschedule exact alarms for upcoming valid classes only (excluding holidays/breaks)
-                    events.filter { it.isActualAttendedClass }.forEach { event ->
-                        try {
-                            app.appContainer.alarmScheduler.scheduleClassAlarm(event)
-                        } catch (e: Exception) {
-                            // Handled if exact alarm permission is restricted
+                    val reminderMins = notifPrefs.reminderMinutesBefore
+
+                    events.filter { it.isActualAttendedClass }
+                        .distinctBy { event ->
+                            if (event.dateString.isNotBlank()) {
+                                "${event.subjectName.trim()}_${event.dateString.take(10)}_${event.startHour}:${event.startMinute}"
+                            } else {
+                                "${event.subjectName.trim()}_day${event.dayOfWeek}_${event.startHour}:${event.startMinute}"
+                            }
                         }
-                    }
+                        .forEach { event ->
+                            try {
+                                app.appContainer.alarmScheduler.scheduleClassAlarm(event, reminderMins)
+                            } catch (e: Exception) {
+                                // Handled if exact alarm permission is restricted
+                            }
+                        }
                 }
 
                 // 4. Check grades if enabled
