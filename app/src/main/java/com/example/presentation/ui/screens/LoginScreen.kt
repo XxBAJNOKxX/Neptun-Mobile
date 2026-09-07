@@ -1,6 +1,7 @@
 package com.example.presentation.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -154,37 +155,7 @@ fun LoginScreen(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
             )
 
-            Spacer(modifier = Modifier.height(20.dp))
-
-            // Offline Ready Notice Banner
-            if (uiState.isOfflineModeAvailable) {
-                Surface(
-                    color = Color(0xFFF0FDF4),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 14.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(12.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.CheckCircle,
-                            contentDescription = "Offline kész",
-                            tint = Color(0xFF16A34A),
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Offline mód elérhető a legutóbbi mentett adatokkal.",
-                            color = Color(0xFF15803D),
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                }
-            }
+            Spacer(modifier = Modifier.height(16.dp))
 
             // Main Card
             Card(
