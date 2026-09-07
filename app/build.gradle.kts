@@ -40,22 +40,33 @@ android {
   }
 
   signingConfigs {
-    create("release") {
-      val keystorePath = System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks"
-      storeFile = file(keystorePath)
-      storePassword = System.getenv("STORE_PASSWORD")
-      keyAlias = "upload"
-      keyPassword = System.getenv("KEY_PASSWORD")
-    }
     create("debugConfig") {
-      val ksFile = file("${rootDir}/debug.keystore")
-      if (ksFile.exists()) {
+      val ksFile = sequenceOf(
+        file("${rootDir}/debug.keystore"),
+        file("${projectDir}/debug.keystore"),
+        file("${projectDir}/../debug.keystore")
+      ).firstOrNull { it.exists() }
+
+      if (ksFile != null) {
         storeFile = ksFile
         storePassword = "android"
         keyAlias = "androiddebugkey"
         keyPassword = "android"
       } else {
         initWith(getByName("debug"))
+      }
+    }
+    create("release") {
+      val keystorePath = System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks"
+      val uploadKey = file(keystorePath)
+      if (uploadKey.exists()) {
+        storeFile = uploadKey
+        storePassword = System.getenv("STORE_PASSWORD")
+        keyAlias = "upload"
+        keyPassword = System.getenv("KEY_PASSWORD")
+      } else {
+        // Fallback to stable debug keystore for consistent releases
+        initWith(getByName("debugConfig"))
       }
     }
   }
