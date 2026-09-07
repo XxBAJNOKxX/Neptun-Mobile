@@ -2,13 +2,19 @@ package com.example.presentation.ui.screens
 
 import android.text.Html
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,53 +24,42 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.DoneAll
-import androidx.compose.material.icons.filled.FilterList
-import androidx.compose.material.icons.filled.Mail
-import androidx.compose.material.icons.filled.MarkEmailRead
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Article
+import androidx.compose.material.icons.filled.Inbox
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.domain.model.NeptunMessage
-import com.example.presentation.ui.components.NeptunTopBar
-import com.example.presentation.viewmodel.MessagesUiState
-import com.example.ui.theme.NeptunBlue40
+import com.example.presentation.ui.components.FilcChip
+import com.example.presentation.ui.components.FilcEmptyState
+import com.example.presentation.ui.components.FilcFilterBar
+import com.example.presentation.ui.components.FilcIconButton
+import com.example.presentation.ui.components.FilcPanel
+import com.example.presentation.ui.components.UnreadDot
+import com.example.presentation.ui.components.filcCard
+import com.example.ui.theme.filcColors
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * Üzenetek – Filc stílus. A lista fölé pilula-szűrő kerül (Mind / Olvasatlan),
+ * a kiválasztott levél pedig jobbról becsúszó, oldalnyi kártyán jelenik meg,
+ * mint a reFilc `MessageViewable`.
+ */
 @Composable
 fun MessagesScreen(
     uiState: MessagesUiState,
@@ -75,206 +70,175 @@ fun MessagesScreen(
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val filc = filcColors()
 
-    Column(
+    Box(
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(filc.background)
     ) {
-        NeptunTopBar(
-            title = "Neptun Üzenetek",
-            subtitle = if (uiState.unreadCount > 0) "${uiState.unreadCount} olvasatlan üzenet" else "Minden üzenet elolvasva",
-            isRefreshing = uiState.isRefreshing,
-            onRefresh = onRefresh
-        )
-
-        // Filter chips bar
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = if (uiState.showUnreadOnly) "Olvasatlan üzenetek" else "Összes üzenet (${uiState.messages.size})",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-
-            FilterChip(
-                selected = uiState.showUnreadOnly,
-                onClick = onToggleUnreadFilter,
-                label = { Text("Csak olvasatlanok") },
-                leadingIcon = {
-                    Icon(
-                        imageVector = if (uiState.showUnreadOnly) Icons.Default.MarkEmailRead else Icons.Default.FilterList,
-                        contentDescription = "Szűrés",
-                        modifier = Modifier.size(16.dp)
-                    )
+        Column(modifier = Modifier.fillMaxSize()) {
+            FilcScreenHeader(
+                title = "Üzenetek",
+                subtitle = if (uiState.unreadCount > 0) {
+                    "${uiState.unreadCount} olvasatlan"
+                } else {
+                    "Mind elolvasva"
                 },
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                    selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
-                ),
-                modifier = Modifier.testTag("messages_unread_filter_chip")
+                isRefreshing = uiState.isRefreshing,
+                onRefresh = onRefresh
             )
-        }
 
-        if (uiState.filteredMessages.isEmpty()) {
-            Box(
+            FilcFilterBar(
+                options = listOf("Mind", "Olvasatlan"),
+                selectedIndex = if (uiState.showUnreadOnly) 1 else 0,
+                onSelect = { index ->
+                    val wantUnreadOnly = index == 1
+                    if (wantUnreadOnly != uiState.showUnreadOnly) onToggleUnreadFilter()
+                },
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(32.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        imageVector = Icons.Default.DoneAll,
-                        contentDescription = "Üres",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(48.dp)
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        text = if (uiState.showUnreadOnly) "Nincs olvasatlan üzeneted!" else "Nem érkezett üzenet a fiókodba.",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    .fillMaxWidth()
+                    .testTag("messages_filter")
+            )
+
+            if (uiState.filteredMessages.isEmpty()) {
+                FilcEmptyState(
+                    icon = Icons.Default.Inbox,
+                    title = if (uiState.showUnreadOnly) "Nincs olvasatlan üzenet" else "Nincs üzenet",
+                    description = "A Neptun postafiókod jelenleg üres.",
+                    modifier = Modifier.padding(top = 24.dp)
+                )
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 28.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(uiState.filteredMessages, key = { it.id }) { message ->
+                        FilcMessageTile(
+                            message = message,
+                            onClick = { onOpenMessage(message) }
+                        )
+                    }
                 }
             }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                item { Spacer(modifier = Modifier.height(4.dp)) }
-
-                items(uiState.filteredMessages) { msg ->
-                    MessageCard(
-                        message = msg,
-                        onClick = { onOpenMessage(msg) }
-                    )
-                }
-
-                item { Spacer(modifier = Modifier.height(20.dp)) }
-            }
         }
-    }
 
-    // Message Detail Bottom Sheet
-    if (uiState.selectedMessage != null) {
-        ModalBottomSheet(
-            onDismissRequest = onCloseMessage,
-            sheetState = sheetState,
-            containerColor = MaterialTheme.colorScheme.surface
+        AnimatedVisibility(
+            visible = uiState.selectedMessage != null,
+            enter = slideInHorizontally(tween(260)) { it / 3 } + androidx.compose.animation.fadeIn(tween(200)),
+            exit = slideOutHorizontally(tween(220)) { it / 3 } + androidx.compose.animation.fadeOut(tween(160)),
+            modifier = Modifier.fillMaxSize()
         ) {
-            MessageDetailContent(
-                message = uiState.selectedMessage,
-                isLoading = uiState.isLoadingContent,
-                onClose = onCloseMessage,
-                onReload = onReloadMessage
-            )
+            val message = uiState.selectedMessage
+            if (message != null) {
+                FilcMessageDetail(
+                    message = message,
+                    isLoadingContent = uiState.isLoadingContent,
+                    onBack = onCloseMessage,
+                    onReload = onReloadMessage
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun MessageCard(
+private fun FilcMessageTile(
     message: NeptunMessage,
     onClick: () -> Unit
 ) {
-    Card(
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (!message.isRead) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
-            else MaterialTheme.colorScheme.surface
-        ),
-        border = BorderStroke(
-            1.dp,
-            if (!message.isRead) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
-            else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (!message.isRead) 2.dp else 0.dp),
+    val filc = filcColors()
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onClick() }
-            .testTag("message_card_${message.id}")
+            .filcCard(shape = RoundedCornerShape(16.dp), elevation = 10.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick)
+            .padding(14.dp),
+        verticalAlignment = Alignment.Top
     ) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
+        Box(
+            modifier = Modifier
+                .size(38.dp)
+                .clip(CircleShape)
+                .background(
+                    if (message.isRead) filc.text.copy(alpha = 0.05f) else filc.accent.copy(alpha = 0.20f)
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.Article,
+                contentDescription = null,
+                tint = if (message.isRead) filc.textMuted else filc.accent,
+                modifier = Modifier.size(18.dp)
+            )
+        }
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = message.sender,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = filc.textMuted,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f)
-                ) {
-                    if (!message.isRead) {
-                        Box(
-                            modifier = Modifier
-                                .size(8.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.primary)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                    }
-                    Text(
-                        text = message.sender,
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = if (!message.isRead) FontWeight.ExtraBold else FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.primary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                )
+                if (message.isOfficial) {
+                    FilcChip(
+                        text = "hivatalos",
+                        color = filc.blue,
+                        background = filc.blue.copy(alpha = 0.14f),
+                        modifier = Modifier.padding(start = 6.dp)
                     )
                 }
-
+                Spacer(modifier = Modifier.width(6.dp))
                 Text(
                     text = message.sendDate,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 11.sp
+                    style = MaterialTheme.typography.labelSmall,
+                    color = filc.textMuted,
+                    maxLines = 1
                 )
             }
-
-            Spacer(modifier = Modifier.height(6.dp))
-
+            Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = message.subject,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = if (!message.isRead) FontWeight.Bold else FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
+                text = message.subject.ifBlank { "(tárgy nélkül)" },
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = if (message.isRead) FontWeight.Medium else FontWeight.Bold,
+                color = filc.text,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            Text(
-                text = message.previewText,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                lineHeight = 16.sp
-            )
+            if (message.previewText.isNotBlank()) {
+                Spacer(modifier = Modifier.height(3.dp))
+                Text(
+                    text = message.previewText,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = filc.textMuted,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    lineHeight = 18.sp
+                )
+            }
+        }
+        if (!message.isRead) {
+            Spacer(modifier = Modifier.width(8.dp))
+            UnreadDot(modifier = Modifier.padding(top = 6.dp))
         }
     }
 }
 
+/** Oldalnyi levélnézet: fejléc, törzs, visszalépés. */
 @Composable
-private fun MessageDetailContent(
+private fun FilcMessageDetail(
     message: NeptunMessage,
-    isLoading: Boolean,
-    onClose: () -> Unit,
+    isLoadingContent: Boolean,
+    onBack: () -> Unit,
     onReload: () -> Unit
 ) {
-    val cleanBody = remember(message.bodyHtml) {
+    val filc = filcColors()
+    val body = remember(message.bodyHtml) {
         if (message.bodyHtml.isNotBlank()) {
             try {
                 Html.fromHtml(message.bodyHtml, Html.FROM_HTML_MODE_COMPACT).toString().trim()
@@ -288,143 +252,107 @@ private fun MessageDetailContent(
 
     Column(
         modifier = Modifier
-            .fillMaxWidth()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 24.dp, vertical = 16.dp)
+            .fillMaxSize()
+            .background(filc.background)
+            .padding(WindowInsets.statusBars.asPaddingValues())
+            .padding(top = 4.dp)
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Surface(
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Text(
-                    text = if (message.isOfficial) "Hivatalos Értesítés" else "Oktatói Üzenet",
-                    color = MaterialTheme.colorScheme.primary,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                )
-            }
-
-            IconButton(onClick = onClose) {
-                Icon(imageVector = Icons.Default.Close, contentDescription = "Bezárás")
-            }
+            FilcIconButton(
+                icon = Icons.AutoMirrored.Filled.ArrowBack,
+                description = "Vissza",
+                onClick = onBack
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = "Beérkezett üzenet",
+                style = MaterialTheme.typography.titleMedium,
+                color = filc.text.copy(alpha = 0.7f),
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            FilcIconButton(icon = Icons.Default.Refresh, description = "Újratöltés", onClick = onReload)
         }
 
-        Spacer(modifier = Modifier.height(10.dp))
-
-        Text(
-            text = message.subject,
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Sender & Date info box
-        Surface(
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-            shape = RoundedCornerShape(12.dp),
-            modifier = Modifier.fillMaxWidth()
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 28.dp)
         ) {
-            Column(modifier = Modifier.padding(12.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.Person,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
+            item {
+                FilcPanel(contentPadding = PaddingValues(16.dp)) {
                     Text(
-                        text = "Feladó: ${message.sender}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold
+                        text = message.subject.ifBlank { "(tárgy nélkül)" },
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = filc.text
                     )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = message.sender,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = filc.textSecondary
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "·",
+                            color = filc.textMuted
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = message.sendDate,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = filc.textMuted
+                        )
+                    }
+                    if (message.isOfficial) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        FilcChip(
+                            text = "Hivatalos értesítés",
+                            color = filc.blue,
+                            background = filc.blue.copy(alpha = 0.14f)
+                        )
+                    }
                 }
-                Spacer(modifier = Modifier.height(4.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.Schedule,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
+            }
+            item {
+                FilcPanel(contentPadding = PaddingValues(16.dp)) {
+                    if (isLoadingContent) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                color = filc.accent,
+                                strokeWidth = 2.dp
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                text = "Törzs betöltése…",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = filc.textMuted
+                            )
+                        }
+                    }
                     Text(
-                        text = "Dátum: ${message.sendDate}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text = body.ifBlank { "Az üzenet törzse üres." },
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = filc.text,
+                        lineHeight = 24.sp
                     )
+                    if (body.isBlank() && !isLoadingContent) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = "Húzd frissítésre a tartalomért.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = filc.textMuted
+                        )
+                    }
                 }
             }
         }
-
-        Spacer(modifier = Modifier.height(16.dp))
-        HorizontalDivider()
-        Spacer(modifier = Modifier.height(16.dp))
-
-        if (isLoading) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 32.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(32.dp),
-                        strokeWidth = 3.dp,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        text = "Üzenet tartalmának letöltése a Neptunból...",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-        } else if (cleanBody.isNotBlank() && !cleanBody.startsWith("Koppints a teljes üzenet")) {
-            SelectionContainer {
-                Text(
-                    text = cleanBody,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    lineHeight = 22.sp
-                )
-            }
-        } else {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = "A levél tartalma üres vagy nem sikerült közvetlenül betölteni a Neptunból.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                FilledTonalButton(onClick = onReload) {
-                    Icon(
-                        imageVector = Icons.Default.Refresh,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Tartalom újrapróbálása")
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(32.dp))
     }
 }
