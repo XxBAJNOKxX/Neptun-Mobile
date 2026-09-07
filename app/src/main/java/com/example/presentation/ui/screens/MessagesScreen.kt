@@ -53,6 +53,7 @@ import com.example.presentation.ui.components.FilcIconButton
 import com.example.presentation.ui.components.FilcPanel
 import com.example.presentation.ui.components.UnreadDot
 import com.example.presentation.ui.components.filcCard
+import com.example.presentation.viewmodel.MessagesUiState
 import com.example.ui.theme.filcColors
 
 /**

@@ -17,6 +17,17 @@ val FilcLime = Color(0xFFA7DC22)
 /** Régi, Filc Napló-beli türkiz. */
 val FilcOgTeal = Color(0xFF20AC9B)
 
+// -- Palettareferenciák: a reFilc `ColorUtils().lighten/darken` képletének ---
+// -- pontosan az eredménye a FILC accent esetén, ezért külön konstansban.   ---
+internal val FilcLightBackground = Color(0xFFFAFFF0)
+internal val FilcLightSurface = Color(0xFFF3FBDE)
+internal val FilcLightRaised = Color(0xFFFEFFFD)
+internal val FilcLightDeep = Color(0xFFFDFEF8)
+internal val FilcDarkBackground = Color(0xFF0D1202)
+internal val FilcDarkSurface = Color(0xFF141905)
+internal val FilcDarkRaised = Color(0xFF20290B)
+internal val FilcDarkDeep = Color(0xFF0A0E01)
+
 // -- V5 "login" paletta ----------------------------------------------------
 internal val FilcLoginPrimaryText = Color(0xFF394C0A)
 internal val FilcLoginIconLight = Color(0xFF0A2456)

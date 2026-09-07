@@ -1,6 +1,7 @@
 package com.example
 
 import android.content.Context
+import androidx.compose.ui.graphics.toArgb
 import androidx.test.core.app.ApplicationProvider
 import com.example.core.security.EncryptedPreferencesManager
 import com.example.ui.theme.AppAccentColor
@@ -74,10 +75,10 @@ class SettingsThemeTest {
         val dark = FilcPalette.of(FilcLime, dark = true)
 
         // A reFilc értékei: #FAFFF0 háttér, #F3FBDE felület, #0D1202 / #141905 sötétben.
-        assertEquals(0xFFFAFFF0L, light.background.value and 0xFFFFFFL)
-        assertEquals(0xFFF3FBDEL, light.surface.value and 0xFFFFFFL)
-        assertEquals(0xFF0D1202L, dark.background.value and 0xFFFFFFL)
-        assertEquals(0xFF141905L, dark.surface.value and 0xFFFFFFL)
+        assertEquals(0xFFFAFFF0.toInt(), light.background.toArgb())
+        assertEquals(0xFFF3FBDE.toInt(), light.surface.toArgb())
+        assertEquals(0xFF0D1202.toInt(), dark.background.toArgb())
+        assertEquals(0xFF141905.toInt(), dark.surface.toArgb())
 
         assertTrue(light.isLight)
         assertFalse(dark.isLight)
