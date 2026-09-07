@@ -92,7 +92,6 @@ fun LoginScreen(
     onPasswordChange: (String) -> Unit,
     onLoginClick: () -> Unit,
     onQuickDemoFill: () -> Unit,
-    onQuickElteTestFill: () -> Unit = {},
     onTwoFactorCodeChange: (String) -> Unit = {},
     onTwoFactorMethodChange: (TwoFactorMethod) -> Unit = {},
     onRequestEmailCode: () -> Unit = {},
@@ -378,35 +377,6 @@ fun LoginScreen(
                     }
 
                     Spacer(modifier = Modifier.height(14.dp))
-
-                    // ELTE Test Credentials Fill
-                    OutlinedButton(
-                        onClick = onQuickElteTestFill,
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f)
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(44.dp)
-                            .testTag("quick_elte_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Shield,
-                            contentDescription = "ELTE 2FA tesztfiók",
-                            modifier = Modifier.size(16.dp),
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "ELTE Tesztfiók kitöltése (I7ZBE7)",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
 
                     // Quick Demo Credentials Fill
                     OutlinedButton(
