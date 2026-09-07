@@ -257,8 +257,8 @@ class EncryptedPreferencesManager(context: Context) {
         } catch (e: Exception) {
             ThemeMode.SYSTEM
         }
-        val dynamicColor = prefs.getBoolean(KEY_DYNAMIC_COLOR, true)
-        val accentId = prefs.getString(KEY_ACCENT_COLOR, AppAccentColor.BLUE.id) ?: AppAccentColor.BLUE.id
+        val dynamicColor = prefs.getBoolean(KEY_DYNAMIC_COLOR, false)
+        val accentId = prefs.getString(KEY_ACCENT_COLOR, AppAccentColor.FILC.id) ?: AppAccentColor.FILC.id
         val accentColor = AppAccentColor.fromId(accentId)
 
         return ThemeSettings(
@@ -290,8 +290,8 @@ class EncryptedPreferencesManager(context: Context) {
         val savedUniUrl = getSelectedUniversityUrl()
         val savedNeptunCode = prefs.getString(KEY_NEPTUN_CODE, "") ?: ""
         val savedThemeMode = prefs.getString(KEY_THEME_MODE, ThemeMode.SYSTEM.name)
-        val savedDynamicColor = prefs.getBoolean(KEY_DYNAMIC_COLOR, true)
-        val savedAccent = prefs.getString(KEY_ACCENT_COLOR, AppAccentColor.BLUE.id)
+        val savedDynamicColor = prefs.getBoolean(KEY_DYNAMIC_COLOR, false)
+        val savedAccent = prefs.getString(KEY_ACCENT_COLOR, AppAccentColor.FILC.id)
         val notifyClasses = prefs.getBoolean(KEY_NOTIFY_CLASSES, true)
         val notifyGrades = prefs.getBoolean(KEY_NOTIFY_GRADES, true)
         val notifyMessages = prefs.getBoolean(KEY_NOTIFY_MESSAGES, true)
