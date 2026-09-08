@@ -64,6 +64,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.domain.model.NeptunMessage
 import com.example.presentation.ui.components.NeptunTopBar
+import com.example.presentation.ui.util.rememberHtmlAnnotatedString
 import com.example.presentation.viewmodel.MessagesUiState
 import com.example.ui.theme.NeptunBlue40
 
@@ -297,17 +298,10 @@ private fun MessageDetailContent(
     onClose: () -> Unit,
     onReload: () -> Unit
 ) {
-    val cleanBody = remember(message.bodyHtml) {
-        if (message.bodyHtml.isNotBlank()) {
-            try {
-                Html.fromHtml(message.bodyHtml, Html.FROM_HTML_MODE_COMPACT).toString().trim()
-            } catch (e: Exception) {
-                message.bodyHtml.trim()
-            }
-        } else {
-            ""
-        }
-    }
+    val annotatedBody = rememberHtmlAnnotatedString(
+        htmlString = message.bodyHtml,
+        linkColor = MaterialTheme.colorScheme.primary
+    )
 
     Column(
         modifier = Modifier
@@ -413,10 +407,10 @@ private fun MessageDetailContent(
                     )
                 }
             }
-        } else if (cleanBody.isNotBlank() && !cleanBody.startsWith("Koppints a teljes üzenet")) {
+        } else if (annotatedBody.text.isNotBlank() && !annotatedBody.text.startsWith("Koppints a teljes üzenet")) {
             SelectionContainer {
                 Text(
-                    text = cleanBody,
+                    text = annotatedBody,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                     lineHeight = 22.sp

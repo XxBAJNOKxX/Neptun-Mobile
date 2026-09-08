@@ -528,10 +528,15 @@ class NeptunRepositoryImpl(
                 }
 
                 if (content.isNotBlank()) {
+                    val plainPreview = try {
+                        android.text.Html.fromHtml(content, android.text.Html.FROM_HTML_MODE_COMPACT).toString().trim()
+                    } catch (_: Exception) {
+                        content
+                    }.replace(Regex("\\s+"), " ")
                     database.messagesDao().updateMessageBody(
                         id = messageId,
                         bodyHtml = content,
-                        previewText = content.take(150)
+                        previewText = plainPreview.take(150)
                     )
                     database.messagesDao().markAsRead(messageId)
                     return@withContext content
