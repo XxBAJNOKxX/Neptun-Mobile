@@ -63,8 +63,20 @@ class NeptunRepositoryImpl(
 
     override suspend fun syncAllData(neptunCode: String, sessionToken: String): Result<Unit> = withContext(Dispatchers.IO) {
         try {
-            val token = ensureValidToken(forceRefresh = false)
             val creds = prefsManager.loadCredentials()
+            val isDemo = neptunCode == "DEMO01" || creds?.neptunCode == "DEMO01" || prefsManager.getDataMode() == DataMode.DEMO
+            if (isDemo) {
+                prefsManager.setDataMode(DataMode.DEMO)
+                prefsManager.clearSessionExpired()
+                refreshCalendar()
+                refreshGrades()
+                refreshMessages()
+                refreshFinances()
+                refreshExams()
+                prefsManager.updateLastSyncTime()
+                return@withContext Result.success(Unit)
+            }
+            val token = ensureValidToken(forceRefresh = false)
             val baseUrl = prefsManager.getBaseUrl().ifEmpty { creds?.neptunUrl ?: "" }
             if (token.isNotBlank() && baseUrl.isNotBlank() && prefsManager.isModernApi()) {
                 try {
@@ -93,6 +105,11 @@ class NeptunRepositoryImpl(
 
     private suspend fun ensureValidToken(forceRefresh: Boolean = false): String {
         val creds = prefsManager.loadCredentials() ?: return ""
+        val isDemo = creds.neptunCode == "DEMO01" || prefsManager.getDataMode() == DataMode.DEMO
+        if (isDemo) {
+            prefsManager.clearSessionExpired()
+            return "demo-token"
+        }
         val baseUrl = prefsManager.getBaseUrl().ifEmpty { creds.neptunUrl }
         val password = prefsManager.getPassword()
         val currentToken = prefsManager.getAccessToken()
@@ -131,6 +148,17 @@ class NeptunRepositoryImpl(
 
     override suspend fun refreshCalendar(): Result<Unit> = withContext(Dispatchers.IO) {
         val creds = prefsManager.loadCredentials()
+        val isDemo = creds?.neptunCode == "DEMO01" || prefsManager.getDataMode() == DataMode.DEMO
+
+        if (isDemo) {
+            val eventsToInsert = MockNeptunDataSource.getMockCalendarEvents()
+            prefsManager.setDataMode(DataMode.DEMO)
+            prefsManager.clearSessionExpired()
+            database.calendarDao().clearAll()
+            database.calendarDao().insertEvents(eventsToInsert.map { CalendarEventEntity.fromDomain(it) })
+            return@withContext Result.success(Unit)
+        }
+
         var eventsToInsert = emptyList<CalendarEvent>()
         var fetchSucceeded = false
 
@@ -176,16 +204,15 @@ class NeptunRepositoryImpl(
             }
         }
 
-        val isDemo = creds?.neptunCode == "DEMO01"
         if (fetchSucceeded) {
-            prefsManager.setDataMode(if (isDemo) DataMode.DEMO else DataMode.REAL)
+            prefsManager.setDataMode(DataMode.REAL)
             if (eventsToInsert.isNotEmpty()) {
                 database.calendarDao().clearAll()
                 database.calendarDao().insertEvents(eventsToInsert.map { CalendarEventEntity.fromDomain(it) })
             }
-        } else if (isDemo || (BuildConfig.DEBUG && database.calendarDao().getAllEvents().first().isEmpty())) {
+        } else if (BuildConfig.DEBUG && database.calendarDao().getAllEvents().first().isEmpty()) {
             eventsToInsert = MockNeptunDataSource.getMockCalendarEvents()
-            prefsManager.setDataMode(if (isDemo) DataMode.DEMO else DataMode.MOCK)
+            prefsManager.setDataMode(DataMode.MOCK)
             database.calendarDao().clearAll()
             database.calendarDao().insertEvents(eventsToInsert.map { CalendarEventEntity.fromDomain(it) })
         }
@@ -195,6 +222,17 @@ class NeptunRepositoryImpl(
 
     override suspend fun refreshGrades(): Result<Unit> = withContext(Dispatchers.IO) {
         val creds = prefsManager.loadCredentials()
+        val isDemo = creds?.neptunCode == "DEMO01" || prefsManager.getDataMode() == DataMode.DEMO
+
+        if (isDemo) {
+            val gradesToInsert = MockNeptunDataSource.getMockGrades()
+            prefsManager.setDataMode(DataMode.DEMO)
+            prefsManager.clearSessionExpired()
+            database.gradesDao().clearAll()
+            database.gradesDao().insertGrades(gradesToInsert.map { SubjectGradeEntity.fromDomain(it) })
+            return@withContext Result.success(Unit)
+        }
+
         var gradesToInsert = emptyList<SubjectGrade>()
         var fetchSucceeded = false
 
@@ -237,16 +275,15 @@ class NeptunRepositoryImpl(
             }
         }
 
-        val isDemo = creds?.neptunCode == "DEMO01"
         if (fetchSucceeded) {
             if (gradesToInsert.isNotEmpty()) {
-                prefsManager.setDataMode(if (isDemo) DataMode.DEMO else DataMode.REAL)
+                prefsManager.setDataMode(DataMode.REAL)
                 database.gradesDao().clearAll()
                 database.gradesDao().insertGrades(gradesToInsert.map { SubjectGradeEntity.fromDomain(it) })
             }
-        } else if (isDemo || (BuildConfig.DEBUG && database.gradesDao().getAllGrades().first().isEmpty())) {
+        } else if (BuildConfig.DEBUG && database.gradesDao().getAllGrades().first().isEmpty()) {
             gradesToInsert = MockNeptunDataSource.getMockGrades()
-            prefsManager.setDataMode(if (isDemo) DataMode.DEMO else DataMode.MOCK)
+            prefsManager.setDataMode(DataMode.MOCK)
             database.gradesDao().clearAll()
             database.gradesDao().insertGrades(gradesToInsert.map { SubjectGradeEntity.fromDomain(it) })
         }
@@ -256,6 +293,17 @@ class NeptunRepositoryImpl(
 
     override suspend fun refreshMessages(): Result<Unit> = withContext(Dispatchers.IO) {
         val creds = prefsManager.loadCredentials()
+        val isDemo = creds?.neptunCode == "DEMO01" || prefsManager.getDataMode() == DataMode.DEMO
+
+        if (isDemo) {
+            val messagesToInsert = MockNeptunDataSource.getMockMessages()
+            prefsManager.setDataMode(DataMode.DEMO)
+            prefsManager.clearSessionExpired()
+            database.messagesDao().clearAll()
+            database.messagesDao().insertMessages(messagesToInsert.map { NeptunMessageEntity.fromDomain(it) })
+            return@withContext Result.success(Unit)
+        }
+
         var messagesToInsert = emptyList<NeptunMessage>()
         var fetchSucceeded = false
 
@@ -298,7 +346,6 @@ class NeptunRepositoryImpl(
             }
         }
 
-        val isDemo = creds?.neptunCode == "DEMO01"
         if (fetchSucceeded || messagesToInsert.isNotEmpty()) {
             val existingEntities = database.messagesDao().getAllMessages().first()
             val existingById = existingEntities.associateBy { it.id }
@@ -326,12 +373,12 @@ class NeptunRepositoryImpl(
             }
             database.messagesDao().clearAll()
             if (entitiesToSave.isNotEmpty()) {
-                prefsManager.setDataMode(if (isDemo) DataMode.DEMO else DataMode.REAL)
+                prefsManager.setDataMode(DataMode.REAL)
                 database.messagesDao().insertMessages(entitiesToSave)
             }
-        } else if (isDemo || (BuildConfig.DEBUG && database.messagesDao().getAllMessages().first().isEmpty())) {
+        } else if (BuildConfig.DEBUG && database.messagesDao().getAllMessages().first().isEmpty()) {
             messagesToInsert = MockNeptunDataSource.getMockMessages()
-            prefsManager.setDataMode(if (isDemo) DataMode.DEMO else DataMode.MOCK)
+            prefsManager.setDataMode(DataMode.MOCK)
             database.messagesDao().clearAll()
             database.messagesDao().insertMessages(messagesToInsert.map { NeptunMessageEntity.fromDomain(it) })
         }
@@ -341,6 +388,17 @@ class NeptunRepositoryImpl(
 
     override suspend fun refreshFinances(): Result<Unit> = withContext(Dispatchers.IO) {
         val creds = prefsManager.loadCredentials()
+        val isDemo = creds?.neptunCode == "DEMO01" || prefsManager.getDataMode() == DataMode.DEMO
+
+        if (isDemo) {
+            val financesToInsert = MockNeptunDataSource.getMockFinances()
+            prefsManager.setDataMode(DataMode.DEMO)
+            prefsManager.clearSessionExpired()
+            database.financesDao().clearAll()
+            database.financesDao().insertFinances(financesToInsert.map { FinanceItemEntity.fromDomain(it) })
+            return@withContext Result.success(Unit)
+        }
+
         var financesToInsert = emptyList<FinanceItem>()
         var fetchSucceeded = false
 
@@ -383,18 +441,17 @@ class NeptunRepositoryImpl(
             }
         }
 
-        val isDemo = creds?.neptunCode == "DEMO01"
         if (fetchSucceeded) {
             if (financesToInsert.isNotEmpty()) {
-                prefsManager.setDataMode(if (isDemo) DataMode.DEMO else DataMode.REAL)
+                prefsManager.setDataMode(DataMode.REAL)
             }
             database.financesDao().clearAll()
             if (financesToInsert.isNotEmpty()) {
                 database.financesDao().insertFinances(financesToInsert.map { FinanceItemEntity.fromDomain(it) })
             }
-        } else if (isDemo || (BuildConfig.DEBUG && database.financesDao().getAllFinances().first().isEmpty())) {
+        } else if (BuildConfig.DEBUG && database.financesDao().getAllFinances().first().isEmpty()) {
             financesToInsert = MockNeptunDataSource.getMockFinances()
-            prefsManager.setDataMode(if (isDemo) DataMode.DEMO else DataMode.MOCK)
+            prefsManager.setDataMode(DataMode.MOCK)
             database.financesDao().clearAll()
             database.financesDao().insertFinances(financesToInsert.map { FinanceItemEntity.fromDomain(it) })
         }
@@ -404,6 +461,17 @@ class NeptunRepositoryImpl(
 
     override suspend fun refreshExams(): Result<Unit> = withContext(Dispatchers.IO) {
         val creds = prefsManager.loadCredentials()
+        val isDemo = creds?.neptunCode == "DEMO01" || prefsManager.getDataMode() == DataMode.DEMO
+
+        if (isDemo) {
+            val examsToInsert = MockNeptunDataSource.getMockExams()
+            prefsManager.setDataMode(DataMode.DEMO)
+            prefsManager.clearSessionExpired()
+            database.examsDao().clearAll()
+            database.examsDao().insertExams(examsToInsert.map { ExamItemEntity.fromDomain(it) })
+            return@withContext Result.success(Unit)
+        }
+
         var examsToInsert = emptyList<ExamItem>()
         var fetchSucceeded = false
 
@@ -446,13 +514,12 @@ class NeptunRepositoryImpl(
             }
         }
 
-        val isDemo = creds?.neptunCode == "DEMO01"
         if (fetchSucceeded) {
             database.examsDao().clearAll()
             if (examsToInsert.isNotEmpty()) {
                 database.examsDao().insertExams(examsToInsert.map { ExamItemEntity.fromDomain(it) })
             }
-        } else if (isDemo || (BuildConfig.DEBUG && database.examsDao().getAllExams().first().isEmpty())) {
+        } else if (BuildConfig.DEBUG && database.examsDao().getAllExams().first().isEmpty()) {
             examsToInsert = MockNeptunDataSource.getMockExams()
             database.examsDao().clearAll()
             database.examsDao().insertExams(examsToInsert.map { ExamItemEntity.fromDomain(it) })
@@ -472,6 +539,9 @@ class NeptunRepositoryImpl(
     override suspend fun markMessageAsRead(messageId: String) = withContext(Dispatchers.IO) {
         database.messagesDao().markAsRead(messageId)
         val creds = prefsManager.loadCredentials()
+        val isDemo = creds?.neptunCode == "DEMO01" || prefsManager.getDataMode() == DataMode.DEMO
+        if (isDemo) return@withContext
+
         if (creds != null && creds.neptunUrl.isNotEmpty()) {
             try {
                 val baseUrl = prefsManager.getBaseUrl().ifEmpty { creds.neptunUrl }
@@ -494,6 +564,16 @@ class NeptunRepositoryImpl(
 
     override suspend fun getMessageContent(messageId: String): String = withContext(Dispatchers.IO) {
         val creds = prefsManager.loadCredentials()
+        val isDemo = creds?.neptunCode == "DEMO01" || prefsManager.getDataMode() == DataMode.DEMO
+        if (isDemo) {
+            val existing = database.messagesDao().getAllMessages().first().firstOrNull { it.id == messageId }
+            if (existing != null) {
+                database.messagesDao().markAsRead(messageId)
+                return@withContext existing.bodyHtml.ifBlank { existing.previewText }
+            }
+            return@withContext ""
+        }
+
         if (creds != null && creds.neptunUrl.isNotEmpty()) {
             try {
                 val baseUrl = prefsManager.getBaseUrl().ifEmpty { creds.neptunUrl }

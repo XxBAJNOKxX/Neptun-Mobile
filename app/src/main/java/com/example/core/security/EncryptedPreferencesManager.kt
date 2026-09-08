@@ -177,7 +177,9 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
     // Adatforrás mód (valódi / demo / mock)
     // ------------------------------------------------------------------ //
 
-    private fun loadDataMode(): DataMode = DataMode.fromName(prefs.getString(KEY_DATA_MODE, DataMode.REAL.name))
+    fun loadDataMode(): DataMode = DataMode.fromName(prefs.getString(KEY_DATA_MODE, DataMode.REAL.name))
+
+    fun getDataMode(): DataMode = loadDataMode()
 
     fun setDataMode(mode: DataMode) {
         prefs.edit().putString(KEY_DATA_MODE, mode.name).apply()
