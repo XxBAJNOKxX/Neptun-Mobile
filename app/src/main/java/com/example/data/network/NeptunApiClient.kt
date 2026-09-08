@@ -1460,13 +1460,17 @@ class NeptunApiClient {
                                     obj["termId"]?.jsonPrimitive?.contentOrNull ?: "2025/26/1"
                                 }
                                 val rawTermName = termName.ifEmpty {
-                                    obj["termName"]?.jsonPrimitive?.contentOrNull ?: "2025/26/1 félév"
+                                    obj["termName"]?.jsonPrimitive?.contentOrNull ?: obj["text"]?.jsonPrimitive?.contentOrNull ?: rawTermId
                                 }
-                                val effectiveTermId = cleanTermString(rawTermId)
-                                val effectiveTermName = cleanTermString(rawTermName)
+                                val effectiveTermName = cleanTermString(rawTermName).ifEmpty { cleanTermString(rawTermId) }
+                                val effectiveTermId = if (effectiveTermName.isNotEmpty() && !isUuidString(effectiveTermName)) {
+                                    effectiveTermName
+                                } else {
+                                    cleanTermString(rawTermId)
+                                }
 
                                 val itemUniqueId = "${effectiveTermId}_${subjectCode}_$subjectId"
-                                if (allGrades.none { it.id == itemUniqueId || (it.subjectCode == subjectCode && it.termId == effectiveTermId) }) {
+                                if (allGrades.none { it.id == itemUniqueId || (it.subjectCode == subjectCode && (it.termId == effectiveTermId || it.termId == rawTermId)) }) {
                                     allGrades.add(
                                         SubjectGrade(
                                             id = itemUniqueId,
@@ -2534,6 +2538,10 @@ class NeptunApiClient {
         }
     }
 
+    fun isUuidString(str: String): Boolean {
+        return str.length >= 32 && str.contains("-") && str.count { it == '-' } >= 3
+    }
+
     fun cleanTermString(raw: String?): String {
         if (raw == null || raw.isBlank()) return "2025/26/1"
         val trimmed = raw.trim()
@@ -2541,18 +2549,18 @@ class NeptunApiClient {
             try {
                 val element = json.parseToJsonElement(trimmed)
                 if (element is JsonObject) {
-                    val extracted = element["id"]?.jsonPrimitive?.contentOrNull
+                    val extracted = element["text"]?.jsonPrimitive?.contentOrNull
+                        ?: element["termName"]?.jsonPrimitive?.contentOrNull
+                        ?: element["name"]?.jsonPrimitive?.contentOrNull
+                        ?: element["id"]?.jsonPrimitive?.contentOrNull
                         ?: element["termId"]?.jsonPrimitive?.contentOrNull
                         ?: element["value"]?.jsonPrimitive?.contentOrNull
-                        ?: element["name"]?.jsonPrimitive?.contentOrNull
-                        ?: element["termName"]?.jsonPrimitive?.contentOrNull
-                        ?: element["text"]?.jsonPrimitive?.contentOrNull
                     if (!extracted.isNullOrBlank() && !extracted.startsWith("{")) {
                         return extracted.trim()
                     }
                 }
             } catch (e: Exception) {
-                val regex = Regex(""""(?:id|termId|value|name|termName|text)"\s*:\s*"([^"]+)"""")
+                val regex = Regex(""""(?:text|termName|name|id|termId|value)"\s*:\s*"([^"]+)"""")
                 val match = regex.find(trimmed)
                 if (match != null) {
                     return match.groupValues[1].trim()
