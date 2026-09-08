@@ -120,7 +120,9 @@ fun MainAppContent() {
         )
     }
 
-    val appUpdateViewModel: AppUpdateViewModel = viewModel(factory = AppUpdateViewModel.Factory)
+    val appUpdateViewModel: AppUpdateViewModel = viewModel(
+        factory = AppUpdateViewModel.provideFactory(prefsManager = appContainer.prefsManager)
+    )
     val updateState by appUpdateViewModel.updateState.collectAsStateWithLifecycle()
 
     // Auto-check for update on app open
@@ -425,6 +427,7 @@ private fun MainDashboard(
                             isSyncing = settingsState.isSyncing,
                             syncSuccessMessage = settingsState.syncSuccessMessage,
                             updateCheckState = settingsState.updateCheckState,
+                            updateChannel = settingsState.updateChannel,
                             isClearingCache = settingsState.isClearingCache,
                             cacheClearedMessage = settingsState.cacheClearedMessage,
                             onThemeModeChange = settingsViewModel::setThemeMode,
@@ -441,6 +444,7 @@ private fun MainDashboard(
                             onHiddenPagesChange = settingsViewModel::setHiddenPages,
                             onTargetCreditsChange = settingsViewModel::setTargetCredits,
                             onBiometricLockChange = settingsViewModel::setBiometricLockEnabled,
+                            onUpdateChannelChange = settingsViewModel::setUpdateChannel,
                             onExportIcs = {
                                 coroutineScope.launch {
                                     exportTimetableAsIcs(app)

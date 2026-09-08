@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - stable
   workflow_dispatch:
 
 permissions:
@@ -17,6 +18,8 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -36,16 +39,87 @@ jobs:
           cp debug.keystore ~/.android/debug.keystore
           echo "Successfully restored consistent debug.keystore to root, app/, and ~/.android/"
 
-      - name: Determine App Version
+      - name: Determine App Version & Generate Release Notes
         id: versioning
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          VERSION_NAME="0.1.${{ github.run_number }}"
-          VERSION_CODE="${{ github.run_number }}"
+          # Fetch latest official non-prerelease tag from GitHub API or git tags
+          LATEST_STABLE_TAG=$(gh api repos/${{ github.repository }}/releases/latest --jq '.tag_name' 2>/dev/null || true)
+
+          if [ -z "$LATEST_STABLE_TAG" ] || [ "$LATEST_STABLE_TAG" = "null" ]; then
+            LATEST_STABLE_TAG=$(git tag -l "v[0-9]*.[0-9]*.[0-9]*" | grep -v "\-dev" | sort -V | tail -n 1 || true)
+          fi
+
+          # Clean version string (e.g., v0.1.0 -> 0.1.0)
+          CLEAN_TAG=$(echo "$LATEST_STABLE_TAG" | sed 's/^v//' | sed 's/-.*//')
+
+          if [[ "$CLEAN_TAG" =~ ^([0-9]+)\.([0-9]+) ]]; then
+            MAJOR="${BASH_REMATCH[1]}"
+            MINOR="${BASH_REMATCH[2]}"
+          else
+            MAJOR="0"
+            MINOR="1"
+          fi
+
+          BRANCH="${{ github.ref_name }}"
+          RUN_NUM="${{ github.run_number }}"
+
+          if [ "$BRANCH" = "stable" ]; then
+            # Increment minor version for stable release: 0.1 -> 0.2.0
+            NEXT_MINOR=$((MINOR + 1))
+            VERSION_NAME="${MAJOR}.${NEXT_MINOR}.0"
+            IS_PRERELEASE="false"
+            RELEASE_TITLE="Neptun Mobile v${VERSION_NAME} (Stabil kiadás)"
+            CHANNEL_NAME="Stabil"
+            CHANNEL_NOTE="🎉 **Hivatalos Stabil Kiadás** — Tesztelt, megbízható verzió mindennapi használatra."
+          else
+            # Main branch or dev branch: 0.1.X-dev or 0.2.X-dev
+            VERSION_NAME="${MAJOR}.${MINOR}.${RUN_NUM}-dev"
+            IS_PRERELEASE="true"
+            RELEASE_TITLE="Neptun Mobile v${VERSION_NAME} (Fejlesztői kiadás)"
+            CHANNEL_NAME="Fejlesztői (Dev)"
+            CHANNEL_NOTE="⚠️ **Fejlesztői (Dev) Kiadás** — Tesztelés alatti funkciókat tartalmazhat. Stabil működéshez használd a **Stabil** csatornát!"
+          fi
+
+          VERSION_CODE="$RUN_NUM"
           VERSION_TAG="v${VERSION_NAME}"
+
+          # Generate clean changelog from git commits
+          if [ -n "$LATEST_STABLE_TAG" ] && git rev-parse "$LATEST_STABLE_TAG" >/dev/null 2>&1; then
+            CHANGES=$(git log "${LATEST_STABLE_TAG}..HEAD" --oneline --no-merges | sed -E 's/^[a-f0-9]+ /* /' | head -n 30)
+          fi
+          if [ -z "$CHANGES" ]; then
+            CHANGES=$(git log -n 12 --oneline --no-merges | sed -E 's/^[a-f0-9]+ /* /')
+          fi
+
+          # Format commits for end-user friendliness
+          CLEAN_CHANGES=$(echo "$CHANGES" | sed -E 's/\* (feat|fix|docs|style|refactor|test|chore|ci)(\(.*\))?!?: /\* /gI')
+
+          # Create end-user friendly release notes markdown
+          cat << EOF > /tmp/release_notes.md
+          ## 📱 Neptun Mobile v${VERSION_NAME}
+
+          ${CHANNEL_NOTE}
+
+          ### 🚀 Újdonságok és Változtatások:
+          ${CLEAN_CHANGES}
+
+          ---
+          ### 📥 Telepítési Útmutató:
+          1. Töltsd le a **\`neptun-mobile-${VERSION_NAME}.apk\`** fájlt az alábbi csatolmányok közül.
+          2. Nyisd meg a letöltött fájlt a telefonodon a telepítéshez.
+          3. *(Szükség esetén engedélyezd a böngésződnek az ismeretlen forrásból származó alkalmazások telepítését).*
+
+          💡 *Verzió kód: \`${VERSION_CODE}\` | Csatorna: \`${CHANNEL_NAME}\`*
+          EOF
+
           echo "VERSION_NAME=$VERSION_NAME" >> $GITHUB_OUTPUT
           echo "VERSION_CODE=$VERSION_CODE" >> $GITHUB_OUTPUT
           echo "VERSION_TAG=$VERSION_TAG" >> $GITHUB_OUTPUT
-          echo "Generated version: $VERSION_NAME (Code: $VERSION_CODE, Tag: $VERSION_TAG)"
+          echo "IS_PRERELEASE=$IS_PRERELEASE" >> $GITHUB_OUTPUT
+          echo "RELEASE_TITLE=$RELEASE_TITLE" >> $GITHUB_OUTPUT
+          echo "Generated version: $VERSION_NAME (Code: $VERSION_CODE, Tag: $VERSION_TAG, Pre-release: $IS_PRERELEASE)"
 
       - name: Build Debug & Release APK with Version
         env:
@@ -72,26 +146,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.versioning.outputs.VERSION_TAG }}
-          name: "Neptun Mobile ${{ steps.versioning.outputs.VERSION_TAG }}"
-          body: |
-            ## Neptun Mobile ${{ steps.versioning.outputs.VERSION_TAG }}
-            
-            Automatikusan kiadott új verzió a(z) `${{ github.sha }}` commitból.
-            
-            ### Változtatások és Verzióinformációk:
-            - **Alkalmazás verzió (versionName):** `${{ steps.versioning.outputs.VERSION_NAME }}`
-            - **Build kód (versionCode):** `${{ steps.versioning.outputs.VERSION_CODE }}`
-            - **Csomagnév (package):** `app.neptun.mobile`
-            - **Commit:** `${{ github.sha }}`
-            
-            ### Letölthető telepítőfájlok:
-            - [`neptun-mobile-${{ steps.versioning.outputs.VERSION_NAME }}.apk`](https://github.com/${{ github.repository }}/releases/download/${{ steps.versioning.outputs.VERSION_TAG }}/neptun-mobile-${{ steps.versioning.outputs.VERSION_NAME }}.apk)
-            - [`app-debug.apk`](https://github.com/${{ github.repository }}/releases/download/${{ steps.versioning.outputs.VERSION_TAG }}/app-debug.apk)
+          name: ${{ steps.versioning.outputs.RELEASE_TITLE }}
+          body_path: /tmp/release_notes.md
           files: |
             release-artifacts/neptun-mobile-${{ steps.versioning.outputs.VERSION_NAME }}.apk
             release-artifacts/app-debug.apk
             release-artifacts/neptun-mobile-${{ steps.versioning.outputs.VERSION_NAME }}-release.apk
           draft: false
-          prerelease: false
+          prerelease: ${{ steps.versioning.outputs.IS_PRERELEASE == 'true' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
