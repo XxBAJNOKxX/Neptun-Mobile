@@ -64,7 +64,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.domain.model.CalendarEvent
-import com.example.domain.model.WeekFilterMode
 import com.example.presentation.ui.components.CourseTypeBadge
 import com.example.presentation.ui.components.NeptunTopBar
 import com.example.presentation.viewmodel.TimetableUiState
@@ -95,7 +94,6 @@ fun TimetableScreen(
     onNextWeek: () -> Unit,
     onCurrentWeek: () -> Unit,
     onToggleWeekView: () -> Unit,
-    onWeekFilterChange: (WeekFilterMode) -> Unit,
     onRefresh: () -> Unit,
     onScheduleReminder: (CalendarEvent) -> Unit,
     modifier: Modifier = Modifier
@@ -251,35 +249,6 @@ fun TimetableScreen(
             )
         }
 
-        // A/B hét szűrő
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 2.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            WeekFilterMode.entries.forEach { mode ->
-                FilterChip(
-                    selected = uiState.weekFilterMode == mode,
-                    onClick = { onWeekFilterChange(mode) },
-                    label = { Text(mode.title) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                )
-            }
-            Spacer(modifier = Modifier.weight(1f))
-            if (uiState.currentWeekType != 0) {
-                Text(
-                    text = "Ez a hét: ${if (uiState.currentWeekType == 1) "A" else "B"}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-
         // Day Tabs (Only in daily view)
         if (!uiState.isWeekView) {
             ScrollableTabRow(
@@ -351,8 +320,8 @@ fun TimetableScreen(
             onRefresh = onRefresh,
             modifier = Modifier.fillMaxSize()
         ) {
-        val hasDatedEvents = remember(uiState.filteredEvents) {
-            uiState.filteredEvents.any { it.dateString.isNotBlank() }
+        val hasDatedEvents = remember(uiState.events) {
+            uiState.events.any { it.dateString.isNotBlank() }
         }
 
         if (uiState.isWeekView) {
@@ -367,9 +336,9 @@ fun TimetableScreen(
                 dayList.forEachIndexed { idx, (dayNum, dayName) ->
                     val weekDay = uiState.weekDays.getOrNull(idx)
                     val dayEvents = if (hasDatedEvents && weekDay != null) {
-                        uiState.filteredEvents.filter { it.dateString.startsWith(weekDay.isoDate) }
+                        uiState.events.filter { it.dateString.startsWith(weekDay.isoDate) }
                     } else {
-                        if (uiState.selectedWeekOffset == 0) uiState.filteredEvents.filter { it.dayOfWeek == dayNum }
+                        if (uiState.selectedWeekOffset == 0) uiState.events.filter { it.dayOfWeek == dayNum }
                         else emptyList()
                     }.sortedBy { it.startHour * 60 + it.startMinute }
 
@@ -408,9 +377,9 @@ fun TimetableScreen(
                 val day = page + 1
                 val weekDay = uiState.weekDays.getOrNull(page)
                 val eventsForDay = if (hasDatedEvents && weekDay != null) {
-                    uiState.filteredEvents.filter { it.dateString.startsWith(weekDay.isoDate) }
+                    uiState.events.filter { it.dateString.startsWith(weekDay.isoDate) }
                 } else {
-                    if (uiState.selectedWeekOffset == 0) uiState.filteredEvents.filter { it.dayOfWeek == day }
+                    if (uiState.selectedWeekOffset == 0) uiState.events.filter { it.dayOfWeek == day }
                     else emptyList()
                 }.sortedBy { it.startHour * 60 + it.startMinute }
 
@@ -583,24 +552,7 @@ fun TimetableEventCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    CourseTypeBadge(courseType = event.courseType)
-                    if (event.weekType != 0) {
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Surface(
-                            color = if (event.weekType == 1) NeptunCyan40.copy(alpha = 0.15f) else NeptunGreen.copy(alpha = 0.15f),
-                            shape = RoundedCornerShape(6.dp)
-                        ) {
-                            Text(
-                                text = if (event.weekType == 1) "A HÉT" else "B HÉT",
-                                color = if (event.weekType == 1) NeptunCyan40 else NeptunGreen,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                            )
-                        }
-                    }
-                }
+                CourseTypeBadge(courseType = event.courseType)
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (isOngoing) {

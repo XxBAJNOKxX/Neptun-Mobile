@@ -7,9 +7,11 @@
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
-    <!-- Kezdőképernyő-widget ( világos mód ) -->
-    <color name="widget_background">#FFF1F5F9</color>
+    <!-- Kezdőképernyő-widget ( világos mód ) – az app kártya-arculatához igazítva -->
+    <color name="widget_background">#FFFFFFFF</color>
     <color name="widget_on_background">#FF0F172A</color>
     <color name="widget_accent">#FF1E40AF</color>
     <color name="widget_muted">#FF64748B</color>
+    <color name="widget_chip_bg">#FFDBEAFE</color>
+    <color name="widget_chip_fg">#FF1E3A8A</color>
 </resources>

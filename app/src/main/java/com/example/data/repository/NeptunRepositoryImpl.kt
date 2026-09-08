@@ -165,7 +165,7 @@ class NeptunRepositoryImpl(
             if (eventsToInsert.isNotEmpty()) {
                 database.calendarDao().insertEvents(eventsToInsert.map { CalendarEventEntity.fromDomain(it) })
             }
-        } else if (BuildConfig.DEBUG && (isDemo || database.calendarDao().getAllEvents().first().isEmpty())) {
+        } else if (isDemo || (BuildConfig.DEBUG && database.calendarDao().getAllEvents().first().isEmpty())) {
             // Csak debug buildben: demo / fejlesztői mock adat, hogy tesztelhető legyen az UI.
             eventsToInsert = MockNeptunDataSource.getMockCalendarEvents()
             prefsManager.setDataMode(if (isDemo) DataMode.DEMO else DataMode.MOCK)
@@ -210,7 +210,7 @@ class NeptunRepositoryImpl(
                 database.gradesDao().clearAll()
                 database.gradesDao().insertGrades(gradesToInsert.map { SubjectGradeEntity.fromDomain(it) })
             }
-        } else if (BuildConfig.DEBUG && (isDemo || database.gradesDao().getAllGrades().first().isEmpty())) {
+        } else if (isDemo || (BuildConfig.DEBUG && database.gradesDao().getAllGrades().first().isEmpty())) {
             gradesToInsert = MockNeptunDataSource.getMockGrades()
             prefsManager.setDataMode(if (isDemo) DataMode.DEMO else DataMode.MOCK)
             database.gradesDao().clearAll()
@@ -276,7 +276,7 @@ class NeptunRepositoryImpl(
                 prefsManager.setDataMode(if (isDemo) DataMode.DEMO else DataMode.REAL)
                 database.messagesDao().insertMessages(entitiesToSave)
             }
-        } else if (BuildConfig.DEBUG && (isDemo || database.messagesDao().getAllMessages().first().isEmpty())) {
+        } else if (isDemo || (BuildConfig.DEBUG && database.messagesDao().getAllMessages().first().isEmpty())) {
             messagesToInsert = MockNeptunDataSource.getMockMessages()
             prefsManager.setDataMode(if (isDemo) DataMode.DEMO else DataMode.MOCK)
             database.messagesDao().clearAll()
@@ -320,7 +320,7 @@ class NeptunRepositoryImpl(
             if (financesToInsert.isNotEmpty()) {
                 database.financesDao().insertFinances(financesToInsert.map { FinanceItemEntity.fromDomain(it) })
             }
-        } else if (BuildConfig.DEBUG && (isDemo || database.financesDao().getAllFinances().first().isEmpty())) {
+        } else if (isDemo || (BuildConfig.DEBUG && database.financesDao().getAllFinances().first().isEmpty())) {
             financesToInsert = MockNeptunDataSource.getMockFinances()
             prefsManager.setDataMode(if (isDemo) DataMode.DEMO else DataMode.MOCK)
             database.financesDao().clearAll()
@@ -361,7 +361,7 @@ class NeptunRepositoryImpl(
             if (examsToInsert.isNotEmpty()) {
                 database.examsDao().insertExams(examsToInsert.map { ExamItemEntity.fromDomain(it) })
             }
-        } else if (BuildConfig.DEBUG && (isDemo || database.examsDao().getAllExams().first().isEmpty())) {
+        } else if (isDemo || (BuildConfig.DEBUG && database.examsDao().getAllExams().first().isEmpty())) {
             examsToInsert = MockNeptunDataSource.getMockExams()
             database.examsDao().clearAll()
             database.examsDao().insertExams(examsToInsert.map { ExamItemEntity.fromDomain(it) })

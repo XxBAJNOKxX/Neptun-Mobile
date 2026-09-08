@@ -45,7 +45,6 @@ import com.example.presentation.navigation.NavigationItem
 import com.example.presentation.ui.components.CourseTypeBadge
 import com.example.presentation.ui.components.NeptunTopBar
 import com.example.presentation.viewmodel.DashboardUiState
-import com.example.ui.theme.NeptunCyan40
 import com.example.ui.theme.NeptunGreen
 import java.time.LocalDate
 import java.time.LocalTime
@@ -333,7 +332,9 @@ private fun QuickStatCard(
         modifier = modifier.clickable { onClick() }
     ) {
         Column(
-            modifier = Modifier.padding(14.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Icon(
@@ -402,20 +403,6 @@ private fun DashboardClassRow(event: CalendarEvent) {
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-            }
-            if (event.weekType != 0) {
-                Surface(
-                    color = if (event.weekType == 1) NeptunCyan40.copy(alpha = 0.15f) else NeptunGreen.copy(alpha = 0.15f),
-                    shape = RoundedCornerShape(6.dp)
-                ) {
-                    Text(
-                        text = if (event.weekType == 1) "A hét" else "B hét",
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (event.weekType == 1) NeptunCyan40 else NeptunGreen,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                    )
-                }
             }
         }
     }
