@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Mail
 import androidx.compose.material.icons.filled.MarkEmailRead
 import androidx.compose.material.icons.filled.Person
@@ -212,18 +213,24 @@ private fun MessageCard(
     message: NeptunMessage,
     onClick: () -> Unit
 ) {
+    val displaySender = message.sender.ifBlank { "Rendszerüzenet" }
+    val isSystem = message.isOfficial || displaySender.equals("Rendszerüzenet", ignoreCase = true) || displaySender.contains("hivatal", ignoreCase = true)
+
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (!message.isRead) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
-            else MaterialTheme.colorScheme.surface
+            containerColor = if (!message.isRead) {
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+            } else {
+                MaterialTheme.colorScheme.surface
+            }
         ),
         border = BorderStroke(
-            1.dp,
-            if (!message.isRead) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
-            else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+            if (!message.isRead) 1.5.dp else 1.dp,
+            if (!message.isRead) MaterialTheme.colorScheme.primary.copy(alpha = 0.65f)
+            else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (!message.isRead) 2.dp else 0.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() }
@@ -249,10 +256,10 @@ private fun MessageCard(
                         Spacer(modifier = Modifier.width(6.dp))
                     }
                     Text(
-                        text = message.sender,
+                        text = displaySender,
                         style = MaterialTheme.typography.bodySmall,
-                        fontWeight = if (!message.isRead) FontWeight.ExtraBold else FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = if (!message.isRead) FontWeight.ExtraBold else FontWeight.SemiBold,
+                        color = if (isSystem) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -298,6 +305,8 @@ private fun MessageDetailContent(
     onClose: () -> Unit,
     onReload: () -> Unit
 ) {
+    val displaySender = message.sender.ifBlank { "Rendszerüzenet" }
+    val isSystem = message.isOfficial || displaySender.equals("Rendszerüzenet", ignoreCase = true) || displaySender.contains("hivatal", ignoreCase = true)
     val annotatedBody = rememberHtmlAnnotatedString(
         htmlString = message.bodyHtml,
         linkColor = MaterialTheme.colorScheme.primary
@@ -315,12 +324,12 @@ private fun MessageDetailContent(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Surface(
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                color = if (isSystem) MaterialTheme.colorScheme.tertiary.copy(alpha = 0.12f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
                 shape = RoundedCornerShape(8.dp)
             ) {
                 Text(
-                    text = if (message.isOfficial) "Hivatalos Értesítés" else "Oktatói Üzenet",
-                    color = MaterialTheme.colorScheme.primary,
+                    text = if (displaySender.equals("Rendszerüzenet", ignoreCase = true)) "Rendszerüzenet" else if (message.isOfficial) "Hivatalos Értesítés" else "Oktatói Üzenet",
+                    color = if (isSystem) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
@@ -352,14 +361,14 @@ private fun MessageDetailContent(
             Column(modifier = Modifier.padding(12.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
-                        imageVector = Icons.Default.Person,
+                        imageVector = if (isSystem) Icons.Default.Info else Icons.Default.Person,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = if (isSystem) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(16.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "Feladó: ${message.sender}",
+                        text = "Feladó: $displaySender",
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold
                     )
