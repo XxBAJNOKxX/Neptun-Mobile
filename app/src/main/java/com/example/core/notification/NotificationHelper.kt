@@ -9,6 +9,7 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.example.MainActivity
+import com.example.R
 
 object NotificationHelper {
 
@@ -106,7 +107,7 @@ object NotificationHelper {
         )
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID_CLASSES)
-            .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+            .setSmallIcon(R.drawable.ic_notif_class)
             .setContentTitle("Hamarosan kezdődik: $subjectName")
             .setContentText("$courseType $startTime-kor | Terem: $room")
             .setStyle(
@@ -139,7 +140,7 @@ object NotificationHelper {
         )
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID_MESSAGES)
-            .setSmallIcon(android.R.drawable.ic_dialog_email)
+            .setSmallIcon(R.drawable.ic_notif_message)
             .setContentTitle("Új üzenet: $sender")
             .setContentText(subject)
             .setStyle(
@@ -182,7 +183,7 @@ object NotificationHelper {
         }
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID_GRADES)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setSmallIcon(R.drawable.ic_notif_grade)
             .setContentTitle("Új érdemjegy: $subjectName")
             .setContentText("Eredmény: $gradeDisplay ($credit kredit)")
             .setStyle(
@@ -217,7 +218,7 @@ object NotificationHelper {
         )
 
         val notification = NotificationCompat.Builder(context, channelId)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setSmallIcon(R.drawable.ic_notif_neptun)
             .setContentTitle(title)
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
@@ -249,7 +250,7 @@ object NotificationHelper {
         )
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID_FINANCES)
-            .setSmallIcon(android.R.drawable.ic_menu_agenda)
+            .setSmallIcon(R.drawable.ic_notif_finance)
             .setContentTitle("Pénzügyi tétel: $title")
             .setContentText("Összeg: $amount | Határidő: $dueDate")
             .setStyle(
