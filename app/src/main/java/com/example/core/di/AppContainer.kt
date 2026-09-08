@@ -4,7 +4,6 @@ import android.content.Context
 import com.example.core.notification.AlarmScheduler
 import com.example.core.security.EncryptedPreferencesManager
 import com.example.data.local.NeptunDatabase
-import com.example.data.network.NeptunNetworkClient
 import com.example.data.repository.AuthRepositoryImpl
 import com.example.data.repository.NeptunRepositoryImpl
 import com.example.domain.repository.AuthRepository
@@ -14,7 +13,6 @@ import com.example.domain.usecase.CalculateAveragesUseCase
 interface AppContainer {
     val prefsManager: EncryptedPreferencesManager
     val database: NeptunDatabase
-    val networkClient: NeptunNetworkClient
     val authRepository: AuthRepository
     val neptunRepository: NeptunRepository
     val calculateAveragesUseCase: CalculateAveragesUseCase
@@ -31,16 +29,12 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
         NeptunDatabase.getInstance(context)
     }
 
-    override val networkClient: NeptunNetworkClient by lazy {
-        NeptunNetworkClient()
-    }
-
     override val authRepository: AuthRepository by lazy {
-        AuthRepositoryImpl(context, prefsManager, networkClient)
+        AuthRepositoryImpl(context, prefsManager)
     }
 
     override val neptunRepository: NeptunRepository by lazy {
-        NeptunRepositoryImpl(database, networkClient, prefsManager)
+        NeptunRepositoryImpl(database, prefsManager)
     }
 
     override val calculateAveragesUseCase: CalculateAveragesUseCase by lazy {

@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.BuildConfig
 import com.example.core.notification.NotificationHelper
+import com.example.core.security.AppPersonalization
 import com.example.core.security.EncryptedPreferencesManager
 import com.example.core.security.NotificationPreferences
 import com.example.domain.model.StudentCredentials
@@ -38,9 +39,12 @@ data class SettingsUiState(
     val credentials: StudentCredentials? = null,
     val themeSettings: ThemeSettings = ThemeSettings(),
     val notificationPreferences: NotificationPreferences = NotificationPreferences(),
+    val personalization: AppPersonalization = AppPersonalization(),
     val isSyncing: Boolean = false,
     val syncSuccessMessage: String? = null,
-    val updateCheckState: UpdateCheckState = UpdateCheckState()
+    val updateCheckState: UpdateCheckState = UpdateCheckState(),
+    val isClearingCache: Boolean = false,
+    val cacheClearedMessage: String? = null
 )
 
 class SettingsViewModel(
@@ -53,7 +57,8 @@ class SettingsViewModel(
         SettingsUiState(
             credentials = prefsManager.loadCredentials(),
             themeSettings = prefsManager.loadThemeSettings(),
-            notificationPreferences = prefsManager.loadNotificationPreferences()
+            notificationPreferences = prefsManager.loadNotificationPreferences(),
+            personalization = prefsManager.loadPersonalization()
         )
     )
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
@@ -72,6 +77,11 @@ class SettingsViewModel(
         viewModelScope.launch {
             prefsManager.notificationPreferencesFlow.collect { notifPrefs ->
                 _uiState.update { it.copy(notificationPreferences = notifPrefs) }
+            }
+        }
+        viewModelScope.launch {
+            prefsManager.personalizationFlow.collect { personalization ->
+                _uiState.update { it.copy(personalization = personalization) }
             }
         }
     }
@@ -109,6 +119,60 @@ class SettingsViewModel(
 
     fun setReminderMinutesBefore(minutes: Int) {
         prefsManager.setReminderMinutesBefore(minutes)
+    }
+
+    fun setQuietHoursEnabled(enabled: Boolean) {
+        prefsManager.setQuietHours(enabled)
+    }
+
+    fun setQuietHoursWindow(startMinute: Int, endMinute: Int) {
+        prefsManager.setQuietHoursWindow(startMinute, endMinute)
+    }
+
+    fun setStartScreen(screen: String) {
+        prefsManager.setStartScreen(screen)
+    }
+
+    fun setShowWeekend(enabled: Boolean) {
+        prefsManager.setShowWeekend(enabled)
+    }
+
+    fun setWeekFilterMode(mode: String) {
+        prefsManager.setWeekFilterMode(mode)
+    }
+
+    fun setHourRange(first: Int, last: Int) {
+        prefsManager.setHourRange(first, last)
+    }
+
+    fun setTargetCredits(credits: Int) {
+        prefsManager.setTargetCredits(credits)
+    }
+
+    fun setBiometricLockEnabled(enabled: Boolean) {
+        prefsManager.setBiometricLockEnabled(enabled)
+    }
+
+    fun clearCachedData() {
+        if (_uiState.value.isClearingCache) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isClearingCache = true, cacheClearedMessage = null) }
+            try {
+                neptunRepository.clearLocalData()
+                _uiState.update {
+                    it.copy(
+                        isClearingCache = false,
+                        cacheClearedMessage = "A helyi gyorsítótár törölve. A következő szinkronizáláskor friss adatok töltődnek le."
+                    )
+                }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(isClearingCache = false, cacheClearedMessage = "A törlés nem sikerült.")
+                }
+            }
+            kotlinx.coroutines.delay(4000)
+            _uiState.update { it.copy(cacheClearedMessage = null) }
+        }
     }
 
     fun triggerManualSync(onDataReload: (() -> Unit)? = null) {

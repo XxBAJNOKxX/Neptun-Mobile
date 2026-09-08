@@ -40,6 +40,7 @@ import androidx.compose.material.icons.filled.BrightnessAuto
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Info
@@ -63,6 +64,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -96,8 +98,11 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.example.BuildConfig
 import com.example.core.notification.NotificationHelper
+import com.example.core.security.AppPersonalization
 import com.example.core.security.NotificationPreferences
 import com.example.domain.model.StudentCredentials
+import com.example.domain.model.WeekFilterMode
+import com.example.presentation.navigation.NavigationItem
 import com.example.presentation.ui.components.NeptunTopBar
 import com.example.presentation.viewmodel.UpdateCheckState
 import com.example.ui.theme.AppAccentColor
@@ -115,9 +120,12 @@ fun SettingsScreen(
     credentials: StudentCredentials?,
     themeSettings: ThemeSettings,
     notificationPreferences: NotificationPreferences,
+    personalization: AppPersonalization = AppPersonalization(),
     isSyncing: Boolean,
     syncSuccessMessage: String?,
     updateCheckState: UpdateCheckState = UpdateCheckState(),
+    isClearingCache: Boolean = false,
+    cacheClearedMessage: String? = null,
     onThemeModeChange: (ThemeMode) -> Unit,
     onDynamicColorToggle: (Boolean) -> Unit,
     onAccentColorSelect: (AppAccentColor) -> Unit,
@@ -125,6 +133,16 @@ fun SettingsScreen(
     onNotifyGradesChange: (Boolean) -> Unit,
     onNotifyMessagesChange: (Boolean) -> Unit,
     onNotifyFinancesChange: (Boolean) -> Unit,
+    onQuietHoursEnabledChange: (Boolean) -> Unit = {},
+    onQuietHoursWindowChange: (Int, Int) -> Unit = { _, _ -> },
+    onStartScreenChange: (String) -> Unit = {},
+    onShowWeekendChange: (Boolean) -> Unit = {},
+    onWeekFilterModeChange: (String) -> Unit = {},
+    onHourRangeChange: (Int, Int) -> Unit = { _, _ -> },
+    onTargetCreditsChange: (Int) -> Unit = {},
+    onBiometricLockChange: (Boolean) -> Unit = {},
+    onExportIcs: () -> Unit = {},
+    onClearCache: () -> Unit = {},
     onSimulateClassNotification: () -> Unit,
     onSimulateMessageNotification: () -> Unit,
     onSimulateGradeNotification: () -> Unit,
@@ -814,6 +832,258 @@ fun SettingsScreen(
                 }
             }
 
+            // ==========================================
+            // PERSONALIZATION & CUSTOMIZATION SECTION
+            // ==========================================
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("personalization_settings_card")
+            ) {
+                Column(
+                    modifier = Modifier.padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // Section Title
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(MaterialTheme.colorScheme.primaryContainer),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.AutoAwesome,
+                                contentDescription = "Személyreszabás",
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = "Személyreszabás",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Kezdőképernyő, órarend és tanulmányi beállítások",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+                    // 1. Kezdőképernyő
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = "Kezdőképernyő",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Az alkalmazás megnyitásakor megjelenő alapértelmezett fül.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        NavigationItem.entries.chunked(3).forEach { rowItems ->
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                rowItems.forEach { item ->
+                                    FilterChip(
+                                        selected = personalization.startScreen == item.name,
+                                        onClick = { onStartScreenChange(item.name) },
+                                        label = { Text(item.title, fontSize = 12.sp) }
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                    // 2. Órarend: hétvége + A/B hét
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = "Órarend",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Hétvége megjelenítése", style = MaterialTheme.typography.bodyMedium)
+                                Text(
+                                    text = "Szombat és vasárnap oszlopai",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Switch(
+                                checked = personalization.showWeekend,
+                                onCheckedChange = onShowWeekendChange
+                            )
+                        }
+
+                        Text(
+                            text = "Alapértelmezett A/B hét szűrő",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            WeekFilterMode.entries.forEach { mode ->
+                                FilterChip(
+                                    selected = personalization.weekFilterMode == mode.name,
+                                    onClick = { onWeekFilterModeChange(mode.name) },
+                                    label = { Text(mode.title, fontSize = 12.sp) }
+                                )
+                            }
+                        }
+
+                        Text(
+                            text = "Megjelenített órasáv: ${personalization.firstHour}:00 – ${personalization.lastHour}:00",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            OutlinedButton(
+                                onClick = { onHourRangeChange((personalization.firstHour - 1).coerceAtLeast(6), personalization.lastHour) },
+                                enabled = personalization.firstHour > 6,
+                                modifier = Modifier.weight(1f)
+                            ) { Text("− 1. óra") }
+                            OutlinedButton(
+                                onClick = { onHourRangeChange((personalization.firstHour + 1).coerceAtMost(12), personalization.lastHour) },
+                                enabled = personalization.firstHour < 12,
+                                modifier = Modifier.weight(1f)
+                            ) { Text("+ 1. óra") }
+                            OutlinedButton(
+                                onClick = { onHourRangeChange(personalization.firstHour, (personalization.lastHour - 1).coerceAtLeast(14)) },
+                                enabled = personalization.lastHour > 14,
+                                modifier = Modifier.weight(1f)
+                            ) { Text("− ut. óra") }
+                            OutlinedButton(
+                                onClick = { onHourRangeChange(personalization.firstHour, (personalization.lastHour + 1).coerceAtMost(24)) },
+                                enabled = personalization.lastHour < 24,
+                                modifier = Modifier.weight(1f)
+                            ) { Text("+ ut. óra") }
+                        }
+                    }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                    // 3. Tanulmányok: cél kreditek
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.School,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Cél kreditek (diploma)",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Text(
+                            text = "A kredithaladás sávja ezt a célt mutatja a Jegyek fülön.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            OutlinedButton(
+                                onClick = { onTargetCreditsChange(personalization.targetCredits - 10) },
+                                enabled = personalization.targetCredits > 30
+                            ) { Text("−10") }
+                            Text(
+                                text = "${personalization.targetCredits} kredit",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            OutlinedButton(
+                                onClick = { onTargetCreditsChange(personalization.targetCredits + 10) },
+                                enabled = personalization.targetCredits < 400
+                            ) { Text("+10") }
+                        }
+                    }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                    // 4. Halk órák (quiet hours)
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.NotificationsOff,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Halk órák", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                                }
+                                Text(
+                                    text = "Ebben az időszakban nem küldünk üzenet-, jegy- és pénzügyi értesítést (az óra-emlékeztetők maradnak).",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Switch(
+                                checked = notificationPreferences.quietHoursEnabled,
+                                onCheckedChange = onQuietHoursEnabledChange
+                            )
+                        }
+
+                        if (notificationPreferences.quietHoursEnabled) {
+                            Text(
+                                text = "Aktív időablak",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                listOf(
+                                    "22:00–07:00" to (22 * 60 to 7 * 60),
+                                    "23:00–08:00" to (23 * 60 to 8 * 60),
+                                    "20:00–08:00" to (20 * 60 to 8 * 60),
+                                    "21:00–06:00" to (21 * 60 to 6 * 60)
+                                ).forEach { (label, window) ->
+                                    FilterChip(
+                                        selected = notificationPreferences.quietStartMinute == window.first &&
+                                            notificationPreferences.quietEndMinute == window.second,
+                                        onClick = { onQuietHoursWindowChange(window.first, window.second) },
+                                        label = { Text(label, fontSize = 12.sp) }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             // Security & Offline Storage Card
             Card(
                 shape = RoundedCornerShape(20.dp),
@@ -863,6 +1133,34 @@ fun SettingsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         lineHeight = 18.sp
                     )
+
+                    // Biometrikus zár
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Biometrikus zár",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Az app felnyitásához ujjlenyomat vagy arcfelismerés szükséges",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = personalization.biometricLockEnabled,
+                            onCheckedChange = onBiometricLockChange,
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = NeptunGreen,
+                                checkedTrackColor = NeptunGreen.copy(alpha = 0.4f)
+                            )
+                        )
+                    }
 
                     Surface(
                         shape = RoundedCornerShape(10.dp),
@@ -1126,6 +1424,54 @@ fun SettingsScreen(
                             Spacer(modifier = Modifier.width(10.dp))
                             Text("Azonnali szinkronizálás", fontWeight = FontWeight.Bold)
                         }
+                    }
+
+                    OutlinedButton(
+                        onClick = onExportIcs,
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                    ) {
+                        Icon(imageVector = Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text("Órarend exportálása (.ics)", fontWeight = FontWeight.Bold)
+                    }
+
+                    OutlinedButton(
+                        onClick = onClearCache,
+                        enabled = !isClearingCache,
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                    ) {
+                        if (isClearingCache) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text("Törlés folyamatban...", fontWeight = FontWeight.Bold)
+                        } else {
+                            Icon(imageVector = Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text("Helyi gyorsítótár törlése", fontWeight = FontWeight.Bold)
+                        }
+                    }
+
+                    AnimatedVisibility(
+                        visible = cacheClearedMessage != null,
+                        enter = fadeIn(),
+                        exit = fadeOut()
+                    ) {
+                        Text(
+                            text = cacheClearedMessage ?: "",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(vertical = 4.dp)
+                        )
                     }
 
                     Button(

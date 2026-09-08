@@ -1,10 +1,11 @@
 package com.example.data.repository
 
 import android.content.Context
+import com.example.BuildConfig
+import com.example.core.security.DataMode
 import com.example.core.security.EncryptedPreferencesManager
 import com.example.data.network.NeptunApiClient
 import com.example.data.network.NeptunAuthResult
-import com.example.data.network.NeptunNetworkClient
 import com.example.domain.model.Neptun2FASession
 import com.example.domain.model.StudentCredentials
 import com.example.domain.model.University
@@ -22,7 +23,6 @@ import java.io.InputStreamReader
 class AuthRepositoryImpl(
     private val context: Context,
     private val prefsManager: EncryptedPreferencesManager,
-    private val networkClient: NeptunNetworkClient,
     private val neptunApiClient: NeptunApiClient = NeptunApiClient()
 ) : AuthRepository {
 
@@ -70,8 +70,10 @@ class AuthRepositoryImpl(
             return@withContext Result.failure(IllegalArgumentException("A jelszó mező nem lehet üres!"))
         }
 
-        // Demo test mode bypass
-        if (trimmedCode == "DEMO01" || trimmedPassword.equals("demo", ignoreCase = true) || trimmedPassword.equals("jelszo", ignoreCase = true)) {
+        // Demo test mode bypass – kizárólag debug buildben engedélyezett!
+        if (BuildConfig.DEBUG &&
+            (trimmedCode == "DEMO01" || trimmedPassword.equals("demo", ignoreCase = true) || trimmedPassword.equals("jelszo", ignoreCase = true))
+        ) {
             prefsManager.saveCredentials(
                 neptunCode = trimmedCode,
                 password = trimmedPassword,
@@ -83,6 +85,8 @@ class AuthRepositoryImpl(
             )
             prefsManager.setBaseUrl(university.neptunUrl)
             prefsManager.setIsModernApi(true)
+            prefsManager.setDataMode(DataMode.DEMO)
+            prefsManager.clearSessionExpired()
 
             val creds = prefsManager.loadCredentials() ?: StudentCredentials(
                 neptunCode = trimmedCode,
@@ -133,6 +137,8 @@ class AuthRepositoryImpl(
                 authResult.studentTrainingId?.let { prefsManager.setStudentTrainingId(it) }
                 prefsManager.setIsModernApi(authResult.isModernApi)
                 prefsManager.setBaseUrl(authResult.normalizedBaseUrl)
+                prefsManager.setDataMode(DataMode.REAL)
+                prefsManager.clearSessionExpired()
 
                 val creds = prefsManager.loadCredentials() ?: StudentCredentials(
                     neptunCode = trimmedCode,
@@ -191,6 +197,8 @@ class AuthRepositoryImpl(
                 authResult.studentTrainingId?.let { prefsManager.setStudentTrainingId(it) }
                 prefsManager.setIsModernApi(authResult.isModernApi)
                 prefsManager.setBaseUrl(authResult.normalizedBaseUrl)
+                prefsManager.setDataMode(DataMode.REAL)
+                prefsManager.clearSessionExpired()
 
                 val creds = prefsManager.loadCredentials() ?: StudentCredentials(
                     neptunCode = session.neptunCode,
