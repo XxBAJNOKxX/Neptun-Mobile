@@ -73,13 +73,14 @@ class GradesViewModel(
                 val cleanedGrades = grades.map { grade ->
                     val cleanTermId = cleanTermString(grade.termId)
                     val cleanTermName = cleanTermString(grade.termName)
-                    val displayTerm = if (cleanTermName.isNotEmpty() && !isUuid(cleanTermName)) {
-                        cleanTermName
-                    } else if (cleanTermId.isNotEmpty() && !isUuid(cleanTermId)) {
+                    val rawDisplayTerm = if (cleanTermId.isNotEmpty() && !isUuid(cleanTermId)) {
                         cleanTermId
+                    } else if (cleanTermName.isNotEmpty() && !isUuid(cleanTermName)) {
+                        cleanTermName
                     } else {
-                        "2026/27/1"
+                        "2025/26/1"
                     }
+                    val displayTerm = rawDisplayTerm.replace(Regex("""(?i)\s*félév.*"""), "").trim()
                     grade.copy(termId = displayTerm, termName = displayTerm)
                 }
                 val terms = cleanedGrades.map { it.termId }.distinct().sortedDescending()
