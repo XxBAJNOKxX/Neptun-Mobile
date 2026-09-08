@@ -27,6 +27,18 @@ enum class DataMode {
     }
 }
 
+/** Frissítési csatorna: Stabil (hivatalos kiadások) vagy Dev (minden build/pre-release). */
+enum class UpdateChannel(val displayName: String, val description: String) {
+    STABLE("Stabil kiadások", "Kizárólag hivatalosan tesztelt, megbízható verziók"),
+    DEV("Fejlesztői (Dev)", "A legújabb fejlesztői buildek és előzetes funkciók");
+
+    companion object {
+        fun fromName(name: String?): UpdateChannel {
+            return entries.firstOrNull { it.name.equals(name, ignoreCase = true) } ?: STABLE
+        }
+    }
+}
+
 /** Felhasználói személyreszabási beállítások (téma mellett). */
 data class AppPersonalization(
     val startScreen: String = "HOME",
@@ -70,6 +82,9 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
 
     private val _dataModeFlow = MutableStateFlow(loadDataMode())
     val dataModeFlow: StateFlow<DataMode> = _dataModeFlow.asStateFlow()
+
+    private val _updateChannelFlow = MutableStateFlow(loadUpdateChannel())
+    val updateChannelFlow: StateFlow<UpdateChannel> = _updateChannelFlow.asStateFlow()
 
     private val _sessionExpiredFlow = MutableStateFlow(prefs.getBoolean(KEY_SESSION_EXPIRED, false))
     val sessionExpiredFlow: StateFlow<Boolean> = _sessionExpiredFlow.asStateFlow()
@@ -184,6 +199,17 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
     fun setDataMode(mode: DataMode) {
         prefs.edit().putString(KEY_DATA_MODE, mode.name).apply()
         _dataModeFlow.value = mode
+    }
+
+    // ------------------------------------------------------------------ //
+    // Frissítési csatorna (STABLE / DEV)
+    // ------------------------------------------------------------------ //
+
+    fun loadUpdateChannel(): UpdateChannel = UpdateChannel.fromName(prefs.getString(KEY_UPDATE_CHANNEL, UpdateChannel.STABLE.name))
+
+    fun setUpdateChannel(channel: UpdateChannel) {
+        prefs.edit().putString(KEY_UPDATE_CHANNEL, channel.name).apply()
+        _updateChannelFlow.value = channel
     }
 
     // ------------------------------------------------------------------ //
@@ -438,6 +464,7 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
         val savedThemeMode = prefs.getString(KEY_THEME_MODE, ThemeMode.SYSTEM.name)
         val savedDynamicColor = prefs.getBoolean(KEY_DYNAMIC_COLOR, true)
         val savedAccent = prefs.getString(KEY_ACCENT_COLOR, AppAccentColor.BLUE.id)
+        val savedUpdateChannel = prefs.getString(KEY_UPDATE_CHANNEL, UpdateChannel.STABLE.name)
         val notifyClasses = prefs.getBoolean(KEY_NOTIFY_CLASSES, true)
         val notifyGrades = prefs.getBoolean(KEY_NOTIFY_GRADES, true)
         val notifyMessages = prefs.getBoolean(KEY_NOTIFY_MESSAGES, true)
@@ -456,6 +483,7 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
             .putString(KEY_THEME_MODE, savedThemeMode)
             .putBoolean(KEY_DYNAMIC_COLOR, savedDynamicColor)
             .putString(KEY_ACCENT_COLOR, savedAccent)
+            .putString(KEY_UPDATE_CHANNEL, savedUpdateChannel)
             .putBoolean(KEY_NOTIFY_CLASSES, notifyClasses)
             .putBoolean(KEY_NOTIFY_GRADES, notifyGrades)
             .putBoolean(KEY_NOTIFY_MESSAGES, notifyMessages)
@@ -499,6 +527,7 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
         private const val KEY_THEME_MODE = "key_theme_mode"
         private const val KEY_DYNAMIC_COLOR = "key_dynamic_color"
         private const val KEY_ACCENT_COLOR = "key_accent_color"
+        private const val KEY_UPDATE_CHANNEL = "key_update_channel"
         private const val KEY_NOTIFY_CLASSES = "key_notify_classes"
         private const val KEY_NOTIFY_GRADES = "key_notify_grades"
         private const val KEY_NOTIFY_MESSAGES = "key_notify_messages"

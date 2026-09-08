@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.core.security.EncryptedPreferencesManager
+import com.example.core.security.UpdateChannel
 import com.example.core.update.AppUpdateManager
 import com.example.core.update.InAppUpdateState
 import com.example.core.update.UpdateInfo
@@ -14,7 +16,8 @@ import kotlinx.coroutines.launch
 import java.io.File
 
 class AppUpdateViewModel(
-    private val updateManager: AppUpdateManager = AppUpdateManager()
+    private val updateManager: AppUpdateManager = AppUpdateManager(),
+    private val prefsManager: EncryptedPreferencesManager? = null
 ) : ViewModel() {
 
     private val _updateState = MutableStateFlow<InAppUpdateState>(InAppUpdateState.Idle)
@@ -22,10 +25,11 @@ class AppUpdateViewModel(
 
     private var downloadedApkFile: File? = null
 
-    fun checkForUpdatesOnLaunch() {
+    fun checkForUpdatesOnLaunch(channel: UpdateChannel? = null) {
         viewModelScope.launch {
             _updateState.value = InAppUpdateState.Checking
-            val info = updateManager.checkForUpdates()
+            val targetChannel = channel ?: prefsManager?.loadUpdateChannel() ?: UpdateChannel.STABLE
+            val info = updateManager.checkForUpdates(targetChannel)
             if (info != null && info.isUpdateAvailable) {
                 _updateState.value = InAppUpdateState.UpdateAvailable(info)
             } else {
@@ -86,11 +90,16 @@ class AppUpdateViewModel(
     }
 
     companion object {
-        val Factory: ViewModelProvider.Factory = object : ViewModelProvider.Factory {
+        fun provideFactory(
+            updateManager: AppUpdateManager = AppUpdateManager(),
+            prefsManager: EncryptedPreferencesManager? = null
+        ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                return AppUpdateViewModel() as T
+                return AppUpdateViewModel(updateManager, prefsManager) as T
             }
         }
+
+        val Factory: ViewModelProvider.Factory = provideFactory()
     }
 }
