@@ -49,6 +49,15 @@ jobs:
           set -o pipefail
           ./gradlew lintDebug --stacktrace 2>&1 | tee -a /tmp/gradle.log
 
+      - name: Lint jelentés feltöltése
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-results
+          path: |
+            app/build/reports/lint-results*.*
+          if-no-files-found: ignore
+
       - name: Debug APK buildelése
         run: |
           set -o pipefail
@@ -82,8 +91,8 @@ jobs:
             echo ""
             echo "### A hibák részletei (a Gradle logból szűrve)"
             echo '```'
-            { grep -nA6 "^e: " /tmp/gradle.log || true; } | tail -n 200
-            { grep -nE "error:|FAILED|FAILURE|Execution failed|Caused by|\* What went wrong" /tmp/gradle.log || true; } | tail -n 60
+            { grep -inA6 "^e: " /tmp/gradle.log || true; } | tail -n 200
+            { grep -inE "error:|: error|failed|failure|execution failed|caused by|runtimeexception|what went wrong" /tmp/gradle.log || true; } | grep -iv "0 errors" | tail -n 100
             echo '```'
             echo ""
             echo "_Automatikus jelentés a CI workflowból. Ha megjavult a build, ez az issue bezárható._"
