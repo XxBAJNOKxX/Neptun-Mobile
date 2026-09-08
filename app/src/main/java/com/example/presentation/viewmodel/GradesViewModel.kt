@@ -71,12 +71,20 @@ class GradesViewModel(
         viewModelScope.launch {
             neptunRepository.getSubjectGrades().collect { grades ->
                 val cleanedGrades = grades.map { grade ->
-                    val cleanTerm = cleanTermString(grade.termId)
-                    grade.copy(termId = cleanTerm, termName = cleanTermString(grade.termName).ifEmpty { "$cleanTerm félév" })
+                    val cleanTermId = cleanTermString(grade.termId)
+                    val cleanTermName = cleanTermString(grade.termName)
+                    val displayTerm = if (cleanTermName.isNotEmpty() && !isUuid(cleanTermName)) {
+                        cleanTermName
+                    } else if (cleanTermId.isNotEmpty() && !isUuid(cleanTermId)) {
+                        cleanTermId
+                    } else {
+                        "2026/27/1"
+                    }
+                    grade.copy(termId = displayTerm, termName = displayTerm)
                 }
                 val terms = cleanedGrades.map { it.termId }.distinct().sortedDescending()
                 val currentTerm = _uiState.value.selectedTerm.ifEmpty {
-                    terms.firstOrNull() ?: "2025/26/1"
+                    terms.firstOrNull() ?: "2026/27/1"
                 }
                 recalculateState(cleanedGrades, terms, currentTerm)
             }
@@ -91,11 +99,15 @@ class GradesViewModel(
         }
     }
 
+    private fun isUuid(str: String): Boolean {
+        return str.length >= 32 && str.contains("-") && str.count { it == '-' } >= 3
+    }
+
     private fun cleanTermString(raw: String): String {
-        if (raw.isBlank()) return "2025/26/1"
+        if (raw.isBlank()) return ""
         val trimmed = raw.trim()
         if (trimmed.startsWith("{") || trimmed.contains("{")) {
-            val regex = Regex(""""(?:id|termId|value|name|termName|text)"\s*:\s*"([^"]+)"""")
+            val regex = Regex(""""(?:text|termName|name|id|termId|value)"\s*:\s*"([^"]+)"""")
             val match = regex.find(trimmed)
             if (match != null) {
                 return match.groupValues[1].trim()
