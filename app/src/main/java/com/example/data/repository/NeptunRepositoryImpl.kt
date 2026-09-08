@@ -12,6 +12,7 @@ import com.example.data.local.entity.SubjectGradeEntity
 import com.example.data.network.MockNeptunDataSource
 import com.example.data.network.NeptunApiClient
 import com.example.data.network.NeptunAuthResult
+import com.example.data.network.NeptunUnauthorizedException
 import com.example.domain.model.CalendarEvent
 import com.example.domain.model.ExamItem
 import com.example.domain.model.FinanceItem
@@ -103,11 +104,10 @@ class NeptunRepositoryImpl(
             val refreshed = neptunApiClient.refreshAccessToken(baseUrl, refreshToken)
             if (!refreshed.isNullOrBlank()) {
                 prefsManager.setAccessToken(refreshed)
+                prefsManager.clearSessionExpired()
                 return refreshed
             }
         }
-
-        if (currentToken.isNotBlank()) return currentToken
 
         if (creds.neptunCode.isNotEmpty() && password.isNotEmpty() && password != "******" && baseUrl.isNotEmpty()) {
             try {
@@ -116,18 +116,17 @@ class NeptunRepositoryImpl(
                     prefsManager.setAccessToken(authRes.accessToken)
                     prefsManager.setBaseUrl(authRes.normalizedBaseUrl)
                     prefsManager.setIsModernApi(authRes.isModernApi)
+                    authRes.refreshToken?.let { prefsManager.setRefreshToken(it) }
                     prefsManager.clearSessionExpired()
                     return authRes.accessToken
                 } else if (authRes is NeptunAuthResult.Failure && prefsManager.isModernApi()) {
-                    // A modern API-nál a refresh és az újra-bejelentkezés is sikertelen:
-                    // nagy eséllyel lejárt / érvénytelen a munkamenet.
                     prefsManager.markSessionExpired()
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
             }
         }
-        return currentToken
+        return if (!forceRefresh) currentToken else ""
     }
 
     override suspend fun refreshCalendar(): Result<Unit> = withContext(Dispatchers.IO) {
@@ -136,13 +135,14 @@ class NeptunRepositoryImpl(
         var fetchSucceeded = false
 
         if (creds != null && creds.neptunUrl.isNotEmpty()) {
-            try {
-                val baseUrl = prefsManager.getBaseUrl().ifEmpty { creds.neptunUrl }
-                val token = ensureValidToken()
-                val trainingId = prefsManager.getStudentTrainingId()
-                val isModern = prefsManager.isModernApi()
-                val password = prefsManager.getPassword()
+            val baseUrl = prefsManager.getBaseUrl().ifEmpty { creds.neptunUrl }
+            val trainingId = prefsManager.getStudentTrainingId()
+            val password = prefsManager.getPassword()
 
+            var token = ensureValidToken(forceRefresh = false)
+            var isModern = prefsManager.isModernApi()
+
+            try {
                 eventsToInsert = neptunApiClient.getCalendarEvents(
                     baseUrl = baseUrl,
                     token = token,
@@ -152,6 +152,25 @@ class NeptunRepositoryImpl(
                     isModern = isModern
                 )
                 fetchSucceeded = true
+            } catch (e: NeptunUnauthorizedException) {
+                token = ensureValidToken(forceRefresh = true)
+                if (token.isNotBlank()) {
+                    val updatedBaseUrl = prefsManager.getBaseUrl().ifEmpty { creds.neptunUrl }
+                    val updatedIsModern = prefsManager.isModernApi()
+                    try {
+                        eventsToInsert = neptunApiClient.getCalendarEvents(
+                            baseUrl = updatedBaseUrl,
+                            token = token,
+                            trainingId = trainingId.ifEmpty { null },
+                            username = creds.neptunCode,
+                            password = password,
+                            isModern = updatedIsModern
+                        )
+                        fetchSucceeded = true
+                    } catch (retryEx: Exception) {
+                        retryEx.printStackTrace()
+                    }
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -159,14 +178,12 @@ class NeptunRepositoryImpl(
 
         val isDemo = creds?.neptunCode == "DEMO01"
         if (fetchSucceeded) {
-            // Sikeres lekérés: az adatbázis a szerver állapotát tükrözze (akár üres lista is).
             prefsManager.setDataMode(if (isDemo) DataMode.DEMO else DataMode.REAL)
             database.calendarDao().clearAll()
             if (eventsToInsert.isNotEmpty()) {
                 database.calendarDao().insertEvents(eventsToInsert.map { CalendarEventEntity.fromDomain(it) })
             }
         } else if (isDemo || (BuildConfig.DEBUG && database.calendarDao().getAllEvents().first().isEmpty())) {
-            // Csak debug buildben: demo / fejlesztői mock adat, hogy tesztelhető legyen az UI.
             eventsToInsert = MockNeptunDataSource.getMockCalendarEvents()
             prefsManager.setDataMode(if (isDemo) DataMode.DEMO else DataMode.MOCK)
             database.calendarDao().clearAll()
@@ -182,12 +199,13 @@ class NeptunRepositoryImpl(
         var fetchSucceeded = false
 
         if (creds != null && creds.neptunUrl.isNotEmpty()) {
-            try {
-                val baseUrl = prefsManager.getBaseUrl().ifEmpty { creds.neptunUrl }
-                val token = ensureValidToken()
-                val isModern = prefsManager.isModernApi()
-                val password = prefsManager.getPassword()
+            val baseUrl = prefsManager.getBaseUrl().ifEmpty { creds.neptunUrl }
+            val password = prefsManager.getPassword()
 
+            var token = ensureValidToken(forceRefresh = false)
+            var isModern = prefsManager.isModernApi()
+
+            try {
                 gradesToInsert = neptunApiClient.getGrades(
                     baseUrl = baseUrl,
                     token = token,
@@ -196,6 +214,24 @@ class NeptunRepositoryImpl(
                     isModern = isModern
                 )
                 fetchSucceeded = true
+            } catch (e: NeptunUnauthorizedException) {
+                token = ensureValidToken(forceRefresh = true)
+                if (token.isNotBlank()) {
+                    val updatedBaseUrl = prefsManager.getBaseUrl().ifEmpty { creds.neptunUrl }
+                    val updatedIsModern = prefsManager.isModernApi()
+                    try {
+                        gradesToInsert = neptunApiClient.getGrades(
+                            baseUrl = updatedBaseUrl,
+                            token = token,
+                            username = creds.neptunCode,
+                            password = password,
+                            isModern = updatedIsModern
+                        )
+                        fetchSucceeded = true
+                    } catch (retryEx: Exception) {
+                        retryEx.printStackTrace()
+                    }
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -203,8 +239,6 @@ class NeptunRepositoryImpl(
 
         val isDemo = creds?.neptunCode == "DEMO01"
         if (fetchSucceeded) {
-            // A korábbi jegyek (pl. szellemjegyek) megőrzése érdekében a jegyeket
-            // nem töröljük üres válasznál, csak ha van mit beszúrni.
             if (gradesToInsert.isNotEmpty()) {
                 prefsManager.setDataMode(if (isDemo) DataMode.DEMO else DataMode.REAL)
                 database.gradesDao().clearAll()
@@ -226,12 +260,13 @@ class NeptunRepositoryImpl(
         var fetchSucceeded = false
 
         if (creds != null && creds.neptunUrl.isNotEmpty()) {
-            try {
-                val baseUrl = prefsManager.getBaseUrl().ifEmpty { creds.neptunUrl }
-                val token = ensureValidToken()
-                val isModern = prefsManager.isModernApi()
-                val password = prefsManager.getPassword()
+            val baseUrl = prefsManager.getBaseUrl().ifEmpty { creds.neptunUrl }
+            val password = prefsManager.getPassword()
 
+            var token = ensureValidToken(forceRefresh = false)
+            var isModern = prefsManager.isModernApi()
+
+            try {
                 messagesToInsert = neptunApiClient.getMessages(
                     baseUrl = baseUrl,
                     token = token,
@@ -240,6 +275,24 @@ class NeptunRepositoryImpl(
                     isModern = isModern
                 )
                 fetchSucceeded = true
+            } catch (e: NeptunUnauthorizedException) {
+                token = ensureValidToken(forceRefresh = true)
+                if (token.isNotBlank()) {
+                    val updatedBaseUrl = prefsManager.getBaseUrl().ifEmpty { creds.neptunUrl }
+                    val updatedIsModern = prefsManager.isModernApi()
+                    try {
+                        messagesToInsert = neptunApiClient.getMessages(
+                            baseUrl = updatedBaseUrl,
+                            token = token,
+                            username = creds.neptunCode,
+                            password = password,
+                            isModern = updatedIsModern
+                        )
+                        fetchSucceeded = true
+                    } catch (retryEx: Exception) {
+                        retryEx.printStackTrace()
+                    }
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -292,12 +345,13 @@ class NeptunRepositoryImpl(
         var fetchSucceeded = false
 
         if (creds != null && creds.neptunUrl.isNotEmpty()) {
-            try {
-                val baseUrl = prefsManager.getBaseUrl().ifEmpty { creds.neptunUrl }
-                val token = ensureValidToken()
-                val isModern = prefsManager.isModernApi()
-                val password = prefsManager.getPassword()
+            val baseUrl = prefsManager.getBaseUrl().ifEmpty { creds.neptunUrl }
+            val password = prefsManager.getPassword()
 
+            var token = ensureValidToken(forceRefresh = false)
+            var isModern = prefsManager.isModernApi()
+
+            try {
                 financesToInsert = neptunApiClient.getFinances(
                     baseUrl = baseUrl,
                     token = token,
@@ -306,6 +360,24 @@ class NeptunRepositoryImpl(
                     isModern = isModern
                 )
                 fetchSucceeded = true
+            } catch (e: NeptunUnauthorizedException) {
+                token = ensureValidToken(forceRefresh = true)
+                if (token.isNotBlank()) {
+                    val updatedBaseUrl = prefsManager.getBaseUrl().ifEmpty { creds.neptunUrl }
+                    val updatedIsModern = prefsManager.isModernApi()
+                    try {
+                        financesToInsert = neptunApiClient.getFinances(
+                            baseUrl = updatedBaseUrl,
+                            token = token,
+                            username = creds.neptunCode,
+                            password = password,
+                            isModern = updatedIsModern
+                        )
+                        fetchSucceeded = true
+                    } catch (retryEx: Exception) {
+                        retryEx.printStackTrace()
+                    }
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -336,12 +408,13 @@ class NeptunRepositoryImpl(
         var fetchSucceeded = false
 
         if (creds != null && creds.neptunUrl.isNotEmpty()) {
-            try {
-                val baseUrl = prefsManager.getBaseUrl().ifEmpty { creds.neptunUrl }
-                val token = ensureValidToken()
-                val isModern = prefsManager.isModernApi()
-                val password = prefsManager.getPassword()
+            val baseUrl = prefsManager.getBaseUrl().ifEmpty { creds.neptunUrl }
+            val password = prefsManager.getPassword()
 
+            var token = ensureValidToken(forceRefresh = false)
+            var isModern = prefsManager.isModernApi()
+
+            try {
                 examsToInsert = neptunApiClient.getExams(
                     baseUrl = baseUrl,
                     token = token,
@@ -350,6 +423,24 @@ class NeptunRepositoryImpl(
                     isModern = isModern
                 )
                 fetchSucceeded = true
+            } catch (e: NeptunUnauthorizedException) {
+                token = ensureValidToken(forceRefresh = true)
+                if (token.isNotBlank()) {
+                    val updatedBaseUrl = prefsManager.getBaseUrl().ifEmpty { creds.neptunUrl }
+                    val updatedIsModern = prefsManager.isModernApi()
+                    try {
+                        examsToInsert = neptunApiClient.getExams(
+                            baseUrl = updatedBaseUrl,
+                            token = token,
+                            username = creds.neptunCode,
+                            password = password,
+                            isModern = updatedIsModern
+                        )
+                        fetchSucceeded = true
+                    } catch (retryEx: Exception) {
+                        retryEx.printStackTrace()
+                    }
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
             }

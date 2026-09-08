@@ -73,6 +73,8 @@ data class NeptunUserInfo(
     val avatarPrintName: String?
 )
 
+class NeptunUnauthorizedException(message: String = "Munkamenet lejárt (401)") : Exception(message)
+
 class NeptunApiClient {
 
     private val tag = "NeptunApiClient"
@@ -1047,6 +1049,8 @@ class NeptunApiClient {
             }
 
             return@withContext events
+        } catch (e: NeptunUnauthorizedException) {
+            throw e
         } catch (e: Exception) {
             Log.e(tag, "Failed to get modern calendar events: ${e.message}")
             if (username.isNotEmpty() && password.isNotEmpty()) {
@@ -1139,8 +1143,14 @@ class NeptunApiClient {
                 .build()
 
             val resp = okHttpClient.newCall(req).execute()
+            if (resp.code == 401 || resp.code == 403) {
+                throw NeptunUnauthorizedException("401 Calendar")
+            }
             if (!resp.isSuccessful) return@withContext emptyList()
             val respBody = resp.body?.string() ?: ""
+            if (respBody.trim().startsWith("<") || respBody.contains("<html", ignoreCase = true)) {
+                throw NeptunUnauthorizedException("HTML response for Calendar request")
+            }
             val parsed = safeParseJsonObject(respBody) ?: return@withContext emptyList()
             val dataPart = parsed["data"] ?: parsed["calendarData"] ?: parsed["events"]
 
@@ -1317,6 +1327,9 @@ class NeptunApiClient {
                     .build()
 
                 val termsResp = okHttpClient.newCall(termsReq).execute()
+                if (termsResp.code == 401 || termsResp.code == 403) {
+                    throw NeptunUnauthorizedException("401 Terms")
+                }
                 if (termsResp.isSuccessful) {
                     val termsBody = termsResp.body?.string() ?: ""
                     val termsData = safeParseJsonObject(termsBody)?.get("data")?.jsonArray
@@ -1377,6 +1390,9 @@ class NeptunApiClient {
                             .build()
 
                         val subResp = okHttpClient.newCall(subReq).execute()
+                        if (subResp.code == 401 || subResp.code == 403) {
+                            throw NeptunUnauthorizedException("401 Grades")
+                        }
                         if (!subResp.isSuccessful) continue
                         val subBody = subResp.body?.string() ?: ""
                         val parsed = safeParseJson(subBody) ?: continue
@@ -1516,6 +1532,8 @@ class NeptunApiClient {
             } else {
                 allGrades
             }
+        } catch (e: NeptunUnauthorizedException) {
+            throw e
         } catch (e: Exception) {
             Log.e(tag, "Modern grades fetch error: ${e.message}")
             if (username.isNotEmpty() && password.isNotEmpty()) {
@@ -1626,8 +1644,14 @@ class NeptunApiClient {
                 .build()
 
             val resp = okHttpClient.newCall(req).execute()
+            if (resp.code == 401 || resp.code == 403) {
+                throw NeptunUnauthorizedException("401 Messages")
+            }
             if (!resp.isSuccessful) return@withContext emptyList()
             val respBody = resp.body?.string() ?: ""
+            if (respBody.trim().startsWith("<") || respBody.contains("<html", ignoreCase = true)) {
+                throw NeptunUnauthorizedException("HTML response for Messages request")
+            }
             val parsed = safeParseJsonObject(respBody) ?: return@withContext emptyList()
             val recMessages = parsed["data"]?.jsonObject?.get("receivedMessages")?.jsonArray ?: return@withContext emptyList()
 
@@ -1666,6 +1690,8 @@ class NeptunApiClient {
                 )
             }
             return@withContext list
+        } catch (e: NeptunUnauthorizedException) {
+            throw e
         } catch (e: Exception) {
             Log.e(tag, "Modern messages error: ${e.message}")
             emptyList()
@@ -2066,11 +2092,16 @@ class NeptunApiClient {
                     .addHeader("Content-Type", "application/json")
                     .build()
                 val resp = okHttpClient.newCall(req).execute()
+                if (resp.code == 401 || resp.code == 403) {
+                    throw NeptunUnauthorizedException("401 Exams")
+                }
                 if (!resp.isSuccessful) continue
                 val body = resp.body?.string() ?: ""
                 val parsed = safeParseJson(body) ?: continue
                 val items = parseExamItems(parsed)
                 if (items.isNotEmpty()) return@withContext items
+            } catch (e: NeptunUnauthorizedException) {
+                throw e
             } catch (e: Exception) {
                 Log.e(tag, "Modern exams fetch error ($path): ${e.message}")
             }
@@ -2257,6 +2288,9 @@ class NeptunApiClient {
                 .addHeader("Content-Type", "application/json")
                 .build()
             val toPayResp = okHttpClient.newCall(toPayReq).execute()
+            if (toPayResp.code == 401 || toPayResp.code == 403) {
+                throw NeptunUnauthorizedException("401 Finances")
+            }
             if (toPayResp.isSuccessful) {
                 val toPayBody = toPayResp.body?.string() ?: ""
                 val toPayData = safeParseJsonObject(toPayBody)?.get("data")?.jsonArray
@@ -2313,6 +2347,9 @@ class NeptunApiClient {
                 .addHeader("Content-Type", "application/json")
                 .build()
             val impResp = okHttpClient.newCall(impReq).execute()
+            if (impResp.code == 401 || impResp.code == 403) {
+                throw NeptunUnauthorizedException("401 Finances")
+            }
             if (impResp.isSuccessful) {
                 val impBody = impResp.body?.string() ?: ""
                 val impData = safeParseJsonObject(impBody)?.get("data")?.jsonArray
@@ -2381,6 +2418,9 @@ class NeptunApiClient {
                 .build()
 
             val resp = okHttpClient.newCall(req).execute()
+            if (resp.code == 401 || resp.code == 403) {
+                throw NeptunUnauthorizedException("401 Finances")
+            }
             if (resp.isSuccessful) {
                 val respBody = resp.body?.string() ?: ""
                 val parsed = safeParseJsonObject(respBody)
