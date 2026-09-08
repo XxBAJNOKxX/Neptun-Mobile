@@ -9,6 +9,8 @@ import com.example.core.notification.NotificationHelper
 import com.example.core.security.AppPersonalization
 import com.example.core.security.EncryptedPreferencesManager
 import com.example.core.security.NotificationPreferences
+import com.example.core.security.UpdateChannel
+import com.example.core.update.AppUpdateManager
 import com.example.domain.model.StudentCredentials
 import com.example.domain.repository.AuthRepository
 import com.example.domain.repository.NeptunRepository
@@ -40,6 +42,7 @@ data class SettingsUiState(
     val themeSettings: ThemeSettings = ThemeSettings(),
     val notificationPreferences: NotificationPreferences = NotificationPreferences(),
     val personalization: AppPersonalization = AppPersonalization(),
+    val updateChannel: UpdateChannel = UpdateChannel.STABLE,
     val isSyncing: Boolean = false,
     val syncSuccessMessage: String? = null,
     val updateCheckState: UpdateCheckState = UpdateCheckState(),
@@ -58,7 +61,8 @@ class SettingsViewModel(
             credentials = prefsManager.loadCredentials(),
             themeSettings = prefsManager.loadThemeSettings(),
             notificationPreferences = prefsManager.loadNotificationPreferences(),
-            personalization = prefsManager.loadPersonalization()
+            personalization = prefsManager.loadPersonalization(),
+            updateChannel = prefsManager.loadUpdateChannel()
         )
     )
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
@@ -82,6 +86,11 @@ class SettingsViewModel(
         viewModelScope.launch {
             prefsManager.personalizationFlow.collect { personalization ->
                 _uiState.update { it.copy(personalization = personalization) }
+            }
+        }
+        viewModelScope.launch {
+            prefsManager.updateChannelFlow.collect { channel ->
+                _uiState.update { it.copy(updateChannel = channel) }
             }
         }
     }
@@ -158,6 +167,10 @@ class SettingsViewModel(
 
     fun setBiometricLockEnabled(enabled: Boolean) {
         prefsManager.setBiometricLockEnabled(enabled)
+    }
+
+    fun setUpdateChannel(channel: UpdateChannel) {
+        prefsManager.setUpdateChannel(channel)
     }
 
     fun clearCachedData() {
@@ -269,81 +282,50 @@ class SettingsViewModel(
 
     fun checkForUpdates() {
         if (_uiState.value.updateCheckState.isChecking) return
+        val currentChannel = _uiState.value.updateChannel
         viewModelScope.launch(Dispatchers.IO) {
             _uiState.update {
                 it.copy(updateCheckState = UpdateCheckState(isChecking = true))
             }
             val repo = BuildConfig.GITHUB_REPO
             try {
-                val client = OkHttpClient.Builder()
-                    .connectTimeout(6, TimeUnit.SECONDS)
-                    .readTimeout(6, TimeUnit.SECONDS)
-                    .build()
-
-                val request = Request.Builder()
-                    .url("https://api.github.com/repos/$repo/releases/latest")
-                    .header("Accept", "application/vnd.github.v3+json")
-                    .header("User-Agent", "NeptunMobileApp")
-                    .build()
-
-                client.newCall(request).execute().use { response ->
-                    if (response.isSuccessful) {
-                        val bodyString = response.body?.string() ?: ""
-                        val json = JSONObject(bodyString)
-                        val tagName = json.optString("tag_name", "")
-                        val htmlUrl = json.optString("html_url", "https://github.com/$repo/releases")
-                        var apkUrl: String? = null
-                        val assets = json.optJSONArray("assets")
-                        if (assets != null) {
-                            for (i in 0 until assets.length()) {
-                                val asset = assets.getJSONObject(i)
-                                val name = asset.optString("name", "")
-                                if (name.endsWith(".apk")) {
-                                    apkUrl = asset.optString("browser_download_url")
-                                    break
-                                }
-                            }
-                        }
-                        val finalDownloadUrl = apkUrl ?: htmlUrl
-                        val currentVersion = BuildConfig.VERSION_NAME
-                        val isNewer = isNewerVersion(tagName, currentVersion)
-
-                        if (isNewer) {
-                            _uiState.update {
-                                it.copy(
-                                    updateCheckState = UpdateCheckState(
-                                        isChecking = false,
-                                        updateAvailable = true,
-                                        latestVersionName = tagName,
-                                        downloadUrl = finalDownloadUrl,
-                                        message = "Új verzió elérhető: $tagName!"
-                                    )
-                                )
-                            }
-                        } else {
-                            _uiState.update {
-                                it.copy(
-                                    updateCheckState = UpdateCheckState(
-                                        isChecking = false,
-                                        updateAvailable = false,
-                                        latestVersionName = tagName,
-                                        downloadUrl = htmlUrl,
-                                        message = "A legfrissebb verziót használod (v$currentVersion)."
-                                    )
-                                )
-                            }
-                        }
-                    } else {
-                        val fallbackUrl = "https://github.com/$repo/releases"
+                val info = AppUpdateManager().checkForUpdates(currentChannel)
+                if (info != null) {
+                    if (info.isUpdateAvailable) {
                         _uiState.update {
                             it.copy(
                                 updateCheckState = UpdateCheckState(
                                     isChecking = false,
-                                    downloadUrl = fallbackUrl,
-                                    message = "Nyisd meg a GitHub Releases oldalt a letöltéshez."
+                                    updateAvailable = true,
+                                    latestVersionName = info.latestVersion,
+                                    downloadUrl = info.downloadUrl,
+                                    message = "Új verzió (${info.tagName}) érhető el a ${currentChannel.displayName} csatornán!"
                                 )
                             )
                         }
+                    } else {
+                        _uiState.update {
+                            it.copy(
+                                updateCheckState = UpdateCheckState(
+                                    isChecking = false,
+                                    updateAvailable = false,
+                                    latestVersionName = info.latestVersion,
+                                    downloadUrl = info.downloadUrl,
+                                    message = "A legfrissebb verziót használod (v${BuildConfig.VERSION_NAME})."
+                                )
+                            )
+                        }
+                    }
+                } else {
+                    val fallbackUrl = "https://github.com/$repo/releases"
+                    _uiState.update {
+                        it.copy(
+                            updateCheckState = UpdateCheckState(
+                                isChecking = false,
+                                downloadUrl = fallbackUrl,
+                                message = "Nyisd meg a GitHub Releases oldalt a letöltéshez."
+                            )
+                        )
                     }
                 }
             } catch (e: Exception) {
