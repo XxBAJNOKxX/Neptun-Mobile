@@ -1,6 +1,7 @@
 package com.example
 
 import android.app.Application
+import com.example.core.crash.CrashReporter
 import com.example.core.di.AppContainer
 import com.example.core.di.DefaultAppContainer
 import com.example.core.notification.NotificationHelper
@@ -12,6 +13,7 @@ class NeptunApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        CrashReporter.install(this)
         appContainer = DefaultAppContainer(this)
         NotificationHelper.createNotificationChannels(this)
         try {

@@ -37,6 +37,7 @@ import androidx.compose.material.icons.filled.ViewAgenda
 import androidx.compose.material.icons.filled.ViewWeek
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FilledTonalButton
@@ -49,6 +50,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -78,7 +80,13 @@ private val DAYS = listOf(
     5 to "Péntek"
 )
 
+private val WEEKEND_DAYS = listOf(
+    6 to "Szombat",
+    7 to "Vasárnap"
+)
+
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 fun TimetableScreen(
     uiState: TimetableUiState,
     onDaySelect: (Int) -> Unit,
@@ -91,14 +99,16 @@ fun TimetableScreen(
     modifier: Modifier = Modifier
 ) {
     val coroutineScope = rememberCoroutineScope()
+    val dayList = if (uiState.showWeekend) DAYS + WEEKEND_DAYS else DAYS
+    val pageCount = dayList.size
     val pagerState = rememberPagerState(
-        initialPage = (uiState.selectedDayOfWeek - 1).coerceIn(0, 4),
-        pageCount = { 5 }
+        initialPage = (uiState.selectedDayOfWeek - 1).coerceIn(0, pageCount - 1),
+        pageCount = { pageCount }
     )
     val snackbarHostState = remember { SnackbarHostState() }
 
-    LaunchedEffect(uiState.selectedDayOfWeek) {
-        val targetPage = (uiState.selectedDayOfWeek - 1).coerceIn(0, 4)
+    LaunchedEffect(uiState.selectedDayOfWeek, pageCount) {
+        val targetPage = (uiState.selectedDayOfWeek - 1).coerceIn(0, pageCount - 1)
         if (pagerState.currentPage != targetPage && !pagerState.isScrollInProgress) {
             pagerState.scrollToPage(targetPage)
         }
@@ -242,12 +252,12 @@ fun TimetableScreen(
         // Day Tabs (Only in daily view)
         if (!uiState.isWeekView) {
             ScrollableTabRow(
-                selectedTabIndex = (uiState.selectedDayOfWeek - 1).coerceIn(0, 4),
+                selectedTabIndex = (uiState.selectedDayOfWeek - 1).coerceIn(0, pageCount - 1),
                 edgePadding = 16.dp,
                 containerColor = MaterialTheme.colorScheme.surface,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                DAYS.forEachIndexed { index, pair ->
+                dayList.forEachIndexed { index, pair ->
                     val isSelected = uiState.selectedDayOfWeek == pair.first
                     val dayInfo = uiState.weekDays.getOrNull(index)
                     val label = if (dayInfo != null) "${pair.second} (${dayInfo.dateFormatted})" else pair.second
@@ -305,6 +315,11 @@ fun TimetableScreen(
         }
 
         // Timetable Content (HorizontalPager for Days OR Full Week List)
+        PullToRefreshBox(
+            isRefreshing = uiState.isRefreshing,
+            onRefresh = onRefresh,
+            modifier = Modifier.fillMaxSize()
+        ) {
         val hasDatedEvents = remember(uiState.events) {
             uiState.events.any { it.dateString.isNotBlank() }
         }
@@ -318,7 +333,7 @@ fun TimetableScreen(
             ) {
                 item { Spacer(modifier = Modifier.height(4.dp)) }
 
-                DAYS.forEachIndexed { idx, (dayNum, dayName) ->
+                dayList.forEachIndexed { idx, (dayNum, dayName) ->
                     val weekDay = uiState.weekDays.getOrNull(idx)
                     val dayEvents = if (hasDatedEvents && weekDay != null) {
                         uiState.events.filter { it.dateString.startsWith(weekDay.isoDate) }
@@ -396,6 +411,8 @@ fun TimetableScreen(
                     }
                 }
             }
+        }
+
         }
 
         SnackbarHost(hostState = snackbarHostState)
