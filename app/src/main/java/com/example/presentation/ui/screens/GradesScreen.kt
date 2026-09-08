@@ -825,6 +825,7 @@ private fun TermStatisticsCard(
     }
 }
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 private fun ExamsTabContent(
     exams: List<ExamItem>,
