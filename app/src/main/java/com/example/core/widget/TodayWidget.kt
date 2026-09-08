@@ -1,8 +1,8 @@
 package com.example.core.widget
 
 import android.content.Context
+import android.content.Intent
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -25,6 +25,7 @@ import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import com.example.MainActivity
+import com.example.R
 import com.example.data.local.NeptunDatabase
 import com.example.domain.model.CalendarEvent
 import com.example.domain.usecase.GetTodayClassesUseCase
@@ -45,8 +46,9 @@ class TodayWidget : GlanceAppWidget() {
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val classes = loadTodayClasses(context)
+        val openAppIntent = Intent(context, MainActivity::class.java)
         provideContent {
-            TodayWidgetContent(classes)
+            TodayWidgetContent(classes, openAppIntent)
         }
     }
 
@@ -54,7 +56,7 @@ class TodayWidget : GlanceAppWidget() {
         suspend fun loadTodayClasses(context: Context): List<CalendarEvent> {
             return try {
                 val db = NeptunDatabase.getInstance(context)
-                val events = db.calendarDao().getAllEvents().first()
+                val events = db.calendarDao().getAllEvents().first().map { it.toDomain() }
                 GetTodayClassesUseCase()(events)
             } catch (e: Exception) {
                 emptyList()
@@ -68,49 +70,60 @@ class TodayWidgetReceiver : GlanceAppWidgetReceiver() {
 }
 
 @Composable
-private fun TodayWidgetContent(classes: List<CalendarEvent>) {
-    val backgroundColor = ColorProvider(day = Color(0xFFF1F5F9), night = Color(0xFF0F172A))
-    val textColor = ColorProvider(day = Color(0xFF0F172A), night = Color(0xFFE2E8F0))
-    val accentColor = ColorProvider(day = Color(0xFF1E40AF), night = Color(0xFF93C5FD))
-    val mutedColor = ColorProvider(day = Color(0xFF64748B), night = Color(0xFF94A3B8))
-
+private fun TodayWidgetContent(classes: List<CalendarEvent>, openAppIntent: Intent) {
     Column(
         modifier = GlanceModifier
             .fillMaxSize()
-            .background(backgroundColor)
-            .clickable(actionStartActivity<MainActivity>())
+            .background(ColorProvider(R.color.widget_background))
+            .clickable(actionStartActivity(openAppIntent))
             .padding(12.dp)
     ) {
         Text(
             "Neptun · Ma",
-            style = TextStyle(color = accentColor, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            style = TextStyle(
+                color = ColorProvider(R.color.widget_accent),
+                fontWeight = FontWeight.Bold,
+                fontSize = 13.sp
+            )
         )
         Spacer(GlanceModifier.height(6.dp))
 
         val actual = classes.filter { it.isActualAttendedClass }
         if (actual.isEmpty()) {
             Text(
-                "Ma nincs több órád 🎉",
-                style = TextStyle(color = textColor, fontSize = 13.sp)
+                "Ma nincs több órád!",
+                style = TextStyle(
+                    color = ColorProvider(R.color.widget_on_background),
+                    fontSize = 13.sp
+                )
             )
         } else {
             actual.take(3).forEach { event ->
                 Spacer(GlanceModifier.height(4.dp))
                 Text(
                     "${event.timeFormatted}  ${event.subjectName}",
-                    style = TextStyle(color = textColor, fontSize = 12.sp)
+                    style = TextStyle(
+                        color = ColorProvider(R.color.widget_on_background),
+                        fontSize = 12.sp
+                    )
                 )
                 Text(
                     listOf(event.courseType.displayName, event.room.takeIf { it.isNotBlank() } ?: "-")
                         .joinToString(" · "),
-                    style = TextStyle(color = mutedColor, fontSize = 11.sp)
+                    style = TextStyle(
+                        color = ColorProvider(R.color.widget_muted),
+                        fontSize = 11.sp
+                    )
                 )
             }
             if (actual.size > 3) {
                 Spacer(GlanceModifier.height(4.dp))
                 Text(
                     "…és még ${actual.size - 3} óra",
-                    style = TextStyle(color = mutedColor, fontSize = 11.sp)
+                    style = TextStyle(
+                        color = ColorProvider(R.color.widget_muted),
+                        fontSize = 11.sp
+                    )
                 )
             }
         }
