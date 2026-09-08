@@ -70,7 +70,6 @@ import com.example.ui.theme.NeptunBlue40
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-@OptIn(ExperimentalMaterial3Api::class)
 fun MessagesScreen(
     uiState: MessagesUiState,
     onToggleUnreadFilter: () -> Unit,

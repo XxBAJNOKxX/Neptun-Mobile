@@ -117,7 +117,7 @@ fun GradesScreen(
 
         if (uiState.selectedTab == 1) {
             ExamsTabContent(exams = uiState.exams, isRefreshing = uiState.isRefreshingExams, onRefresh = onRefreshExams)
-            return
+            return@Column
         }
 
         // Semester selector tabs
