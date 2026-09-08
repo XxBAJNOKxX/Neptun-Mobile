@@ -25,9 +25,7 @@ fun NeptunBottomBar(
     modifier: Modifier = Modifier
 ) {
     NavigationBar(
-        modifier = modifier
-            .windowInsetsPadding(WindowInsets.navigationBars)
-            .testTag("neptun_bottom_navigation")
+        modifier = modifier.testTag("neptun_bottom_navigation")
     ) {
         items.forEach { item ->
             val selected = currentDestination == item

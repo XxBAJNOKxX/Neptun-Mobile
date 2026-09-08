@@ -339,6 +339,7 @@ private fun MainDashboard(
         }
 
         androidx.compose.material3.Scaffold(
+            contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
             bottomBar = {
                 NeptunBottomBar(
                     currentDestination = currentDestination,
