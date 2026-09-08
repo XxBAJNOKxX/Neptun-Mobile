@@ -3,6 +3,8 @@ package com.example.presentation.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.core.security.EncryptedPreferencesManager
+import com.example.domain.model.ExamItem
 import com.example.domain.model.GradeCalculation
 import com.example.domain.model.SubjectGrade
 import com.example.domain.repository.NeptunRepository
@@ -13,6 +15,14 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+/** Egy félév kreditindex statisztikája a diagramhoz. */
+data class TermStat(
+    val termId: String,
+    val weightedAverage: Double,
+    val creditIndex: Double,
+    val completedCredits: Int
+)
+
 data class GradesUiState(
     val allGrades: List<SubjectGrade> = emptyList(),
     val availableTerms: List<String> = emptyList(),
@@ -20,20 +30,41 @@ data class GradesUiState(
     val termGrades: List<SubjectGrade> = emptyList(),
     val calculation: GradeCalculation? = null,
     val isRefreshing: Boolean = false,
-    val ghostMarkDialogSubject: SubjectGrade? = null
+    val ghostMarkDialogSubject: SubjectGrade? = null,
+    // Új: statisztika és vizsgák
+    val termStats: List<TermStat> = emptyList(),
+    val totalCompletedCredits: Int = 0,
+    val targetCredits: Int = 240,
+    val selectedTab: Int = 0, // 0 = Jegyek, 1 = Vizsgák
+    val exams: List<ExamItem> = emptyList(),
+    val isRefreshingExams: Boolean = false
 )
 
 class GradesViewModel(
     private val neptunRepository: NeptunRepository,
-    private val calculateAveragesUseCase: CalculateAveragesUseCase
+    private val calculateAveragesUseCase: CalculateAveragesUseCase,
+    private val prefsManager: EncryptedPreferencesManager? = null
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(GradesUiState())
+    private val _uiState = MutableStateFlow(
+        GradesUiState(targetCredits = prefsManager?.loadPersonalization()?.targetCredits ?: 240)
+    )
     val uiState: StateFlow<GradesUiState> = _uiState.asStateFlow()
 
     init {
         observeGrades()
+        observeExams()
+        observeTargetCredits()
         refreshGrades()
+        refreshExams()
+    }
+
+    private fun observeTargetCredits() {
+        viewModelScope.launch {
+            prefsManager?.personalizationFlow?.collect { personalization ->
+                _uiState.update { it.copy(targetCredits = personalization.targetCredits) }
+            }
+        }
     }
 
     private fun observeGrades() {
@@ -48,6 +79,14 @@ class GradesViewModel(
                     terms.firstOrNull() ?: "2025/26/1"
                 }
                 recalculateState(cleanedGrades, terms, currentTerm)
+            }
+        }
+    }
+
+    private fun observeExams() {
+        viewModelScope.launch {
+            neptunRepository.getExams().collect { exams ->
+                _uiState.update { it.copy(exams = exams) }
             }
         }
     }
@@ -78,13 +117,33 @@ class GradesViewModel(
         }
         val calc = calculateAveragesUseCase(selectedTerm, filtered)
 
+        // Félévenkénti kreditindex – a diagramhoz (legutóbbi 6 félév)
+        val termStats = terms.take(6)
+            .reversed()
+            .map { term ->
+                val termSubjects = allGrades.filter { it.termId == term || it.termName == term }
+                val termCalc = calculateAveragesUseCase(term, termSubjects)
+                TermStat(
+                    termId = term,
+                    weightedAverage = termCalc.weightedAverage,
+                    creditIndex = termCalc.creditIndex,
+                    completedCredits = termCalc.completedCredits
+                )
+            }
+
+        val totalCompleted = allGrades
+            .filter { it.grade != null && it.grade >= 2 }
+            .sumOf { it.credit }
+
         _uiState.update {
             it.copy(
                 allGrades = allGrades,
                 availableTerms = terms,
                 selectedTerm = selectedTerm,
                 termGrades = filtered,
-                calculation = calc
+                calculation = calc,
+                termStats = termStats,
+                totalCompletedCredits = totalCompleted
             )
         }
     }
@@ -92,6 +151,10 @@ class GradesViewModel(
     fun selectTerm(term: String) {
         val state = _uiState.value
         recalculateState(state.allGrades, state.availableTerms, term)
+    }
+
+    fun selectTab(tab: Int) {
+        _uiState.update { it.copy(selectedTab = tab.coerceIn(0, 1)) }
     }
 
     fun openGhostMarkDialog(subject: SubjectGrade) {
@@ -123,14 +186,23 @@ class GradesViewModel(
         }
     }
 
+    fun refreshExams() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isRefreshingExams = true) }
+            neptunRepository.refreshExams()
+            _uiState.update { it.copy(isRefreshingExams = false) }
+        }
+    }
+
     companion object {
         fun provideFactory(
             neptunRepository: NeptunRepository,
-            calculateAveragesUseCase: CalculateAveragesUseCase
+            calculateAveragesUseCase: CalculateAveragesUseCase,
+            prefsManager: EncryptedPreferencesManager? = null
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                return GradesViewModel(neptunRepository, calculateAveragesUseCase) as T
+                return GradesViewModel(neptunRepository, calculateAveragesUseCase, prefsManager) as T
             }
         }
     }

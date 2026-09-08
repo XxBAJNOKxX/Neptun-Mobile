@@ -1,16 +1,19 @@
 package com.example.data.repository
 
+import com.example.BuildConfig
+import com.example.core.security.DataMode
 import com.example.core.security.EncryptedPreferencesManager
 import com.example.data.local.NeptunDatabase
 import com.example.data.local.entity.CalendarEventEntity
+import com.example.data.local.entity.ExamItemEntity
 import com.example.data.local.entity.FinanceItemEntity
 import com.example.data.local.entity.NeptunMessageEntity
 import com.example.data.local.entity.SubjectGradeEntity
 import com.example.data.network.MockNeptunDataSource
 import com.example.data.network.NeptunApiClient
 import com.example.data.network.NeptunAuthResult
-import com.example.data.network.NeptunNetworkClient
 import com.example.domain.model.CalendarEvent
+import com.example.domain.model.ExamItem
 import com.example.domain.model.FinanceItem
 import com.example.domain.model.NeptunMessage
 import com.example.domain.model.SubjectGrade
@@ -23,7 +26,6 @@ import kotlinx.coroutines.withContext
 
 class NeptunRepositoryImpl(
     private val database: NeptunDatabase,
-    private val networkClient: NeptunNetworkClient,
     private val prefsManager: EncryptedPreferencesManager,
     private val neptunApiClient: NeptunApiClient = NeptunApiClient()
 ) : NeptunRepository {
@@ -52,6 +54,12 @@ class NeptunRepositoryImpl(
         }
     }
 
+    override fun getExams(): Flow<List<ExamItem>> {
+        return database.examsDao().getAllExams().map { entities ->
+            entities.map { it.toDomain() }
+        }
+    }
+
     override suspend fun syncAllData(neptunCode: String, sessionToken: String): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             val token = ensureValidToken(forceRefresh = false)
@@ -74,6 +82,7 @@ class NeptunRepositoryImpl(
             refreshGrades()
             refreshMessages()
             refreshFinances()
+            refreshExams()
             prefsManager.updateLastSyncTime()
             Result.success(Unit)
         } catch (e: Exception) {
@@ -107,7 +116,12 @@ class NeptunRepositoryImpl(
                     prefsManager.setAccessToken(authRes.accessToken)
                     prefsManager.setBaseUrl(authRes.normalizedBaseUrl)
                     prefsManager.setIsModernApi(authRes.isModernApi)
+                    prefsManager.clearSessionExpired()
                     return authRes.accessToken
+                } else if (authRes is NeptunAuthResult.Failure && prefsManager.isModernApi()) {
+                    // A modern API-nál a refresh és az újra-bejelentkezés is sikertelen:
+                    // nagy eséllyel lejárt / érvénytelen a munkamenet.
+                    prefsManager.markSessionExpired()
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -144,14 +158,17 @@ class NeptunRepositoryImpl(
         }
 
         val isDemo = creds?.neptunCode == "DEMO01"
-        if (!fetchSucceeded || (isDemo && eventsToInsert.isEmpty())) {
-            val existing = database.calendarDao().getAllEvents().first()
-            if (existing.isEmpty()) {
-                eventsToInsert = MockNeptunDataSource.getMockCalendarEvents()
+        if (fetchSucceeded) {
+            // Sikeres lekérés: az adatbázis a szerver állapotát tükrözze (akár üres lista is).
+            prefsManager.setDataMode(if (isDemo) DataMode.DEMO else DataMode.REAL)
+            database.calendarDao().clearAll()
+            if (eventsToInsert.isNotEmpty()) {
+                database.calendarDao().insertEvents(eventsToInsert.map { CalendarEventEntity.fromDomain(it) })
             }
-        }
-
-        if (eventsToInsert.isNotEmpty()) {
+        } else if (isDemo || (BuildConfig.DEBUG && database.calendarDao().getAllEvents().first().isEmpty())) {
+            // Csak debug buildben: demo / fejlesztői mock adat, hogy tesztelhető legyen az UI.
+            eventsToInsert = MockNeptunDataSource.getMockCalendarEvents()
+            prefsManager.setDataMode(if (isDemo) DataMode.DEMO else DataMode.MOCK)
             database.calendarDao().clearAll()
             database.calendarDao().insertEvents(eventsToInsert.map { CalendarEventEntity.fromDomain(it) })
         }
@@ -185,14 +202,17 @@ class NeptunRepositoryImpl(
         }
 
         val isDemo = creds?.neptunCode == "DEMO01"
-        if (!fetchSucceeded || (isDemo && gradesToInsert.isEmpty())) {
-            val existing = database.gradesDao().getAllGrades().first()
-            if (existing.isEmpty()) {
-                gradesToInsert = MockNeptunDataSource.getMockGrades()
+        if (fetchSucceeded) {
+            // A korábbi jegyek (pl. szellemjegyek) megőrzése érdekében a jegyeket
+            // nem töröljük üres válasznál, csak ha van mit beszúrni.
+            if (gradesToInsert.isNotEmpty()) {
+                prefsManager.setDataMode(if (isDemo) DataMode.DEMO else DataMode.REAL)
+                database.gradesDao().clearAll()
+                database.gradesDao().insertGrades(gradesToInsert.map { SubjectGradeEntity.fromDomain(it) })
             }
-        }
-
-        if (gradesToInsert.isNotEmpty()) {
+        } else if (isDemo || (BuildConfig.DEBUG && database.gradesDao().getAllGrades().first().isEmpty())) {
+            gradesToInsert = MockNeptunDataSource.getMockGrades()
+            prefsManager.setDataMode(if (isDemo) DataMode.DEMO else DataMode.MOCK)
             database.gradesDao().clearAll()
             database.gradesDao().insertGrades(gradesToInsert.map { SubjectGradeEntity.fromDomain(it) })
         }
@@ -226,13 +246,6 @@ class NeptunRepositoryImpl(
         }
 
         val isDemo = creds?.neptunCode == "DEMO01"
-        if (!fetchSucceeded || (isDemo && messagesToInsert.isEmpty())) {
-            val existing = database.messagesDao().getAllMessages().first()
-            if (existing.isEmpty()) {
-                messagesToInsert = MockNeptunDataSource.getMockMessages()
-            }
-        }
-
         if (fetchSucceeded || messagesToInsert.isNotEmpty()) {
             val existingEntities = database.messagesDao().getAllMessages().first()
             val existingById = existingEntities.associateBy { it.id }
@@ -260,8 +273,14 @@ class NeptunRepositoryImpl(
             }
             database.messagesDao().clearAll()
             if (entitiesToSave.isNotEmpty()) {
+                prefsManager.setDataMode(if (isDemo) DataMode.DEMO else DataMode.REAL)
                 database.messagesDao().insertMessages(entitiesToSave)
             }
+        } else if (isDemo || (BuildConfig.DEBUG && database.messagesDao().getAllMessages().first().isEmpty())) {
+            messagesToInsert = MockNeptunDataSource.getMockMessages()
+            prefsManager.setDataMode(if (isDemo) DataMode.DEMO else DataMode.MOCK)
+            database.messagesDao().clearAll()
+            database.messagesDao().insertMessages(messagesToInsert.map { NeptunMessageEntity.fromDomain(it) })
         }
 
         Result.success(Unit)
@@ -293,16 +312,59 @@ class NeptunRepositoryImpl(
         }
 
         val isDemo = creds?.neptunCode == "DEMO01"
-        if (!fetchSucceeded || (isDemo && financesToInsert.isEmpty())) {
-            val existing = database.financesDao().getAllFinances().first()
-            if (existing.isEmpty()) {
-                financesToInsert = MockNeptunDataSource.getMockFinances()
+        if (fetchSucceeded) {
+            if (financesToInsert.isNotEmpty()) {
+                prefsManager.setDataMode(if (isDemo) DataMode.DEMO else DataMode.REAL)
+            }
+            database.financesDao().clearAll()
+            if (financesToInsert.isNotEmpty()) {
+                database.financesDao().insertFinances(financesToInsert.map { FinanceItemEntity.fromDomain(it) })
+            }
+        } else if (isDemo || (BuildConfig.DEBUG && database.financesDao().getAllFinances().first().isEmpty())) {
+            financesToInsert = MockNeptunDataSource.getMockFinances()
+            prefsManager.setDataMode(if (isDemo) DataMode.DEMO else DataMode.MOCK)
+            database.financesDao().clearAll()
+            database.financesDao().insertFinances(financesToInsert.map { FinanceItemEntity.fromDomain(it) })
+        }
+
+        Result.success(Unit)
+    }
+
+    override suspend fun refreshExams(): Result<Unit> = withContext(Dispatchers.IO) {
+        val creds = prefsManager.loadCredentials()
+        var examsToInsert = emptyList<ExamItem>()
+        var fetchSucceeded = false
+
+        if (creds != null && creds.neptunUrl.isNotEmpty()) {
+            try {
+                val baseUrl = prefsManager.getBaseUrl().ifEmpty { creds.neptunUrl }
+                val token = ensureValidToken()
+                val isModern = prefsManager.isModernApi()
+                val password = prefsManager.getPassword()
+
+                examsToInsert = neptunApiClient.getExams(
+                    baseUrl = baseUrl,
+                    token = token,
+                    username = creds.neptunCode,
+                    password = password,
+                    isModern = isModern
+                )
+                fetchSucceeded = true
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
         }
 
-        if (financesToInsert.isNotEmpty()) {
-            database.financesDao().clearAll()
-            database.financesDao().insertFinances(financesToInsert.map { FinanceItemEntity.fromDomain(it) })
+        val isDemo = creds?.neptunCode == "DEMO01"
+        if (fetchSucceeded) {
+            database.examsDao().clearAll()
+            if (examsToInsert.isNotEmpty()) {
+                database.examsDao().insertExams(examsToInsert.map { ExamItemEntity.fromDomain(it) })
+            }
+        } else if (isDemo || (BuildConfig.DEBUG && database.examsDao().getAllExams().first().isEmpty())) {
+            examsToInsert = MockNeptunDataSource.getMockExams()
+            database.examsDao().clearAll()
+            database.examsDao().insertExams(examsToInsert.map { ExamItemEntity.fromDomain(it) })
         }
 
         Result.success(Unit)
@@ -416,5 +478,6 @@ class NeptunRepositoryImpl(
         database.gradesDao().clearAll()
         database.messagesDao().clearAll()
         database.financesDao().clearAll()
+        database.examsDao().clearAll()
     }
 }

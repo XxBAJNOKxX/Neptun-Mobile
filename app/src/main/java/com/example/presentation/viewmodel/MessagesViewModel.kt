@@ -18,7 +18,8 @@ data class MessagesUiState(
     val isLoadingContent: Boolean = false,
     val showUnreadOnly: Boolean = false,
     val isRefreshing: Boolean = false,
-    val unreadCount: Int = 0
+    val unreadCount: Int = 0,
+    val searchQuery: String = ""
 )
 
 class MessagesViewModel(
@@ -38,11 +39,7 @@ class MessagesViewModel(
             neptunRepository.getMessages().collect { msgs ->
                 val unread = msgs.count { !it.isRead }
                 _uiState.update { state ->
-                    val filtered = if (state.showUnreadOnly) {
-                        msgs.filter { !it.isRead }
-                    } else {
-                        msgs
-                    }
+                    val filtered = applyFilters(msgs, state.showUnreadOnly, state.searchQuery)
                     val updatedSelected = state.selectedMessage?.let { curSel ->
                         msgs.firstOrNull { it.id == curSel.id } ?: curSel
                     }
@@ -57,15 +54,40 @@ class MessagesViewModel(
         }
     }
 
+    private fun applyFilters(
+        messages: List<NeptunMessage>,
+        unreadOnly: Boolean,
+        query: String
+    ): List<NeptunMessage> {
+        var result = messages
+        if (unreadOnly) {
+            result = result.filter { !it.isRead }
+        }
+        if (query.isNotBlank()) {
+            result = result.filter { msg ->
+                msg.subject.contains(query, ignoreCase = true) ||
+                    msg.sender.contains(query, ignoreCase = true)
+            }
+        }
+        return result
+    }
+
+    fun onSearchQueryChange(query: String) {
+        _uiState.update { state ->
+            state.copy(
+                searchQuery = query,
+                filteredMessages = applyFilters(state.messages, state.showUnreadOnly, query)
+            )
+        }
+    }
+
     fun toggleUnreadFilter() {
         _uiState.update { state ->
             val newFilter = !state.showUnreadOnly
-            val filtered = if (newFilter) {
-                state.messages.filter { !it.isRead }
-            } else {
-                state.messages
-            }
-            state.copy(showUnreadOnly = newFilter, filteredMessages = filtered)
+            state.copy(
+                showUnreadOnly = newFilter,
+                filteredMessages = applyFilters(state.messages, newFilter, state.searchQuery)
+            )
         }
     }
 
