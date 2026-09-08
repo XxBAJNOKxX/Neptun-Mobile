@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: read
+  issues: write
 
 jobs:
   build-and-test:
@@ -31,7 +32,9 @@ jobs:
         run: chmod +x gradlew
 
       - name: Unit tesztek futtatása
-        run: ./gradlew testDebugUnitTest --stacktrace
+        run: |
+          set -o pipefail
+          ./gradlew testDebugUnitTest --stacktrace 2>&1 | tee /tmp/gradle.log
 
       - name: Unit teszt eredmények feltöltése
         if: always()
@@ -42,13 +45,19 @@ jobs:
           if-no-files-found: ignore
 
       - name: Lint ellenőrzés
-        run: ./gradlew lintDebug --stacktrace
+        run: |
+          set -o pipefail
+          ./gradlew lintDebug --stacktrace 2>&1 | tee -a /tmp/gradle.log
 
       - name: Debug APK buildelése
-        run: ./gradlew assembleDebug --stacktrace
+        run: |
+          set -o pipefail
+          ./gradlew assembleDebug --stacktrace 2>&1 | tee -a /tmp/gradle.log
 
       - name: Release APK buildelése (R8 minify)
-        run: ./gradlew assembleRelease --stacktrace
+        run: |
+          set -o pipefail
+          ./gradlew assembleRelease --stacktrace 2>&1 | tee -a /tmp/gradle.log
 
       - name: APK artifactok feltöltése
         if: always()
@@ -59,3 +68,27 @@ jobs:
             app/build/outputs/apk/debug/*.apk
             app/build/outputs/apk/release/*.apk
           if-no-files-found: ignore
+
+      - name: Hibajelentés issue-ban
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo "## CI hiba – run #${{ github.run_number }}"
+            echo ""
+            echo "Branch: \`${{ github.ref_name }}\` • Commit: \`${{ github.sha }}\`"
+            echo "Futás: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            echo ""
+            echo "### A hibák részletei (a Gradle logból szűrve)"
+            echo '```'
+            { grep -nE "^e: |error:|FAILED|FAILURE|Execution failed|Caused by|\* What went wrong" /tmp/gradle.log || true; } | tail -n 150
+            echo '```'
+            echo ""
+            echo "_Automatikus jelentés a CI workflowból. Ha megjavult a build, ez az issue bezárható._"
+          } > /tmp/ci-report.md
+          if [ -s /tmp/ci-report.md ]; then
+            gh issue create \
+              --title "🔴 CI hiba: run #${{ github.run_number }} @ ${{ github.ref_name }}" \
+              --body-file /tmp/ci-report.md || echo "Nem sikerült issue-t létrehozni"
+          fi

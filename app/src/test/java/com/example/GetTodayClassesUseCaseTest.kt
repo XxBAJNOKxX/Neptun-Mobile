@@ -23,7 +23,7 @@ class GetTodayClassesUseCaseTest {
         weekType: Int = 0,
         dateString: String = ""
     ) = CalendarEvent(
-        id = "evt_$dayOfWeek\_$startHour\_$weekType\_$dateString",
+        id = "evt_${dayOfWeek}_${startHour}_${weekType}_$dateString",
         subjectName = "Tárgy $dayOfWeek:$startHour",
         subjectCode = "XYZ",
         courseCode = "EA01",
