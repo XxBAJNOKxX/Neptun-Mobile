@@ -5,7 +5,7 @@ import com.example.domain.usecase.CalculateAveragesUseCase
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-class ExampleUnitTest {
+class CalculateAveragesUseCaseTest {
 
     private val calculateAverages = CalculateAveragesUseCase()
 

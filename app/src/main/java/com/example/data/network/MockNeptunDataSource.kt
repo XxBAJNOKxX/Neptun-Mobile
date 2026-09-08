@@ -2,6 +2,7 @@ package com.example.data.network
 
 import com.example.domain.model.CalendarEvent
 import com.example.domain.model.CourseType
+import com.example.domain.model.ExamItem
 import com.example.domain.model.FinanceItem
 import com.example.domain.model.FinanceStatus
 import com.example.domain.model.NeptunMessage
@@ -101,7 +102,8 @@ object MockNeptunDataSource {
             endHour = 12,
             endMinute = 0,
             dayOfWeek = 3,
-            courseType = CourseType.PRACTICE
+            courseType = CourseType.PRACTICE,
+            weekType = 1
         ),
         CalendarEvent(
             id = "cal_7",
@@ -433,6 +435,45 @@ object MockNeptunDataSource {
             dueDate = "2026.09.10",
             paymentDate = "2026.09.05",
             transactionId = "TRX-941002"
+        )
+    )
+
+    fun getMockExams(): List<ExamItem> = listOf(
+        ExamItem(
+            id = "exam_1",
+            subjectName = "Mesterséges intelligencia",
+            subjectCode = "BMEVIIIM01",
+            courseCode = "V1",
+            examDate = "2027-01-15",
+            startTime = "08:00",
+            room = "IB028",
+            location = "I épület",
+            examType = "Írásbeli vizsga",
+            isSignedUp = true
+        ),
+        ExamItem(
+            id = "exam_2",
+            subjectName = "Algoritmusok és adatszerkezetek",
+            subjectCode = "BMETMTM04",
+            courseCode = "V2",
+            examDate = "2027-01-20",
+            startTime = "10:00",
+            room = "Q-II nagyelőadó",
+            location = "Q épület",
+            examType = "Írásbeli vizsga",
+            isSignedUp = true
+        ),
+        ExamItem(
+            id = "exam_3",
+            subjectName = "Adatbázisok elmélete",
+            subjectCode = "BMESZITM05",
+            courseCode = "V1",
+            examDate = "2027-01-27",
+            startTime = "14:00",
+            room = "IL102",
+            location = "I épület",
+            examType = "Szóbeli vizsga",
+            isSignedUp = false
         )
     )
 }

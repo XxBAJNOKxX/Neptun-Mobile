@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import com.example.data.local.entity.CalendarEventEntity
+import com.example.data.local.entity.ExamItemEntity
 import com.example.data.local.entity.FinanceItemEntity
 import com.example.data.local.entity.NeptunMessageEntity
 import com.example.data.local.entity.SubjectGradeEntity
@@ -67,5 +68,17 @@ interface FinancesDao {
     suspend fun insertFinances(items: List<FinanceItemEntity>)
 
     @Query("DELETE FROM finance_items")
+    suspend fun clearAll()
+}
+
+@Dao
+interface ExamsDao {
+    @Query("SELECT * FROM exam_items ORDER BY examDate ASC, startTime ASC")
+    fun getAllExams(): Flow<List<ExamItemEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertExams(items: List<ExamItemEntity>)
+
+    @Query("DELETE FROM exam_items")
     suspend fun clearAll()
 }

@@ -1,5 +1,7 @@
 package com.example.core.security
 
+import com.example.core.notification.NotifiedStore
+
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
@@ -12,7 +14,31 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-class EncryptedPreferencesManager(context: Context) {
+/**
+ * Adataink forrása (UI visszajelzéshez): valódi szerveradat, demo bejelentkezés vagy mock adat.
+ */
+enum class DataMode {
+    REAL, DEMO, MOCK;
+
+    companion object {
+        fun fromName(name: String?): DataMode {
+            return entries.firstOrNull { it.name.equals(name, ignoreCase = true) } ?: REAL
+        }
+    }
+}
+
+/** Felhasználói személyreszabási beállítások (téma mellett). */
+data class AppPersonalization(
+    val startScreen: String = "HOME",
+    val showWeekend: Boolean = false,
+    val weekFilterMode: String = "ALL",
+    val firstHour: Int = 8,
+    val lastHour: Int = 20,
+    val targetCredits: Int = 240,
+    val biometricLockEnabled: Boolean = false
+)
+
+class EncryptedPreferencesManager(context: Context) : NotifiedStore {
 
     private val prefs: SharedPreferences = try {
         val masterKey = MasterKey.Builder(context)
@@ -40,10 +66,23 @@ class EncryptedPreferencesManager(context: Context) {
     private val _notificationPreferencesFlow = MutableStateFlow(loadNotificationPreferences())
     val notificationPreferencesFlow: StateFlow<NotificationPreferences> = _notificationPreferencesFlow.asStateFlow()
 
+    private val _personalizationFlow = MutableStateFlow(loadPersonalization())
+    val personalizationFlow: StateFlow<AppPersonalization> = _personalizationFlow.asStateFlow()
+
+    private val _dataModeFlow = MutableStateFlow(loadDataMode())
+    val dataModeFlow: StateFlow<DataMode> = _dataModeFlow.asStateFlow()
+
+    private val _sessionExpiredFlow = MutableStateFlow(prefs.getBoolean(KEY_SESSION_EXPIRED, false))
+    val sessionExpiredFlow: StateFlow<Boolean> = _sessionExpiredFlow.asStateFlow()
+
     fun updateLastSyncTime(timestamp: Long = System.currentTimeMillis()) {
         prefs.edit().putLong(KEY_LAST_SYNC, timestamp).apply()
         _credentialsFlow.value = loadCredentials()
     }
+
+    // ------------------------------------------------------------------ //
+    // Értesítési beállítások
+    // ------------------------------------------------------------------ //
 
     fun loadNotificationPreferences(): NotificationPreferences {
         return NotificationPreferences(
@@ -51,7 +90,10 @@ class EncryptedPreferencesManager(context: Context) {
             notifyGrades = prefs.getBoolean(KEY_NOTIFY_GRADES, true),
             notifyMessages = prefs.getBoolean(KEY_NOTIFY_MESSAGES, true),
             notifyFinances = prefs.getBoolean(KEY_NOTIFY_FINANCES, true),
-            reminderMinutesBefore = prefs.getInt(KEY_CLASS_REMINDER_MINUTES, 15)
+            reminderMinutesBefore = prefs.getInt(KEY_CLASS_REMINDER_MINUTES, 15),
+            quietHoursEnabled = prefs.getBoolean(KEY_QUIET_HOURS_ENABLED, false),
+            quietStartMinute = prefs.getInt(KEY_QUIET_START_MINUTE, 22 * 60),
+            quietEndMinute = prefs.getInt(KEY_QUIET_END_MINUTE, 7 * 60)
         )
     }
 
@@ -76,9 +118,122 @@ class EncryptedPreferencesManager(context: Context) {
     }
 
     fun setReminderMinutesBefore(minutes: Int) {
-        prefs.edit().putInt(KEY_CLASS_REMINDER_MINUTES, minutes).apply()
+        prefs.edit().putInt(KEY_CLASS_REMINDER_MINUTES, minutes.coerceIn(5, 120)).apply()
         _notificationPreferencesFlow.value = loadNotificationPreferences()
     }
+
+    fun setQuietHours(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_QUIET_HOURS_ENABLED, enabled).apply()
+        _notificationPreferencesFlow.value = loadNotificationPreferences()
+    }
+
+    fun setQuietHoursWindow(startMinute: Int, endMinute: Int) {
+        prefs.edit()
+            .putInt(KEY_QUIET_START_MINUTE, startMinute.coerceIn(0, 24 * 60 - 1))
+            .putInt(KEY_QUIET_END_MINUTE, endMinute.coerceIn(0, 24 * 60 - 1))
+            .apply()
+        _notificationPreferencesFlow.value = loadNotificationPreferences()
+    }
+
+    // ------------------------------------------------------------------ //
+    // Személyreszabás
+    // ------------------------------------------------------------------ //
+
+    fun loadPersonalization(): AppPersonalization {
+        return AppPersonalization(
+            startScreen = prefs.getString(KEY_START_SCREEN, "HOME") ?: "HOME",
+            showWeekend = prefs.getBoolean(KEY_SHOW_WEEKEND, false),
+            weekFilterMode = prefs.getString(KEY_WEEK_FILTER_MODE, "ALL") ?: "ALL",
+            firstHour = prefs.getInt(KEY_FIRST_HOUR, 8).coerceIn(6, 12),
+            lastHour = prefs.getInt(KEY_LAST_HOUR, 20).coerceIn(14, 24),
+            targetCredits = prefs.getInt(KEY_TARGET_CREDITS, 240).coerceIn(30, 400),
+            biometricLockEnabled = prefs.getBoolean(KEY_BIOMETRIC_LOCK, false)
+        )
+    }
+
+    fun setStartScreen(screen: String) {
+        prefs.edit().putString(KEY_START_SCREEN, screen).apply()
+        _personalizationFlow.value = loadPersonalization()
+    }
+
+    fun setShowWeekend(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_SHOW_WEEKEND, enabled).apply()
+        _personalizationFlow.value = loadPersonalization()
+    }
+
+    fun setWeekFilterMode(mode: String) {
+        prefs.edit().putString(KEY_WEEK_FILTER_MODE, mode).apply()
+        _personalizationFlow.value = loadPersonalization()
+    }
+
+    fun setHourRange(first: Int, last: Int) {
+        prefs.edit()
+            .putInt(KEY_FIRST_HOUR, first.coerceIn(6, 12))
+            .putInt(KEY_LAST_HOUR, last.coerceIn(14, 24))
+            .apply()
+        _personalizationFlow.value = loadPersonalization()
+    }
+
+    fun setTargetCredits(credits: Int) {
+        prefs.edit().putInt(KEY_TARGET_CREDITS, credits.coerceIn(30, 400)).apply()
+        _personalizationFlow.value = loadPersonalization()
+    }
+
+    fun setBiometricLockEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_BIOMETRIC_LOCK, enabled).apply()
+        _personalizationFlow.value = loadPersonalization()
+    }
+
+    // ------------------------------------------------------------------ //
+    // Adatforrás mód (valódi / demo / mock)
+    // ------------------------------------------------------------------ //
+
+    private fun loadDataMode(): DataMode = DataMode.fromName(prefs.getString(KEY_DATA_MODE, DataMode.REAL.name))
+
+    fun setDataMode(mode: DataMode) {
+        prefs.edit().putString(KEY_DATA_MODE, mode.name).apply()
+        _dataModeFlow.value = mode
+    }
+
+    // ------------------------------------------------------------------ //
+    // Lejárt munkamenet jelzés
+    // ------------------------------------------------------------------ //
+
+    fun isSessionExpired(): Boolean = prefs.getBoolean(KEY_SESSION_EXPIRED, false)
+
+    fun markSessionExpired() {
+        prefs.edit().putBoolean(KEY_SESSION_EXPIRED, true).apply()
+        _sessionExpiredFlow.value = true
+    }
+
+    fun clearSessionExpired() {
+        prefs.edit().putBoolean(KEY_SESSION_EXPIRED, false).apply()
+        _sessionExpiredFlow.value = false
+    }
+
+    // ------------------------------------------------------------------ //
+    // Már értesített elemek követése (diff-alapú értesítésekhez)
+    // ------------------------------------------------------------------ //
+
+    override fun getNotifiedIds(key: String): Set<String> {
+        return prefs.getStringSet(KEY_NOTIFIED_PREFIX + key, emptySet()) ?: emptySet()
+    }
+
+    override fun setNotifiedIds(key: String, ids: Set<String>) {
+        prefs.edit().putStringSet(KEY_NOTIFIED_PREFIX + key, ids).apply()
+    }
+
+    override fun isBaselineDone(key: String): Boolean {
+        return prefs.getBoolean(KEY_NOTIFIED_BASELINE_PREFIX + key, false)
+    }
+
+    override fun markBaselineDone(key: String) {
+        prefs.edit().putBoolean(KEY_NOTIFIED_BASELINE_PREFIX + key, true).apply()
+    }
+
+    // ------------------------------------------------------------------ //
+    // Egyetem / belépés
+    // ------------------------------------------------------------------ //
 
     fun saveSelectedUniversity(universityId: String, universityName: String, neptunUrl: String) {
         prefs.edit()
@@ -297,6 +452,8 @@ class EncryptedPreferencesManager(context: Context) {
         val notifyMessages = prefs.getBoolean(KEY_NOTIFY_MESSAGES, true)
         val notifyFinances = prefs.getBoolean(KEY_NOTIFY_FINANCES, true)
         val reminderMins = prefs.getInt(KEY_CLASS_REMINDER_MINUTES, 15)
+        val savedPersonalization = loadPersonalization()
+        val savedNotifQuiet = loadNotificationPreferences()
 
         prefs.edit()
             .clear()
@@ -313,10 +470,21 @@ class EncryptedPreferencesManager(context: Context) {
             .putBoolean(KEY_NOTIFY_MESSAGES, notifyMessages)
             .putBoolean(KEY_NOTIFY_FINANCES, notifyFinances)
             .putInt(KEY_CLASS_REMINDER_MINUTES, reminderMins)
+            .putString(KEY_START_SCREEN, savedPersonalization.startScreen)
+            .putBoolean(KEY_SHOW_WEEKEND, savedPersonalization.showWeekend)
+            .putString(KEY_WEEK_FILTER_MODE, savedPersonalization.weekFilterMode)
+            .putInt(KEY_FIRST_HOUR, savedPersonalization.firstHour)
+            .putInt(KEY_LAST_HOUR, savedPersonalization.lastHour)
+            .putInt(KEY_TARGET_CREDITS, savedPersonalization.targetCredits)
+            .putBoolean(KEY_BIOMETRIC_LOCK, savedPersonalization.biometricLockEnabled)
+            .putBoolean(KEY_QUIET_HOURS_ENABLED, savedNotifQuiet.quietHoursEnabled)
+            .putInt(KEY_QUIET_START_MINUTE, savedNotifQuiet.quietStartMinute)
+            .putInt(KEY_QUIET_END_MINUTE, savedNotifQuiet.quietEndMinute)
             .putBoolean(KEY_IS_LOGGED_IN, false)
             .apply()
 
         _credentialsFlow.value = null
+        _sessionExpiredFlow.value = false
     }
 
     companion object {
@@ -347,6 +515,20 @@ class EncryptedPreferencesManager(context: Context) {
         private const val KEY_NOTIFY_MESSAGES = "key_notify_messages"
         private const val KEY_NOTIFY_FINANCES = "key_notify_finances"
         private const val KEY_CLASS_REMINDER_MINUTES = "key_class_reminder_minutes"
+        private const val KEY_QUIET_HOURS_ENABLED = "key_quiet_hours_enabled"
+        private const val KEY_QUIET_START_MINUTE = "key_quiet_start_minute"
+        private const val KEY_QUIET_END_MINUTE = "key_quiet_end_minute"
+        private const val KEY_START_SCREEN = "key_start_screen"
+        private const val KEY_SHOW_WEEKEND = "key_show_weekend"
+        private const val KEY_WEEK_FILTER_MODE = "key_week_filter_mode"
+        private const val KEY_FIRST_HOUR = "key_first_hour"
+        private const val KEY_LAST_HOUR = "key_last_hour"
+        private const val KEY_TARGET_CREDITS = "key_target_credits"
+        private const val KEY_BIOMETRIC_LOCK = "key_biometric_lock"
+        private const val KEY_DATA_MODE = "key_data_mode"
+        private const val KEY_SESSION_EXPIRED = "key_session_expired"
+        private const val KEY_NOTIFIED_PREFIX = "key_notified_"
+        private const val KEY_NOTIFIED_BASELINE_PREFIX = "key_notified_baseline_"
     }
 }
 
@@ -355,5 +537,33 @@ data class NotificationPreferences(
     val notifyGrades: Boolean = true,
     val notifyMessages: Boolean = true,
     val notifyFinances: Boolean = true,
-    val reminderMinutesBefore: Int = 15
-)
+    val reminderMinutesBefore: Int = 15,
+    val quietHoursEnabled: Boolean = false,
+    val quietStartMinute: Int = 22 * 60,
+    val quietEndMinute: Int = 7 * 60
+) {
+    /**
+     * A [nowMinuteOfDay] (0..1439) a halk időszakban van-e.
+     * Támogatja az éjfélen átnyúló (pl. 22:00–07:00) ablakot is.
+     */
+    fun isQuietNow(nowMinuteOfDay: Int): Boolean {
+        if (!quietHoursEnabled) return false
+        val start = quietStartMinute
+        val end = quietEndMinute
+        return if (start == end) {
+            false
+        } else if (start < end) {
+            nowMinuteOfDay in start until end
+        } else {
+            nowMinuteOfDay >= start || nowMinuteOfDay < end
+        }
+    }
+
+    companion object {
+        fun formatMinute(minuteOfDay: Int): String {
+            val h = minuteOfDay / 60
+            val m = minuteOfDay % 60
+            return "%02d:%02d".format(h, m)
+        }
+    }
+}

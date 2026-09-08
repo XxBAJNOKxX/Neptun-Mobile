@@ -1,6 +1,7 @@
 package com.example.presentation.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
+import com.example.BuildConfig
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -349,7 +350,8 @@ fun LoginScreen(
 
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    // Quick Demo Credentials Fill
+                    // Quick Demo Credentials Fill (csak debug buildben)
+                    if (BuildConfig.DEBUG) {
                     OutlinedButton(
                         onClick = onQuickDemoFill,
                         shape = RoundedCornerShape(12.dp),
@@ -365,10 +367,11 @@ fun LoginScreen(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Offline Demo adatok betöltése",
+                            text = "Offline Demo adatok betöltése (fejlesztői)",
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Medium
                         )
+                    }
                     }
                 }
             }

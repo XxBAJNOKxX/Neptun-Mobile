@@ -26,6 +26,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Mail
 import androidx.compose.material.icons.filled.MarkEmailRead
 import androidx.compose.material.icons.filled.Person
@@ -43,7 +44,10 @@ import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -66,9 +70,11 @@ import com.example.ui.theme.NeptunBlue40
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 fun MessagesScreen(
     uiState: MessagesUiState,
     onToggleUnreadFilter: () -> Unit,
+    onSearchQueryChange: (String) -> Unit = {},
     onOpenMessage: (NeptunMessage) -> Unit,
     onCloseMessage: () -> Unit,
     onReloadMessage: () -> Unit = {},
@@ -123,6 +129,24 @@ fun MessagesScreen(
             )
         }
 
+        // Kereső mező
+        OutlinedTextField(
+            value = uiState.searchQuery,
+            onValueChange = onSearchQueryChange,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 2.dp),
+            placeholder = { Text("Keresés feladó vagy tárgy szerint…") },
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Keresés") },
+            singleLine = true,
+            shape = RoundedCornerShape(14.dp)
+        )
+
+        PullToRefreshBox(
+            isRefreshing = uiState.isRefreshing,
+            onRefresh = onRefresh,
+            modifier = Modifier.fillMaxSize()
+        ) {
         if (uiState.filteredMessages.isEmpty()) {
             Box(
                 modifier = Modifier
@@ -163,6 +187,7 @@ fun MessagesScreen(
 
                 item { Spacer(modifier = Modifier.height(20.dp)) }
             }
+        }
         }
     }
 
