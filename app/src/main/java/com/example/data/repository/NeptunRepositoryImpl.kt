@@ -179,8 +179,8 @@ class NeptunRepositoryImpl(
         val isDemo = creds?.neptunCode == "DEMO01"
         if (fetchSucceeded) {
             prefsManager.setDataMode(if (isDemo) DataMode.DEMO else DataMode.REAL)
-            database.calendarDao().clearAll()
             if (eventsToInsert.isNotEmpty()) {
+                database.calendarDao().clearAll()
                 database.calendarDao().insertEvents(eventsToInsert.map { CalendarEventEntity.fromDomain(it) })
             }
         } else if (isDemo || (BuildConfig.DEBUG && database.calendarDao().getAllEvents().first().isEmpty())) {
