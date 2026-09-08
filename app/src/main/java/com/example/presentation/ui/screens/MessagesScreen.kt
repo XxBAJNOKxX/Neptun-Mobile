@@ -33,6 +33,10 @@ import androidx.compose.material.icons.filled.MarkEmailRead
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.foundation.text.selection.SelectionContainer
+import com.example.presentation.ui.util.HtmlBlock
+import com.example.presentation.ui.util.HtmlTableView
+import com.example.presentation.ui.util.parseHtmlBlocks
+import com.example.presentation.ui.util.rememberHtmlAnnotatedString
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Button
@@ -307,10 +311,9 @@ private fun MessageDetailContent(
 ) {
     val displaySender = message.sender.ifBlank { "Rendszerüzenet" }
     val isSystem = message.isOfficial || displaySender.equals("Rendszerüzenet", ignoreCase = true) || displaySender.contains("hivatal", ignoreCase = true)
-    val annotatedBody = rememberHtmlAnnotatedString(
-        htmlString = message.bodyHtml,
-        linkColor = MaterialTheme.colorScheme.primary
-    )
+    
+    val rawBody = message.bodyHtml.ifBlank { message.previewText }
+    val htmlBlocks = remember(rawBody) { parseHtmlBlocks(rawBody) }
 
     Column(
         modifier = Modifier
@@ -416,14 +419,34 @@ private fun MessageDetailContent(
                     )
                 }
             }
-        } else if (annotatedBody.text.isNotBlank() && !annotatedBody.text.startsWith("Koppints a teljes üzenet")) {
-            SelectionContainer {
-                Text(
-                    text = annotatedBody,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    lineHeight = 22.sp
-                )
+        } else if (htmlBlocks.isNotEmpty()) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                for (block in htmlBlocks) {
+                    when (block) {
+                        is HtmlBlock.Text -> {
+                            val annotated = rememberHtmlAnnotatedString(
+                                htmlString = block.htmlText,
+                                linkColor = MaterialTheme.colorScheme.primary
+                            )
+                            if (annotated.text.isNotBlank() && !annotated.text.startsWith("Koppints a teljes üzenet")) {
+                                SelectionContainer {
+                                    Text(
+                                        text = annotated,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        lineHeight = 22.sp,
+                                        modifier = Modifier.padding(vertical = 4.dp)
+                                    )
+                                }
+                            }
+                        }
+                        is HtmlBlock.Table -> {
+                            SelectionContainer {
+                                HtmlTableView(table = block)
+                            }
+                        }
+                    }
+                }
             }
         } else {
             Column(

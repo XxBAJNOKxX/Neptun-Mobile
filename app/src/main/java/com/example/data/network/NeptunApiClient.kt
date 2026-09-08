@@ -1906,7 +1906,7 @@ class NeptunApiClient {
                         subject = subject,
                         sender = sender,
                         sendDate = formattedDate,
-                        previewText = detail.take(120),
+                        previewText = stripHtmlForPreview(detail).take(120),
                         bodyHtml = detail,
                         isRead = !isNew,
                         isOfficial = sender.equals("Rendszerüzenet", ignoreCase = true) || sender.contains("hivatal", ignoreCase = true) || sender.contains("tanulmányi", ignoreCase = true)
@@ -2059,16 +2059,29 @@ class NeptunApiClient {
     }
 
     private fun cleanHtml(raw: String): String {
+        if (raw.isBlank()) return ""
         return raw
-            .replace(Regex("""<style[^>]*>[\s\S]*?</style>"""), "")
-            .replace(Regex("""<script[^>]*>[\s\S]*?</script>"""), "")
-            .replace(Regex("""<br\s*/?>""", RegexOption.IGNORE_CASE), "\n")
-            .replace(Regex("""</p>""", RegexOption.IGNORE_CASE), "\n\n")
+            .replace(Regex("""<style[^>]*>[\s\S]*?</style>""", RegexOption.IGNORE_CASE), "")
+            .replace(Regex("""<script[^>]*>[\s\S]*?</script>""", RegexOption.IGNORE_CASE), "")
+            .trim()
+    }
+
+    private fun stripHtmlForPreview(raw: String): String {
+        if (raw.isBlank()) return ""
+        return raw
+            .replace(Regex("""<style[^>]*>[\s\S]*?</style>""", RegexOption.IGNORE_CASE), "")
+            .replace(Regex("""<script[^>]*>[\s\S]*?</script>""", RegexOption.IGNORE_CASE), "")
+            .replace(Regex("""<br\s*/?>""", RegexOption.IGNORE_CASE), " ")
+            .replace(Regex("""</p>""", RegexOption.IGNORE_CASE), " ")
+            .replace(Regex("""</tr[^>]*>""", RegexOption.IGNORE_CASE), " ")
+            .replace(Regex("""</td[^>]*>""", RegexOption.IGNORE_CASE), " ")
+            .replace(Regex("""</th[^>]*>""", RegexOption.IGNORE_CASE), " ")
             .replace(Regex("""<[^>]*>"""), "")
             .replace("&nbsp;", " ")
             .replace("&amp;", "&")
             .replace("&lt;", "<")
             .replace("&gt;", ">")
+            .replace(Regex("""\s+"""), " ")
             .trim()
     }
 
