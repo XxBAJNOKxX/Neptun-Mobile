@@ -159,18 +159,18 @@ fun InAppUpdateDialog(
                                 ),
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .heightIn(max = 160.dp)
+                                    .heightIn(max = 220.dp)
                             ) {
                                 Column(
                                     modifier = Modifier
                                         .padding(12.dp)
                                         .verticalScroll(rememberScrollState())
                                 ) {
-                                    Text(
-                                        text = info.releaseNotes,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        lineHeight = 18.sp
+                                    MarkdownViewer(
+                                        markdown = info.releaseNotes,
+                                        textColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        linkColor = MaterialTheme.colorScheme.primary,
+                                        baseFontSize = 13.sp
                                     )
                                 }
                             }
