@@ -118,8 +118,7 @@ object NotificationHelper {
             .setContentIntent(pendingIntent)
             .build()
 
-        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        notificationManager.notify(notificationId, notification)
+        safeNotify(context, notificationId, notification)
     }
 
     fun showMessageNotification(
@@ -152,8 +151,7 @@ object NotificationHelper {
             .setContentIntent(pendingIntent)
             .build()
 
-        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        notificationManager.notify(notificationId, notification)
+        safeNotify(context, notificationId, notification)
     }
 
     fun showGradeNotification(
@@ -196,8 +194,41 @@ object NotificationHelper {
             .setContentIntent(pendingIntent)
             .build()
 
-        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        notificationManager.notify(notificationId, notification)
+        safeNotify(context, notificationId, notification)
+    }
+
+    /** Több új elem együttes összefoglaló értesítése (pl. "3 új üzenet"). */
+    fun showSummaryNotification(
+        context: Context,
+        channelId: String,
+        notificationId: Int,
+        title: String,
+        text: String,
+        priorityHigh: Boolean = false
+    ) {
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            notificationId,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notification = NotificationCompat.Builder(context, channelId)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle(title)
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setPriority(
+                if (priorityHigh) NotificationCompat.PRIORITY_HIGH else NotificationCompat.PRIORITY_DEFAULT
+            )
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
+            .build()
+
+        safeNotify(context, notificationId, notification)
     }
 
     fun showFinanceNotification(
@@ -230,7 +261,20 @@ object NotificationHelper {
             .setContentIntent(pendingIntent)
             .build()
 
-        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        notificationManager.notify(notificationId, notification)
+        safeNotify(context, notificationId, notification)
+    }
+
+    /**
+     * Értesítés küldése biztonságosan: engedély-ellenőrzéssel és hibakezeléssel,
+     * hogy egy hiányzó engedély vagy egy rendszer-specifikus kivétel sose döntse
+     * le az appot.
+     */
+    private fun safeNotify(context: Context, notificationId: Int, notification: android.app.Notification) {
+        try {
+            if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) return
+            NotificationManagerCompat.from(context).notify(notificationId, notification)
+        } catch (e: Exception) {
+            android.util.Log.e("NotificationHelper", "Értesítés küldése sikertelen: ${e.message}")
+        }
     }
 }

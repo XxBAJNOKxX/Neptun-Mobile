@@ -1,0 +1,104 @@
+name: CI – Build & Test
+
+on:
+  push:
+    branches:
+      - main
+      - 'arena/**'
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  build-and-test:
+    name: Unit tesztek, lint és build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'gradle'
+
+      - name: Grant Execute Permission for Gradlew
+        run: chmod +x gradlew
+
+      - name: Unit tesztek futtatása
+        run: |
+          set -o pipefail
+          ./gradlew testDebugUnitTest --stacktrace 2>&1 | tee /tmp/gradle.log
+
+      - name: Unit teszt eredmények feltöltése
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-results
+          path: app/build/reports/tests/**
+          if-no-files-found: ignore
+
+      - name: Lint ellenőrzés
+        run: |
+          set -o pipefail
+          ./gradlew lintDebug --stacktrace 2>&1 | tee -a /tmp/gradle.log
+
+      - name: Lint jelentés feltöltése
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-results
+          path: |
+            app/build/reports/lint-results*.*
+          if-no-files-found: ignore
+
+      - name: Debug APK buildelése
+        run: |
+          set -o pipefail
+          ./gradlew assembleDebug --stacktrace 2>&1 | tee -a /tmp/gradle.log
+
+      - name: Release APK buildelése (R8 minify)
+        run: |
+          set -o pipefail
+          ./gradlew assembleRelease --stacktrace 2>&1 | tee -a /tmp/gradle.log
+
+      - name: APK artifactok feltöltése
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: apk-artifacts
+          path: |
+            app/build/outputs/apk/debug/*.apk
+            app/build/outputs/apk/release/*.apk
+          if-no-files-found: ignore
+
+      - name: Hibajelentés issue-ban
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo "## CI hiba – run #${{ github.run_number }}"
+            echo ""
+            echo "Branch: \`${{ github.ref_name }}\` • Commit: \`${{ github.sha }}\`"
+            echo "Futás: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            echo ""
+            echo "### A hibák részletei (a Gradle logból szűrve)"
+            echo '```'
+            { grep -inA6 "^e: " /tmp/gradle.log || true; } | tail -n 200
+            { grep -inE "error:|: error|failed|failure|execution failed|caused by|runtimeexception|what went wrong" /tmp/gradle.log || true; } | grep -iv "0 errors" | tail -n 100
+            echo '```'
+            echo ""
+            echo "_Automatikus jelentés a CI workflowból. Ha megjavult a build, ez az issue bezárható._"
+          } > /tmp/ci-report.md
+          if [ -s /tmp/ci-report.md ]; then
+            gh issue create \
+              --title "🔴 CI hiba: run #${{ github.run_number }} @ ${{ github.ref_name }}" \
+              --body-file /tmp/ci-report.md || echo "Nem sikerült issue-t létrehozni"
+          fi

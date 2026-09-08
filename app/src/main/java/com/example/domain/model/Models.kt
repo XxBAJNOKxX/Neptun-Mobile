@@ -42,9 +42,10 @@ data class CalendarEvent(
     val startMinute: Int,
     val endHour: Int,
     val endMinute: Int,
-    val dayOfWeek: Int, // 1 = Monday, ..., 5 = Friday
+    val dayOfWeek: Int, // 1 = Monday, ..., 7 = Sunday
     val courseType: CourseType,
-    val dateString: String = ""
+    val dateString: String = "",
+    val weekType: Int = 0 // 0 = minden héten, 1 = páratlan (A) hét, 2 = páros (B) hét
 ) {
     val timeFormatted: String
         get() = "%02d:%02d - %02d:%02d".format(startHour, startMinute, endHour, endMinute)
@@ -131,6 +132,20 @@ enum class TwoFactorMethod(val displayName: String) {
     EMAIL("E-mail kód"),
     TOTP("Hitelesítő App (TOTP)")
 }
+
+/** Vizsgaelem a Neptun vizsgalista oldaláról (kísérleti támogatás). */
+data class ExamItem(
+    val id: String,
+    val subjectName: String,
+    val subjectCode: String = "",
+    val courseCode: String = "",
+    val examDate: String = "",
+    val startTime: String = "",
+    val room: String = "",
+    val location: String = "",
+    val examType: String = "",
+    val isSignedUp: Boolean = true
+)
 
 data class FinanceItem(
     val id: String,

@@ -28,7 +28,9 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -51,6 +53,7 @@ import java.text.NumberFormat
 import java.util.Locale
 
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 fun FinancesScreen(
     uiState: FinancesUiState,
     onFilterSelect: (FinanceStatus?) -> Unit,
@@ -71,6 +74,11 @@ fun FinancesScreen(
             onRefresh = onRefresh
         )
 
+        PullToRefreshBox(
+            isRefreshing = uiState.isRefreshing,
+            onRefresh = onRefresh,
+            modifier = Modifier.fillMaxSize()
+        ) {
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -153,6 +161,7 @@ fun FinancesScreen(
             }
 
             item { Spacer(modifier = Modifier.height(20.dp)) }
+        }
         }
     }
 }
