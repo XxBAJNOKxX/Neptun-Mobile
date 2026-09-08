@@ -1,5 +1,6 @@
 package com.example
 
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -52,9 +53,9 @@ class ManifestSanityTest {
 
     @Test
     fun `class alarm receiver is registered`() {
-        val intent = Intent(context, ClassAlarmReceiver::class.java)
+        val component = ComponentName(context, ClassAlarmReceiver::class.java)
         val info = context.packageManager.getReceiverInfo(
-            intent.component,
+            component,
             PackageManager.GET_META_DATA
         )
         assertTrue("A ClassAlarmReceiver nem exportálható kifelé!", !info.exported)
