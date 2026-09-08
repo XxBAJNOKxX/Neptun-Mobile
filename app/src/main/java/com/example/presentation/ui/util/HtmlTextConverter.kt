@@ -6,9 +6,12 @@ import android.text.Spanned
 import android.text.style.AbsoluteSizeSpan
 import android.text.style.BackgroundColorSpan
 import android.text.style.ForegroundColorSpan
+import android.text.style.QuoteSpan
 import android.text.style.RelativeSizeSpan
 import android.text.style.StrikethroughSpan
 import android.text.style.StyleSpan
+import android.text.style.SubscriptSpan
+import android.text.style.SuperscriptSpan
 import android.text.style.TypefaceSpan
 import android.text.style.URLSpan
 import android.text.style.UnderlineSpan
@@ -39,8 +42,10 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.BaselineShift
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 
 /**
@@ -135,8 +140,7 @@ private fun parseSingleTable(tableHtml: String): HtmlBlock.Table? {
 
 private fun cleanCellHtml(rawCell: String): String {
     return rawCell
-        .replace(Regex("(?i)<br\\s*/?>"), " ")
-        .replace(Regex("""\s+"""), " ")
+        .replace(Regex("(?i)<br\\s*/?>"), "<br>")
         .trim()
 }
 
@@ -149,29 +153,32 @@ fun preprocessNeptunHtml(rawHtml: String): String {
     var html = rawHtml.trim()
 
     // Handle double-encoded HTML entities if present
-    if ((html.contains("&lt;p") || html.contains("&lt;div") || html.contains("&lt;br")) &&
-        !html.contains("<p") && !html.contains("<div")) {
+    if ((html.contains("&lt;p") || html.contains("&lt;div") || html.contains("&lt;br") || html.contains("&lt;h")) &&
+        !html.contains("<p") && !html.contains("<div") && !html.contains("<br") && !html.contains("<h")) {
         try {
             html = Html.fromHtml(html, Html.FROM_HTML_MODE_LEGACY).toString()
         } catch (_: Exception) {}
     }
 
-    // Convert block HTML tags to explicit newlines before passing to Html.fromHtml
-    html = html
-        .replace(Regex("(?i)<p[^>]*>"), "\n\n")
-        .replace(Regex("(?i)</p>"), "")
-        .replace(Regex("(?i)<div[^>]*>"), "\n")
-        .replace(Regex("(?i)</div>"), "")
-        .replace(Regex("(?i)<br\\s*/?>"), "\n")
-        .replace(Regex("(?i)<li[^>]*>"), "\n• ")
-        .replace(Regex("(?i)</li>"), "")
-        .replace(Regex("(?i)<ul[^>]*>"), "\n")
-        .replace(Regex("(?i)</ul>"), "\n")
-        .replace(Regex("(?i)<ol[^>]*>"), "\n")
-        .replace(Regex("(?i)</ol>"), "\n")
+    // Standardize Windows carriage returns
+    html = html.replace("\r\n", "\n").replace("\r", "\n")
 
-    // Limit consecutive newlines to max 2
-    html = html.replace(Regex("""\n{3,}"""), "\n\n")
+    // Replace horizontal rule tags <hr> with a visual divider line
+    html = html.replace(Regex("(?i)<hr\\s*/?>"), "<br>────────────────────<br>")
+
+    // Convert list items to bullet points
+    html = html.replace(Regex("(?i)<li[^>]*>"), "<br>• ")
+        .replace(Regex("(?i)</li>"), "")
+        .replace(Regex("(?i)<ul[^>]*>"), "")
+        .replace(Regex("(?i)</ul>"), "<br>")
+        .replace(Regex("(?i)<ol[^>]*>"), "")
+        .replace(Regex("(?i)</ol>"), "<br>")
+
+    // Normalize break tags
+    html = html.replace(Regex("(?i)<br\\s*/?>"), "<br>")
+
+    // Convert raw newlines (\n) that are NOT adjacent to HTML tags into <br>
+    html = html.replace(Regex("""(?<!>)\n(?!<)"""), "<br>")
 
     return html.trim()
 }
@@ -300,19 +307,26 @@ fun rememberHtmlAnnotatedString(
 
         val cleanHtml = preprocessNeptunHtml(htmlString)
         val spanned: Spanned = try {
-            Html.fromHtml(cleanHtml, Html.FROM_HTML_MODE_COMPACT)
+            Html.fromHtml(cleanHtml, Html.FROM_HTML_MODE_LEGACY)
         } catch (_: Exception) {
             return@remember AnnotatedString(cleanHtml)
         }
 
-        val text = spanned.toString()
+        val rawText = spanned.toString()
+        var trimmedLen = rawText.length
+        while (trimmedLen > 0 && (rawText[trimmedLen - 1] == '\n' || rawText[trimmedLen - 1] == '\r')) {
+            trimmedLen--
+        }
+        val text = if (trimmedLen < rawText.length) rawText.substring(0, trimmedLen) else rawText
         val builder = AnnotatedString.Builder(text)
 
         val spans = spanned.getSpans(0, spanned.length, Any::class.java)
         for (span in spans) {
             val start = spanned.getSpanStart(span)
-            val end = spanned.getSpanEnd(span)
-            if (start < 0 || end <= start || start >= text.length || end > text.length) continue
+            var end = spanned.getSpanEnd(span)
+            if (start >= text.length) continue
+            if (end > text.length) end = text.length
+            if (start < 0 || end <= start) continue
 
             when (span) {
                 is StyleSpan -> {
@@ -353,15 +367,60 @@ fun rememberHtmlAnnotatedString(
                     builder.addStyle(SpanStyle(background = color), start, end)
                 }
                 is TypefaceSpan -> {
-                    if (span.family?.equals("monospace", ignoreCase = true) == true) {
-                        builder.addStyle(SpanStyle(fontFamily = FontFamily.Monospace), start, end)
+                    when (span.family?.lowercase()) {
+                        "monospace", "courier", "courier new", "code" -> {
+                            builder.addStyle(
+                                SpanStyle(
+                                    fontFamily = FontFamily.Monospace,
+                                    background = Color.Gray.copy(alpha = 0.15f)
+                                ),
+                                start,
+                                end
+                            )
+                        }
+                        "serif", "times", "times new roman", "georgia" -> {
+                            builder.addStyle(SpanStyle(fontFamily = FontFamily.Serif), start, end)
+                        }
+                        "sans-serif", "arial", "helvetica", "tahoma" -> {
+                            builder.addStyle(SpanStyle(fontFamily = FontFamily.SansSerif), start, end)
+                        }
                     }
                 }
                 is RelativeSizeSpan -> {
-                    builder.addStyle(SpanStyle(fontSize = (14 * span.sizeChange).sp), start, end)
+                    builder.addStyle(SpanStyle(fontSize = span.sizeChange.em), start, end)
                 }
                 is AbsoluteSizeSpan -> {
                     builder.addStyle(SpanStyle(fontSize = span.size.sp), start, end)
+                }
+                is SubscriptSpan -> {
+                    builder.addStyle(
+                        SpanStyle(
+                            baselineShift = BaselineShift.Subscript,
+                            fontSize = 0.8.em
+                        ),
+                        start,
+                        end
+                    )
+                }
+                is SuperscriptSpan -> {
+                    builder.addStyle(
+                        SpanStyle(
+                            baselineShift = BaselineShift.Superscript,
+                            fontSize = 0.8.em
+                        ),
+                        start,
+                        end
+                    )
+                }
+                is QuoteSpan -> {
+                    builder.addStyle(
+                        SpanStyle(
+                            fontStyle = FontStyle.Italic,
+                            background = Color.Gray.copy(alpha = 0.12f)
+                        ),
+                        start,
+                        end
+                    )
                 }
                 is URLSpan -> {
                     val url = span.url
