@@ -114,6 +114,7 @@ import com.example.presentation.ui.components.NeptunTopBar
 import com.example.presentation.viewmodel.UpdateCheckState
 import com.example.ui.theme.AppAccentColor
 import com.example.ui.theme.NeptunCyan40
+import com.example.ui.theme.NeptunGold
 import com.example.ui.theme.NeptunGreen
 import com.example.ui.theme.ThemeMode
 import com.example.ui.theme.ThemeSettings
@@ -850,7 +851,7 @@ fun SettingsScreen(
                     // 4. Pénzügyek
                     NotificationCategoryItem(
                         icon = Icons.Default.AccountBalanceWallet,
-                        iconTint = Color(0xFFEAB308),
+                        iconTint = NeptunGold,
                         title = "Pénzügyi tételek",
                         description = "Emlékeztetők kiírásokról, díjakról és fizetési határidőkről",
                         checked = notificationPreferences.notifyFinances,
