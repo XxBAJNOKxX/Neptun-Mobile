@@ -1,13 +1,12 @@
 package com.example.presentation.ui.screens
 
 import android.Manifest
+import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.spring
@@ -82,6 +81,7 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -93,13 +93,17 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.example.BuildConfig
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.example.core.notification.NotificationHelper
 import com.example.core.security.AppPersonalization
 import com.example.core.security.NotificationPreferences
@@ -115,6 +119,9 @@ import com.example.ui.theme.ThemeSettings
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+
+/** A FragmentActivity 16 bites requestCode-korlátjába eső, fix requestCode. */
+private const val NOTIFICATION_PERMISSION_REQUEST_CODE = 1001
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -169,14 +176,41 @@ fun SettingsScreen(
 
     var isNotificationPermissionGranted by remember { mutableStateOf(checkPermission()) }
 
-    val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        isNotificationPermissionGranted = isGranted
+    // A Compose activity-result launcher a FragmentActivity 16 bites requestCode
+    // korlátjával ütközve IllegalArgumentException-t dobott
+    // ("Can only use lower 16 bits for requestCode"). Ezért itt közvetlen,
+    // fix kis requestCode-os ActivityCompat hívást használunk, és az állapotot
+    // ON_RESUME-ban (az engedély-párbeszéd bezárulása után) frissítjük.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                isNotificationPermissionGranted = checkPermission()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    LaunchedEffect(Unit) {
-        isNotificationPermissionGranted = checkPermission()
+    fun requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val activity = context as? Activity ?: return
+            if (ContextCompat.checkSelfPermission(
+                    activity, Manifest.permission.POST_NOTIFICATIONS
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                ActivityCompat.requestPermissions(
+                    activity,
+                    arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                    NOTIFICATION_PERMISSION_REQUEST_CODE
+                )
+            }
+        } else {
+            val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+            }
+            context.startActivity(intent)
+        }
     }
 
     val lastSyncFormatted = remember(credentials?.lastSyncTime) {
@@ -758,16 +792,7 @@ fun SettingsScreen(
 
                             if (!isNotificationPermissionGranted) {
                                 Button(
-                                    onClick = {
-                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                            permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                                        } else {
-                                            val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
-                                                putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
-                                            }
-                                            context.startActivity(intent)
-                                        }
-                                    },
+                                    onClick = { requestNotificationPermission() },
                                     shape = RoundedCornerShape(8.dp),
                                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
                                 ) {
