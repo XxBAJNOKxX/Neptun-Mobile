@@ -305,42 +305,44 @@ private fun MainDashboard(
         )
     }
 
-    androidx.compose.foundation.layout.Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-    ) {
-        // Demo / mock adat figyelmeztető sáv
-        if (dataMode != DataMode.REAL) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.tertiaryContainer)
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Science,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onTertiaryContainer,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = if (dataMode == DataMode.DEMO) {
-                        "Demo módban vagy – a megjelenített adatok nem valódiak."
-                    } else {
-                        "Fejlesztői mintaadatok láthatók (szinkronizálás nem sikerült)."
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onTertiaryContainer
-                )
-            }
-        }
-
-        androidx.compose.material3.Scaffold(
-            contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
-            bottomBar = {
+    androidx.compose.material3.Scaffold(
+        contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
+        bottomBar = {
+            Column {
+                if (dataMode != DataMode.REAL) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.tertiaryContainer,
+                        shape = RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 6.dp),
+                            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Science,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                                modifier = Modifier.size(15.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = if (dataMode == DataMode.DEMO) {
+                                    "Demo mód – a megjelenített adatok nem valódiak"
+                                } else {
+                                    "Mintaadatok láthatók (szinkronizálás nem sikerült)"
+                                },
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer
+                            )
+                        }
+                    }
+                }
                 NeptunBottomBar(
                     currentDestination = currentDestination,
                     items = visibleItems,
@@ -352,7 +354,8 @@ private fun MainDashboard(
                     }
                 )
             }
-        ) { innerPadding ->
+        }
+    ) { innerPadding ->
             androidx.compose.foundation.layout.Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -462,7 +465,6 @@ private fun MainDashboard(
             }
         }
     }
-}
 
 /** Az órarend exportálása .ics fájlba és megosztási szándék indítása. */
 private suspend fun exportTimetableAsIcs(app: NeptunApp) {

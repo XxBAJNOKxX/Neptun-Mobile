@@ -1662,8 +1662,14 @@ class NeptunApiClient {
             val list = mutableListOf<NeptunMessage>()
             for (item in recMessages) {
                 val obj = item.jsonObject
-                val subject = obj["subject"]?.jsonPrimitive?.contentOrNull ?: "Nincs tárgy"
-                val sender = obj["senderName"]?.jsonPrimitive?.contentOrNull ?: "Ismeretlen feladó"
+                val subject = obj["subject"]?.jsonPrimitive?.contentOrNull?.trim()?.ifEmpty { "Nincs tárgy" } ?: "Nincs tárgy"
+                val rawSender = obj["senderName"]?.jsonPrimitive?.contentOrNull?.trim()
+                    ?: obj["SenderName"]?.jsonPrimitive?.contentOrNull?.trim()
+                    ?: ""
+                val isSystem = obj["isSystemMessage"]?.jsonPrimitive?.booleanOrNull == true ||
+                        obj["IsSystemMessage"]?.jsonPrimitive?.booleanOrNull == true ||
+                        rawSender.isBlank()
+                val sender = if (rawSender.isNotBlank()) rawSender else "Rendszerüzenet"
                 val dateStr = obj["lastPostDate"]?.jsonPrimitive?.contentOrNull ?: ""
                 val unreadCount = obj["unreadedPostCount"]?.jsonPrimitive?.intOrNull ?: 0
 
@@ -1689,7 +1695,7 @@ class NeptunApiClient {
                         previewText = "Koppints a teljes üzenet megtekintéséhez...",
                         bodyHtml = "",
                         isRead = unreadCount == 0,
-                        isOfficial = sender.contains("hivatal", ignoreCase = true) || sender.contains("tanulmányi", ignoreCase = true)
+                        isOfficial = isSystem || sender.contains("hivatal", ignoreCase = true) || sender.contains("tanulmányi", ignoreCase = true)
                     )
                 )
             }
@@ -1871,9 +1877,11 @@ class NeptunApiClient {
                 val subject = obj["Subject"]?.jsonPrimitive?.contentOrNull
                     ?: obj["subject"]?.jsonPrimitive?.contentOrNull
                     ?: "Tárgy"
-                val sender = obj["Name"]?.jsonPrimitive?.contentOrNull
-                    ?: obj["name"]?.jsonPrimitive?.contentOrNull
-                    ?: "Feladó"
+                val senderRaw = obj["Name"]?.jsonPrimitive?.contentOrNull?.trim()
+                    ?: obj["name"]?.jsonPrimitive?.contentOrNull?.trim()
+                    ?: obj["Sender"]?.jsonPrimitive?.contentOrNull?.trim()
+                    ?: ""
+                val sender = if (senderRaw.isNotBlank()) senderRaw else "Rendszerüzenet"
                 val sendDateRaw = obj["SendDate"]?.jsonPrimitive?.contentOrNull?.replace(Regex("""\D"""), "")?.toLongOrNull() ?: System.currentTimeMillis()
 
                 val id = obj["PersonMessageId"]?.jsonPrimitive?.contentOrNull
@@ -1901,7 +1909,7 @@ class NeptunApiClient {
                         previewText = detail.take(120),
                         bodyHtml = detail,
                         isRead = !isNew,
-                        isOfficial = sender.contains("hivatal", ignoreCase = true) || sender.contains("tanulmányi", ignoreCase = true)
+                        isOfficial = sender.equals("Rendszerüzenet", ignoreCase = true) || sender.contains("hivatal", ignoreCase = true) || sender.contains("tanulmányi", ignoreCase = true)
                     )
                 )
             }

@@ -500,7 +500,7 @@ private fun SubjectGradeCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (subject.isSigned) {
                         Surface(
-                            color = Color(0xFFF0FDF4),
+                            color = NeptunGreen.copy(alpha = 0.15f),
                             shape = RoundedCornerShape(4.dp),
                             modifier = Modifier.padding(end = 6.dp)
                         ) {
@@ -509,7 +509,7 @@ private fun SubjectGradeCard(
                                 color = NeptunGreen,
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
                             )
                         }
                     }
@@ -597,7 +597,7 @@ private fun GhostMarkPickerModal(
                     modifier = Modifier
                         .size(44.dp)
                         .clip(CircleShape)
-                        .background(Color(0xFFEDE9FE))
+                        .background(NeptunPurple.copy(alpha = 0.15f))
                 ) {
                     Icon(
                         imageVector = Icons.Default.AutoAwesome,
