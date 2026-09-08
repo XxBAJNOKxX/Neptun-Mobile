@@ -137,12 +137,19 @@ class SettingsViewModel(
         prefsManager.setShowWeekend(enabled)
     }
 
-    fun setWeekFilterMode(mode: String) {
-        prefsManager.setWeekFilterMode(mode)
-    }
-
-    fun setHourRange(first: Int, last: Int) {
-        prefsManager.setHourRange(first, last)
+    /**
+     * Oldalak elrejtése/bejelentése. Ha a jelenlegi kezdőképernyőt rejtik el,
+     * automatikusan az első látható oldalra váltunk vissza.
+     */
+    fun setHiddenPages(hidden: Set<String>) {
+        val current = _uiState.value.personalization
+        var startScreen = current.startScreen
+        if (startScreen in hidden) {
+            startScreen = com.example.presentation.navigation.NavigationItem.entries
+                .firstOrNull { it.name !in hidden }?.name ?: "HOME"
+            prefsManager.setStartScreen(startScreen)
+        }
+        prefsManager.setHiddenPages(hidden)
     }
 
     fun setTargetCredits(credits: Int) {

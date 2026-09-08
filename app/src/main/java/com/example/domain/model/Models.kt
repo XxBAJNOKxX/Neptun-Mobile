@@ -133,19 +133,6 @@ enum class TwoFactorMethod(val displayName: String) {
     TOTP("Hitelesítő App (TOTP)")
 }
 
-/** A/B hét (páratlan / páros) szűrési mód az órarendben. */
-enum class WeekFilterMode(val title: String) {
-    ALL("Mind"),
-    ODD("A hét"),
-    EVEN("B hét");
-
-    companion object {
-        fun fromName(name: String?): WeekFilterMode {
-            return entries.firstOrNull { it.name.equals(name, ignoreCase = true) } ?: ALL
-        }
-    }
-}
-
 /** Vizsgaelem a Neptun vizsgalista oldaláról (kísérleti támogatás). */
 data class ExamItem(
     val id: String,

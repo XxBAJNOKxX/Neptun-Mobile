@@ -1,7 +1,6 @@
 package com.example.data.repository
 
 import android.content.Context
-import com.example.BuildConfig
 import com.example.core.security.DataMode
 import com.example.core.security.EncryptedPreferencesManager
 import com.example.data.network.NeptunApiClient
@@ -70,10 +69,8 @@ class AuthRepositoryImpl(
             return@withContext Result.failure(IllegalArgumentException("A jelszó mező nem lehet üres!"))
         }
 
-        // Demo test mode bypass – kizárólag debug buildben engedélyezett!
-        if (BuildConfig.DEBUG &&
-            (trimmedCode == "DEMO01" || trimmedPassword.equals("demo", ignoreCase = true) || trimmedPassword.equals("jelszo", ignoreCase = true))
-        ) {
+        // Demo mód: mintaadatokkal való kipróbálás (DEMO jelöléssel jelölve a UI-ban)
+        if (trimmedCode == "DEMO01" || trimmedPassword.equals("demo", ignoreCase = true) || trimmedPassword.equals("jelszo", ignoreCase = true)) {
             prefsManager.saveCredentials(
                 neptunCode = trimmedCode,
                 password = trimmedPassword,
