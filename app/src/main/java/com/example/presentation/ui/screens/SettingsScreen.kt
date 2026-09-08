@@ -107,6 +107,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import com.example.core.notification.NotificationHelper
 import com.example.core.security.AppPersonalization
 import com.example.core.security.NotificationPreferences
+import com.example.core.security.UpdateChannel
 import com.example.domain.model.StudentCredentials
 import com.example.presentation.navigation.NavigationItem
 import com.example.presentation.ui.components.NeptunTopBar
@@ -133,6 +134,7 @@ fun SettingsScreen(
     isSyncing: Boolean,
     syncSuccessMessage: String?,
     updateCheckState: UpdateCheckState = UpdateCheckState(),
+    updateChannel: UpdateChannel = UpdateChannel.STABLE,
     isClearingCache: Boolean = false,
     cacheClearedMessage: String? = null,
     onThemeModeChange: (ThemeMode) -> Unit,
@@ -149,6 +151,7 @@ fun SettingsScreen(
     onHiddenPagesChange: (Set<String>) -> Unit = {},
     onTargetCreditsChange: (Int) -> Unit = {},
     onBiometricLockChange: (Boolean) -> Unit = {},
+    onUpdateChannelChange: (UpdateChannel) -> Unit = {},
     onExportIcs: () -> Unit = {},
     onClearCache: () -> Unit = {},
     onSimulateClassNotification: () -> Unit,
@@ -1280,6 +1283,46 @@ fun SettingsScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
+                    }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                    // Update Channel Selector
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            text = "Frissítési csatorna",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        SingleChoiceSegmentedButtonRow(
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            UpdateChannel.entries.forEachIndexed { index, channel ->
+                                SegmentedButton(
+                                    selected = updateChannel == channel,
+                                    onClick = { onUpdateChannelChange(channel) },
+                                    shape = SegmentedButtonDefaults.itemShape(
+                                        index = index,
+                                        count = UpdateChannel.entries.size
+                                    )
+                                ) {
+                                    Text(
+                                        text = channel.displayName,
+                                        fontSize = 12.sp,
+                                        fontWeight = if (updateChannel == channel) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                }
+                            }
+                        }
+                        Text(
+                            text = updateChannel.description,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 11.sp
+                        )
                     }
 
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
