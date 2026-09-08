@@ -6,10 +6,8 @@ import androidx.lifecycle.viewModelScope
 import com.example.core.notification.AlarmScheduler
 import com.example.core.security.EncryptedPreferencesManager
 import com.example.domain.model.CalendarEvent
-import com.example.domain.model.WeekFilterMode
 import com.example.domain.repository.NeptunRepository
 import com.example.domain.usecase.GetTodayClassesUseCase
-import com.example.domain.usecase.WeekParityUtil
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -41,23 +39,8 @@ data class TimetableUiState(
     val nextUpcomingEvent: CalendarEvent? = null,
     val isRefreshing: Boolean = false,
     val notificationScheduledId: String? = null,
-    // Új: A/B hét és megjelenítési beállítások
-    val weekFilterMode: WeekFilterMode = WeekFilterMode.ALL,
-    val currentWeekType: Int = 0, // 1 = A (páratlan), 2 = B (páros) – a kiválasztott héten
     val showWeekend: Boolean = false
-) {
-    /** A weekFilter és a hét típusa alapján szűrt események. */
-    val filteredEvents: List<CalendarEvent>
-        get() = filterEvents(events, weekFilterMode, selectedWeekOffset)
-
-    private fun filterEvents(events: List<CalendarEvent>, filter: WeekFilterMode, weekOffset: Int): List<CalendarEvent> {
-        if (filter == WeekFilterMode.ALL) return events
-        val weekTypeNow = WeekParityUtil.weekTypeForOffset(weekOffset)
-        return events.filter { event ->
-            event.weekType == 0 || event.dateString.isNotBlank() || event.weekType == weekTypeNow
-        }
-    }
-}
+)
 
 private fun currentOrNextSchoolDay(): Int {
     val dayOfWeek = LocalDate.now().dayOfWeek
@@ -97,8 +80,6 @@ class TimetableViewModel(
             selectedWeekOffset = 0,
             weekLabel = weekLabel,
             weekDays = weekDays,
-            weekFilterMode = personalization?.let { WeekFilterMode.fromName(it.weekFilterMode) } ?: WeekFilterMode.ALL,
-            currentWeekType = WeekParityUtil.weekTypeForOffset(0),
             showWeekend = showWeekend
         )
     }
@@ -110,7 +91,6 @@ class TimetableViewModel(
                     val (weekDays, weekLabel) = calculateWeekInfo(state.selectedWeekOffset, personalization.showWeekend)
                     state.copy(
                         showWeekend = personalization.showWeekend,
-                        weekFilterMode = WeekFilterMode.fromName(personalization.weekFilterMode),
                         weekDays = weekDays,
                         weekLabel = weekLabel
                     )
@@ -211,11 +191,6 @@ class TimetableViewModel(
         _uiState.update { it.copy(selectedDayOfWeek = dayOfWeek) }
     }
 
-    fun setWeekFilter(mode: WeekFilterMode) {
-        _uiState.update { it.copy(weekFilterMode = mode) }
-        prefsManager?.setWeekFilterMode(mode.name)
-    }
-
     fun previousWeek() {
         _uiState.update { state ->
             val newOffset = state.selectedWeekOffset - 1
@@ -223,8 +198,7 @@ class TimetableViewModel(
             state.copy(
                 selectedWeekOffset = newOffset,
                 weekDays = weekDays,
-                weekLabel = weekLabel,
-                currentWeekType = WeekParityUtil.weekTypeForOffset(newOffset)
+                weekLabel = weekLabel
             )
         }
     }
@@ -236,8 +210,7 @@ class TimetableViewModel(
             state.copy(
                 selectedWeekOffset = newOffset,
                 weekDays = weekDays,
-                weekLabel = weekLabel,
-                currentWeekType = WeekParityUtil.weekTypeForOffset(newOffset)
+                weekLabel = weekLabel
             )
         }
     }
@@ -249,7 +222,6 @@ class TimetableViewModel(
                 selectedWeekOffset = 0,
                 weekDays = weekDays,
                 weekLabel = weekLabel,
-                currentWeekType = WeekParityUtil.weekTypeForOffset(0),
                 selectedDayOfWeek = currentOrNextSchoolDay()
             )
         }

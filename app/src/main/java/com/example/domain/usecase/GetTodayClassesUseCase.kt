@@ -13,13 +13,11 @@ class GetTodayClassesUseCase {
     operator fun invoke(
         events: List<CalendarEvent>,
         today: LocalDate = LocalDate.now(),
-        now: LocalTime = LocalTime.now(),
-        weekTypeToday: Int = WeekParityUtil.weekTypeOf(today)
+        now: LocalTime = LocalTime.now()
     ): List<CalendarEvent> {
         val todayIso = today.toString()
         return events
             .filter { event -> isToday(event, todayIso) }
-            .filter { event -> matchesWeekType(event, weekTypeToday, today) }
             .sortedWith(
                 compareBy({ it.startHour }, { it.startMinute })
             )
@@ -49,11 +47,6 @@ class GetTodayClassesUseCase {
         }
     }
 
-    private fun matchesWeekType(event: CalendarEvent, weekTypeToday: Int, today: LocalDate): Boolean {
-        if (event.weekType == 0) return true
-        if (event.dateString.isNotBlank()) return true // pontos dátumú esemény mindig aktuális
-        return event.weekType == weekTypeToday
-    }
 }
 
 /** ISO hét sorszámából A/B (páratlan/páros) hét meghatározása. 1 = A (páratlan), 2 = B (páros). */

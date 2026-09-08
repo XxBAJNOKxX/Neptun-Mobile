@@ -102,8 +102,7 @@ object MockNeptunDataSource {
             endHour = 12,
             endMinute = 0,
             dayOfWeek = 3,
-            courseType = CourseType.PRACTICE,
-            weekType = 1
+            courseType = CourseType.PRACTICE
         ),
         CalendarEvent(
             id = "cal_7",

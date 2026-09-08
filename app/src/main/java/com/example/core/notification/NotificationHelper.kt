@@ -118,8 +118,7 @@ object NotificationHelper {
             .setContentIntent(pendingIntent)
             .build()
 
-        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        notificationManager.notify(notificationId, notification)
+        safeNotify(context, notificationId, notification)
     }
 
     fun showMessageNotification(
@@ -152,8 +151,7 @@ object NotificationHelper {
             .setContentIntent(pendingIntent)
             .build()
 
-        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        notificationManager.notify(notificationId, notification)
+        safeNotify(context, notificationId, notification)
     }
 
     fun showGradeNotification(
@@ -196,8 +194,7 @@ object NotificationHelper {
             .setContentIntent(pendingIntent)
             .build()
 
-        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        notificationManager.notify(notificationId, notification)
+        safeNotify(context, notificationId, notification)
     }
 
     /** Több új elem együttes összefoglaló értesítése (pl. "3 új üzenet"). */
@@ -231,8 +228,7 @@ object NotificationHelper {
             .setContentIntent(pendingIntent)
             .build()
 
-        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        notificationManager.notify(notificationId, notification)
+        safeNotify(context, notificationId, notification)
     }
 
     fun showFinanceNotification(
@@ -265,7 +261,20 @@ object NotificationHelper {
             .setContentIntent(pendingIntent)
             .build()
 
-        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        notificationManager.notify(notificationId, notification)
+        safeNotify(context, notificationId, notification)
+    }
+
+    /**
+     * Értesítés küldése biztonságosan: engedély-ellenőrzéssel és hibakezeléssel,
+     * hogy egy hiányzó engedély vagy egy rendszer-specifikus kivétel sose döntse
+     * le az appot.
+     */
+    private fun safeNotify(context: Context, notificationId: Int, notification: android.app.Notification) {
+        try {
+            if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) return
+            NotificationManagerCompat.from(context).notify(notificationId, notification)
+        } catch (e: Exception) {
+            android.util.Log.e("NotificationHelper", "Értesítés küldése sikertelen: ${e.message}")
+        }
     }
 }

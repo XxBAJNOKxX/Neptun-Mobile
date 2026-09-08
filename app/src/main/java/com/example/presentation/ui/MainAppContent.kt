@@ -32,10 +32,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.NeptunApp
+import com.example.core.crash.CrashReporter
 import com.example.core.export.IcsExporter
 import com.example.core.security.DataMode
 import com.example.presentation.navigation.NavigationItem
@@ -66,6 +68,54 @@ fun MainAppContent() {
     val context = LocalContext.current
     val app = context.applicationContext as NeptunApp
     val appContainer = app.appContainer
+
+    // Előző futás crash naplójának megjelenítése (ha volt)
+    var lastCrashLog by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) {
+        lastCrashLog = CrashReporter.consumeLastCrash(context)
+    }
+    lastCrashLog?.let { crashLog ->
+        AlertDialog(
+            onDismissRequest = { lastCrashLog = null },
+            title = { Text("Az alkalmazás váratlanul leállt") },
+            text = {
+                Column {
+                    Text(
+                        text = "Az előző futás hibanaplója (a hibajelentéshez másolható):",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = crashLog.take(3000),
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            fontSize = 10.sp
+                        ),
+                        maxLines = 12,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        modifier = Modifier.verticalScroll(rememberScrollState())
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE)
+                            as android.content.ClipboardManager
+                    clipboard.setPrimaryClip(
+                        android.content.ClipData.newPlainText("Neptun crash log", crashLog)
+                    )
+                    lastCrashLog = null
+                }) {
+                    Text("Másolás")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { lastCrashLog = null }) {
+                    Text("Bezárás")
+                }
+            }
+        )
+    }
 
     val appUpdateViewModel: AppUpdateViewModel = viewModel(factory = AppUpdateViewModel.Factory)
     val updateState by appUpdateViewModel.updateState.collectAsStateWithLifecycle()
@@ -195,12 +245,25 @@ private fun MainDashboard(
     val sessionExpired by appContainer.prefsManager.sessionExpiredFlow.collectAsStateWithLifecycle()
     val personalization by appContainer.prefsManager.personalizationFlow.collectAsStateWithLifecycle()
 
-    val startDestination = remember(personalization.startScreen) {
-        NavigationItem.fromName(personalization.startScreen)
+    // Elrejtett oldalak kiszűrése (a Profil mindig látható)
+    val visibleItems = remember(personalization.hiddenPages) {
+        NavigationItem.entries.filter { it == NavigationItem.SETTINGS || it.name !in personalization.hiddenPages }
+    }
+
+    val startDestination = remember(personalization.startScreen, personalization.hiddenPages) {
+        val preferred = NavigationItem.fromName(personalization.startScreen)
+        if (preferred in visibleItems) preferred else visibleItems.firstOrNull() ?: NavigationItem.SETTINGS
     }
 
     var currentDestination by rememberSaveable {
         mutableStateOf(startDestination)
+    }
+
+    // Ha a jelenlegi oldalt épp elrejtették, váltsunk a kezdőképernyőre
+    LaunchedEffect(visibleItems) {
+        if (currentDestination !in visibleItems) {
+            currentDestination = startDestination
+        }
     }
 
     // Vissza gomb: bármelyik fülről a kezdőképernyőre ugrik
@@ -276,8 +339,13 @@ private fun MainDashboard(
             bottomBar = {
                 NeptunBottomBar(
                     currentDestination = currentDestination,
+                    items = visibleItems,
                     unreadMessageCount = messagesState.unreadCount,
-                    onNavigate = { currentDestination = it }
+                    onNavigate = { item ->
+                        if (item in visibleItems) {
+                            currentDestination = item
+                        }
+                    }
                 )
             }
         ) { innerPadding ->
@@ -295,7 +363,11 @@ private fun MainDashboard(
                             uiState = dashboardState,
                             studentName = authState.credentials?.studentName ?: "Hallgató",
                             isDemoData = dataMode != DataMode.REAL,
-                            onNavigate = { currentDestination = it },
+                            onNavigate = { item ->
+                                if (item in visibleItems) {
+                                    currentDestination = item
+                                }
+                            },
                             onRefresh = dashboardViewModel::refresh
                         )
 
@@ -306,7 +378,6 @@ private fun MainDashboard(
                             onNextWeek = timetableViewModel::nextWeek,
                             onCurrentWeek = timetableViewModel::currentWeek,
                             onToggleWeekView = timetableViewModel::toggleWeekView,
-                            onWeekFilterChange = timetableViewModel::setWeekFilter,
                             onRefresh = timetableViewModel::refreshCalendar,
                             onScheduleReminder = timetableViewModel::scheduleClassReminder
                         )
@@ -360,8 +431,7 @@ private fun MainDashboard(
                             onQuietHoursWindowChange = settingsViewModel::setQuietHoursWindow,
                             onStartScreenChange = settingsViewModel::setStartScreen,
                             onShowWeekendChange = settingsViewModel::setShowWeekend,
-                            onWeekFilterModeChange = settingsViewModel::setWeekFilterMode,
-                            onHourRangeChange = settingsViewModel::setHourRange,
+                            onHiddenPagesChange = settingsViewModel::setHiddenPages,
                             onTargetCreditsChange = settingsViewModel::setTargetCredits,
                             onBiometricLockChange = settingsViewModel::setBiometricLockEnabled,
                             onExportIcs = {

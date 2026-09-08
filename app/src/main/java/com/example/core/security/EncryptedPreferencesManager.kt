@@ -31,11 +31,10 @@ enum class DataMode {
 data class AppPersonalization(
     val startScreen: String = "HOME",
     val showWeekend: Boolean = false,
-    val weekFilterMode: String = "ALL",
-    val firstHour: Int = 8,
-    val lastHour: Int = 20,
     val targetCredits: Int = 240,
-    val biometricLockEnabled: Boolean = false
+    val biometricLockEnabled: Boolean = false,
+    /** A kikapcsolt (elrejtett) oldalak nevei (NavigationItem.name). */
+    val hiddenPages: Set<String> = emptySet()
 )
 
 class EncryptedPreferencesManager(context: Context) : NotifiedStore {
@@ -143,11 +142,9 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
         return AppPersonalization(
             startScreen = prefs.getString(KEY_START_SCREEN, "HOME") ?: "HOME",
             showWeekend = prefs.getBoolean(KEY_SHOW_WEEKEND, false),
-            weekFilterMode = prefs.getString(KEY_WEEK_FILTER_MODE, "ALL") ?: "ALL",
-            firstHour = prefs.getInt(KEY_FIRST_HOUR, 8).coerceIn(6, 12),
-            lastHour = prefs.getInt(KEY_LAST_HOUR, 20).coerceIn(14, 24),
             targetCredits = prefs.getInt(KEY_TARGET_CREDITS, 240).coerceIn(30, 400),
-            biometricLockEnabled = prefs.getBoolean(KEY_BIOMETRIC_LOCK, false)
+            biometricLockEnabled = prefs.getBoolean(KEY_BIOMETRIC_LOCK, false),
+            hiddenPages = prefs.getStringSet(KEY_HIDDEN_PAGES, emptySet())?.toSet() ?: emptySet()
         )
     }
 
@@ -161,16 +158,8 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
         _personalizationFlow.value = loadPersonalization()
     }
 
-    fun setWeekFilterMode(mode: String) {
-        prefs.edit().putString(KEY_WEEK_FILTER_MODE, mode).apply()
-        _personalizationFlow.value = loadPersonalization()
-    }
-
-    fun setHourRange(first: Int, last: Int) {
-        prefs.edit()
-            .putInt(KEY_FIRST_HOUR, first.coerceIn(6, 12))
-            .putInt(KEY_LAST_HOUR, last.coerceIn(14, 24))
-            .apply()
+    fun setHiddenPages(hiddenPages: Set<String>) {
+        prefs.edit().putStringSet(KEY_HIDDEN_PAGES, hiddenPages).apply()
         _personalizationFlow.value = loadPersonalization()
     }
 
@@ -472,11 +461,9 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
             .putInt(KEY_CLASS_REMINDER_MINUTES, reminderMins)
             .putString(KEY_START_SCREEN, savedPersonalization.startScreen)
             .putBoolean(KEY_SHOW_WEEKEND, savedPersonalization.showWeekend)
-            .putString(KEY_WEEK_FILTER_MODE, savedPersonalization.weekFilterMode)
-            .putInt(KEY_FIRST_HOUR, savedPersonalization.firstHour)
-            .putInt(KEY_LAST_HOUR, savedPersonalization.lastHour)
             .putInt(KEY_TARGET_CREDITS, savedPersonalization.targetCredits)
             .putBoolean(KEY_BIOMETRIC_LOCK, savedPersonalization.biometricLockEnabled)
+            .putStringSet(KEY_HIDDEN_PAGES, savedPersonalization.hiddenPages)
             .putBoolean(KEY_QUIET_HOURS_ENABLED, savedNotifQuiet.quietHoursEnabled)
             .putInt(KEY_QUIET_START_MINUTE, savedNotifQuiet.quietStartMinute)
             .putInt(KEY_QUIET_END_MINUTE, savedNotifQuiet.quietEndMinute)
@@ -520,11 +507,9 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
         private const val KEY_QUIET_END_MINUTE = "key_quiet_end_minute"
         private const val KEY_START_SCREEN = "key_start_screen"
         private const val KEY_SHOW_WEEKEND = "key_show_weekend"
-        private const val KEY_WEEK_FILTER_MODE = "key_week_filter_mode"
-        private const val KEY_FIRST_HOUR = "key_first_hour"
-        private const val KEY_LAST_HOUR = "key_last_hour"
         private const val KEY_TARGET_CREDITS = "key_target_credits"
         private const val KEY_BIOMETRIC_LOCK = "key_biometric_lock"
+        private const val KEY_HIDDEN_PAGES = "key_hidden_pages"
         private const val KEY_DATA_MODE = "key_data_mode"
         private const val KEY_SESSION_EXPIRED = "key_session_expired"
         private const val KEY_NOTIFIED_PREFIX = "key_notified_"

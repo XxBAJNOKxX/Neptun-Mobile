@@ -19,6 +19,7 @@ import com.example.presentation.navigation.NavigationItem
 @Composable
 fun NeptunBottomBar(
     currentDestination: NavigationItem,
+    items: List<NavigationItem> = NavigationItem.entries,
     unreadMessageCount: Int,
     onNavigate: (NavigationItem) -> Unit,
     modifier: Modifier = Modifier
@@ -28,7 +29,7 @@ fun NeptunBottomBar(
             .windowInsetsPadding(WindowInsets.navigationBars)
             .testTag("neptun_bottom_navigation")
     ) {
-        NavigationItem.entries.forEach { item ->
+        items.forEach { item ->
             val selected = currentDestination == item
 
             NavigationBarItem(

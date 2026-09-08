@@ -98,26 +98,12 @@ class GetTodayClassesUseCaseTest {
     }
 
     @Test
-    fun `week type filter hides other parity events`() {
-        // 2030-09-02 hétfőjének ISO hete alapján számolt A/B típus
-        val weekType = WeekParityUtil.weekTypeOf(monday)
-        val opposite = if (weekType == 1) 2 else 1
-
-        val events = listOf(event(1, 8, weekType = weekType), event(1, 10, weekType = opposite))
+    fun `all week type events are visible regardless of parity`() {
+        // Az A/B hét szűrést eltávolítottuk: minden felvett óra látszik
+        val events = listOf(event(1, 8, weekType = 1), event(1, 10, weekType = 2))
         val classes = useCase(events, today = monday, now = LocalTime.of(7, 0))
 
-        assertEquals(1, classes.size)
-        assertEquals(weekType, classes.first().weekType)
-    }
-
-    @Test
-    fun `week type zero events always visible`() {
-        val classes = useCase(
-            events = listOf(event(1, 8, weekType = 0)),
-            today = monday,
-            now = LocalTime.of(7, 0)
-        )
-        assertEquals(1, classes.size)
+        assertEquals(2, classes.size)
     }
 
     @Test

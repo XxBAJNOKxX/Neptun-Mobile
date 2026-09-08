@@ -63,8 +63,10 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
+import androidx.compose.material.icons.filled.ArrowDropDownimport androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -101,7 +103,6 @@ import com.example.core.notification.NotificationHelper
 import com.example.core.security.AppPersonalization
 import com.example.core.security.NotificationPreferences
 import com.example.domain.model.StudentCredentials
-import com.example.domain.model.WeekFilterMode
 import com.example.presentation.navigation.NavigationItem
 import com.example.presentation.ui.components.NeptunTopBar
 import com.example.presentation.viewmodel.UpdateCheckState
@@ -137,8 +138,7 @@ fun SettingsScreen(
     onQuietHoursWindowChange: (Int, Int) -> Unit = { _, _ -> },
     onStartScreenChange: (String) -> Unit = {},
     onShowWeekendChange: (Boolean) -> Unit = {},
-    onWeekFilterModeChange: (String) -> Unit = {},
-    onHourRangeChange: (Int, Int) -> Unit = { _, _ -> },
+    onHiddenPagesChange: (Set<String>) -> Unit = {},
     onTargetCreditsChange: (Int) -> Unit = {},
     onBiometricLockChange: (Boolean) -> Unit = {},
     onExportIcs: () -> Unit = {},
@@ -880,7 +880,7 @@ fun SettingsScreen(
 
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
-                    // 1. Kezdőképernyő
+                    // 1. Kezdőképernyő (dropdown)
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
                             text = "Kezdőképernyő",
@@ -888,17 +888,46 @@ fun SettingsScreen(
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "Az alkalmazás megnyitásakor megjelenő alapértelmezett fül.",
+                            text = "Az alkalmazás megnyitásakor megjelenő alapértelmezett oldal.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        NavigationItem.entries.chunked(3).forEach { rowItems ->
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                rowItems.forEach { item ->
-                                    FilterChip(
-                                        selected = personalization.startScreen == item.name,
-                                        onClick = { onStartScreenChange(item.name) },
-                                        label = { Text(item.title, fontSize = 12.sp) }
+                        var startScreenDropdownOpen by remember { mutableStateOf(false) }
+                        val selectedStartItem = NavigationItem.entries.firstOrNull {
+                            it.name == personalization.startScreen
+                        } ?: NavigationItem.HOME
+                        Box {
+                            OutlinedButton(
+                                onClick = { startScreenDropdownOpen = true },
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = selectedStartItem.title,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Icon(
+                                    imageVector = Icons.Default.ArrowDropDown,
+                                    contentDescription = "Kiválasztás"
+                                )
+                            }
+                            DropdownMenu(
+                                expanded = startScreenDropdownOpen,
+                                onDismissRequest = { startScreenDropdownOpen = false }
+                            ) {
+                                NavigationItem.entries.forEach { item ->
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                item.title,
+                                                fontWeight = if (item == selectedStartItem) FontWeight.Bold else FontWeight.Normal
+                                            )
+                                        },
+                                        onClick = {
+                                            startScreenDropdownOpen = false
+                                            onStartScreenChange(item.name)
+                                        }
                                     )
                                 }
                             }
@@ -907,7 +936,7 @@ fun SettingsScreen(
 
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
-                    // 2. Órarend: hétvége + A/B hét
+                    // 2. Órarend: hétvége megjelenítése
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
                             text = "Órarend",
@@ -933,53 +962,48 @@ fun SettingsScreen(
                                 onCheckedChange = onShowWeekendChange
                             )
                         }
+                    }
 
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                    // 3. Látható oldalak: tetszőleges fül kikapcsolása
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
-                            text = "Alapértelmezett A/B hét szűrő",
+                            text = "Látható oldalak",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "A számodra nem hasznos oldalakat elrejtheted – eltűnnek az alsó sávból. A Profil mindig látható marad.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            WeekFilterMode.entries.forEach { mode ->
-                                FilterChip(
-                                    selected = personalization.weekFilterMode == mode.name,
-                                    onClick = { onWeekFilterModeChange(mode.name) },
-                                    label = { Text(mode.title, fontSize = 12.sp) }
-                                )
+                        NavigationItem.entries
+                            .filter { it != NavigationItem.SETTINGS }
+                            .forEach { item ->
+                                val isHidden = item.name in personalization.hiddenPages
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = item.title,
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                    Switch(
+                                        checked = !isHidden,
+                                        onCheckedChange = { visible ->
+                                            val newHidden = if (visible) {
+                                                personalization.hiddenPages - item.name
+                                            } else {
+                                                personalization.hiddenPages + item.name
+                                            }
+                                            onHiddenPagesChange(newHidden)
+                                        }
+                                    )
+                                }
                             }
-                        }
-
-                        Text(
-                            text = "Megjelenített órasáv: ${personalization.firstHour}:00 – ${personalization.lastHour}:00",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            OutlinedButton(
-                                onClick = { onHourRangeChange((personalization.firstHour - 1).coerceAtLeast(6), personalization.lastHour) },
-                                enabled = personalization.firstHour > 6,
-                                modifier = Modifier.weight(1f)
-                            ) { Text("− 1. óra") }
-                            OutlinedButton(
-                                onClick = { onHourRangeChange((personalization.firstHour + 1).coerceAtMost(12), personalization.lastHour) },
-                                enabled = personalization.firstHour < 12,
-                                modifier = Modifier.weight(1f)
-                            ) { Text("+ 1. óra") }
-                            OutlinedButton(
-                                onClick = { onHourRangeChange(personalization.firstHour, (personalization.lastHour - 1).coerceAtLeast(14)) },
-                                enabled = personalization.lastHour > 14,
-                                modifier = Modifier.weight(1f)
-                            ) { Text("− ut. óra") }
-                            OutlinedButton(
-                                onClick = { onHourRangeChange(personalization.firstHour, (personalization.lastHour + 1).coerceAtMost(24)) },
-                                enabled = personalization.lastHour < 24,
-                                modifier = Modifier.weight(1f)
-                            ) { Text("+ ut. óra") }
-                        }
                     }
 
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
