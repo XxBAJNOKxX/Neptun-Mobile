@@ -62,7 +62,7 @@ class NotifiedItemsTracker(
         if (notified.size > maxTrackedIds) {
             // Hegyében vágjuk a halmaznak; a régi elemek ismét "újak" lehetnek,
             // de ritka eset, és jobb mint a korlátlan növekedés.
-            store.setNotifiedIds(key, notified.takeLast(maxTrackedIds).toSet())
+            store.setNotifiedIds(key, notified.toList().takeLast(maxTrackedIds).toSet())
         } else {
             store.setNotifiedIds(key, notified)
         }

@@ -82,7 +82,8 @@ jobs:
             echo ""
             echo "### A hibák részletei (a Gradle logból szűrve)"
             echo '```'
-            { grep -nE "^e: |error:|FAILED|FAILURE|Execution failed|Caused by|\* What went wrong" /tmp/gradle.log || true; } | tail -n 150
+            { grep -nA6 "^e: " /tmp/gradle.log || true; } | tail -n 200
+            { grep -nE "error:|FAILED|FAILURE|Execution failed|Caused by|\* What went wrong" /tmp/gradle.log || true; } | tail -n 60
             echo '```'
             echo ""
             echo "_Automatikus jelentés a CI workflowból. Ha megjavult a build, ez az issue bezárható._"
