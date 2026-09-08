@@ -768,8 +768,9 @@ private fun TermStatisticsCard(
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = stat.termId.takeLast(3),
-                                fontSize = 9.sp,
+                                text = formatShortTermLabel(stat.termId),
+                                fontSize = 9.5.sp,
+                                fontWeight = FontWeight.Medium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 1
                             )
@@ -953,3 +954,42 @@ private fun ExamCard(exam: ExamItem) {
         }
     }
 }
+
+private fun formatShortTermLabel(raw: String): String {
+    if (raw.isBlank()) return ""
+    val cleaned = raw.trim()
+        .replace(Regex("""(?i)\s*félév.*"""), "")
+        .replace(Regex("""(?i)\s*felev.*"""), "")
+        .replace(Regex("""(?i)\s*semester.*"""), "")
+        .trim()
+
+    // e.g. "2025/26/1", "2025/2026/1", "25/26/1" -> "26/1"
+    val regexFull = Regex("""(?:20)?(\d{2})/(?:20)?(\d{2})/(\d)""")
+    val matchFull = regexFull.find(cleaned)
+    if (matchFull != null) {
+        val secondYear = matchFull.groupValues[2]
+        val termNum = matchFull.groupValues[3]
+        return "$secondYear/$termNum"
+    }
+
+    // e.g. "2025/1" or "2026/2" -> "25/1", "26/2"
+    val regexSingleYear = Regex("""(?:20)?(\d{2})/(\d)""")
+    val matchSingleYear = regexSingleYear.find(cleaned)
+    if (matchSingleYear != null) {
+        val year = matchSingleYear.groupValues[1]
+        val termNum = matchSingleYear.groupValues[2]
+        return "$year/$termNum"
+    }
+
+    // e.g. "26/1"
+    if (Regex("""^\d{2}/\d$""").matches(cleaned)) {
+        return cleaned
+    }
+
+    if (cleaned.length <= 4) {
+        return cleaned
+    }
+
+    return cleaned.takeLast(4)
+}
+
