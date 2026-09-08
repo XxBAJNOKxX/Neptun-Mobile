@@ -4,6 +4,7 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 import com.example.domain.model.CalendarEvent
 import com.example.domain.model.CourseType
+import com.example.domain.model.ExamItem
 import com.example.domain.model.FinanceItem
 import com.example.domain.model.FinanceStatus
 import com.example.domain.model.NeptunMessage
@@ -24,7 +25,8 @@ data class CalendarEventEntity(
     val endMinute: Int,
     val dayOfWeek: Int,
     val courseType: String,
-    val dateString: String
+    val dateString: String,
+    val weekType: Int = 0
 ) {
     fun toDomain(): CalendarEvent = CalendarEvent(
         id = id,
@@ -40,7 +42,8 @@ data class CalendarEventEntity(
         endMinute = endMinute,
         dayOfWeek = dayOfWeek,
         courseType = try { CourseType.valueOf(courseType) } catch (e: Exception) { CourseType.LECTURE },
-        dateString = dateString
+        dateString = dateString,
+        weekType = weekType
     )
 
     companion object {
@@ -58,7 +61,8 @@ data class CalendarEventEntity(
             endMinute = event.endMinute,
             dayOfWeek = event.dayOfWeek,
             courseType = event.courseType.name,
-            dateString = event.dateString
+            dateString = event.dateString,
+            weekType = event.weekType
         )
     }
 }
@@ -148,6 +152,48 @@ data class NeptunMessageEntity(
             bodyHtml = msg.bodyHtml,
             isRead = msg.isRead,
             isOfficial = msg.isOfficial
+        )
+    }
+}
+
+@Entity(tableName = "exam_items")
+data class ExamItemEntity(
+    @PrimaryKey val id: String,
+    val subjectName: String,
+    val subjectCode: String,
+    val courseCode: String,
+    val examDate: String,
+    val startTime: String,
+    val room: String,
+    val location: String,
+    val examType: String,
+    val isSignedUp: Boolean
+) {
+    fun toDomain(): ExamItem = ExamItem(
+        id = id,
+        subjectName = subjectName,
+        subjectCode = subjectCode,
+        courseCode = courseCode,
+        examDate = examDate,
+        startTime = startTime,
+        room = room,
+        location = location,
+        examType = examType,
+        isSignedUp = isSignedUp
+    )
+
+    companion object {
+        fun fromDomain(item: ExamItem): ExamItemEntity = ExamItemEntity(
+            id = item.id,
+            subjectName = item.subjectName,
+            subjectCode = item.subjectCode,
+            courseCode = item.courseCode,
+            examDate = item.examDate,
+            startTime = item.startTime,
+            room = item.room,
+            location = item.location,
+            examType = item.examType,
+            isSignedUp = item.isSignedUp
         )
     }
 }

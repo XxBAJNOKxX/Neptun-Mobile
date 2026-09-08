@@ -103,10 +103,11 @@ class AlarmScheduler(private val context: Context) {
     }
 
     private fun generateClassKey(event: CalendarEvent): String {
+        // A tantárgykód + kurzuskód + terem bevonásával csökkentjük a hashCode ütközések esélyét.
         return if (event.dateString.isNotBlank()) {
-            "${event.subjectName.trim()}_${event.dateString.take(10)}_${event.startHour}:${event.startMinute}"
+            "${event.subjectName.trim()}_${event.subjectCode.trim()}_${event.courseCode.trim()}_${event.dateString.take(10)}_${event.startHour}:${event.startMinute}"
         } else {
-            "${event.subjectName.trim()}_day${event.dayOfWeek}_${event.startHour}:${event.startMinute}"
+            "${event.subjectName.trim()}_${event.subjectCode.trim()}_${event.courseCode.trim()}_day${event.dayOfWeek}_${event.startHour}:${event.startMinute}"
         }
     }
 

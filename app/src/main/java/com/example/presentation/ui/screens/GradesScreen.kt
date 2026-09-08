@@ -38,9 +38,13 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.ScrollableTabRow
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,6 +55,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.example.domain.model.ExamItem
 import com.example.domain.model.SubjectGrade
 import com.example.presentation.ui.components.GradeBadge
 import com.example.presentation.ui.components.NeptunTopBar
@@ -63,6 +68,7 @@ import com.example.ui.theme.NeptunPurple
 import com.example.ui.theme.NeptunRed
 
 @Composable
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 fun GradesScreen(
     uiState: GradesUiState,
     onSelectTerm: (String) -> Unit,
@@ -70,7 +76,9 @@ fun GradesScreen(
     onCloseGhostDialog: () -> Unit,
     onSetGhostGrade: (String, Int?) -> Unit,
     onResetAllGhostGrades: () -> Unit,
+    onTabSelect: (Int) -> Unit = {},
     onRefresh: () -> Unit,
+    onRefreshExams: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -81,9 +89,36 @@ fun GradesScreen(
         NeptunTopBar(
             title = "Jegyek & Átlagszámítás",
             subtitle = "Kreditindex és Szellemjegy kalkulátor",
-            isRefreshing = uiState.isRefreshing,
-            onRefresh = onRefresh
+            isRefreshing = if (uiState.selectedTab == 0) uiState.isRefreshing else uiState.isRefreshingExams,
+            onRefresh = if (uiState.selectedTab == 0) onRefresh else onRefreshExams
         )
+
+        // Jegyek / Vizsgák váltó
+        SingleChoiceSegmentedButtonRow(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+        ) {
+            SegmentedButton(
+                selected = uiState.selectedTab == 0,
+                onClick = { onTabSelect(0) },
+                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+            ) {
+                Text("Jegyek")
+            }
+            SegmentedButton(
+                selected = uiState.selectedTab == 1,
+                onClick = { onTabSelect(1) },
+                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
+            ) {
+                Text("Vizsgák")
+            }
+        }
+
+        if (uiState.selectedTab == 1) {
+            ExamsTabContent(exams = uiState.exams, isRefreshing = uiState.isRefreshingExams, onRefresh = onRefreshExams)
+            return
+        }
 
         // Semester selector tabs
         if (uiState.availableTerms.isNotEmpty()) {
@@ -111,6 +146,11 @@ fun GradesScreen(
             }
         }
 
+        PullToRefreshBox(
+            isRefreshing = uiState.isRefreshing,
+            onRefresh = onRefresh,
+            modifier = Modifier.fillMaxSize()
+        ) {
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -124,6 +164,15 @@ fun GradesScreen(
                 AcademicSummaryCard(
                     uiState = uiState,
                     onResetAllGhostGrades = onResetAllGhostGrades
+                )
+            }
+
+            // Féléves statisztika: kreditindex diagram + kredithaladás
+            item {
+                TermStatisticsCard(
+                    termStats = uiState.termStats,
+                    totalCompletedCredits = uiState.totalCompletedCredits,
+                    targetCredits = uiState.targetCredits
                 )
             }
 
@@ -179,6 +228,7 @@ fun GradesScreen(
             }
 
             item { Spacer(modifier = Modifier.height(20.dp)) }
+        }
         }
     }
 
@@ -638,6 +688,267 @@ private fun GhostMarkPickerModal(
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun TermStatisticsCard(
+    termStats: List<com.example.presentation.viewmodel.TermStat>,
+    totalCompletedCredits: Int,
+    targetCredits: Int
+) {
+    Card(
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Féléves statisztika",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Icon(
+                    imageVector = Icons.Default.TrendingUp,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            if (termStats.isEmpty()) {
+                Text(
+                    text = "Még nincs elég adat a statisztikához.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                // Súlyozott átlag oszlopdiagram félévenként
+                val maxAvg = termStats.maxOf { it.weightedAverage }.coerceAtLeast(1.0)
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(120.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
+                    verticalAlignment = Alignment.Bottom
+                ) {
+                    termStats.forEach { stat ->
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                text = if (stat.weightedAverage > 0) "%.2f".format(stat.weightedAverage) else "-",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth(0.6f)
+                                    .height(((stat.weightedAverage / maxAvg) * 72.0).coerceIn(3.0, 72.0).dp)
+                                    .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
+                                    .background(
+                                        if (stat.weightedAverage >= 4.0) NeptunGreen
+                                        else if (stat.weightedAverage >= 3.0) NeptunCyan40
+                                        else MaterialTheme.colorScheme.primary
+                                    )
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = stat.termId.takeLast(3),
+                                fontSize = 9.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Kredithaladás a célig
+            val progress = if (targetCredits > 0) {
+                (totalCompletedCredits.toFloat() / targetCredits.toFloat()).coerceIn(0f, 1f)
+            } else 0f
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Kredithaladás",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "$totalCompletedCredits / $targetCredits kredit",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            LinearProgressIndicator(
+                progress = { progress },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp)
+                    .clip(RoundedCornerShape(4.dp)),
+                color = NeptunGreen,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+            Text(
+                text = "A célt a Beállítások → Tanulmányok menüben módosíthatod.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 10.sp,
+                modifier = Modifier.padding(top = 6.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun ExamsTabContent(
+    exams: List<ExamItem>,
+    isRefreshing: Boolean,
+    onRefresh: () -> Unit
+) {
+    androidx.compose.material3.pulltorefresh.PullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = onRefresh,
+        modifier = Modifier.fillMaxSize()
+    ) {
+        if (exams.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(32.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(
+                        imageVector = Icons.Default.HourglassEmpty,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(48.dp)
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "Nem található vizsgaadat.",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "A vizsgalista ezen az egyetemi szerveren nem elérhető, vagy nincs felvett vizsgád. (Kísérleti funkció)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                item { Spacer(modifier = Modifier.height(4.dp)) }
+                items(exams) { exam ->
+                    ExamCard(exam = exam)
+                }
+                item { Spacer(modifier = Modifier.height(20.dp)) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ExamCard(exam: ExamItem) {
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (exam.examType.isNotBlank()) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        shape = RoundedCornerShape(6.dp)
+                    ) {
+                        Text(
+                            text = exam.examType,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+                if (!exam.isSignedUp) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.errorContainer,
+                        shape = RoundedCornerShape(6.dp)
+                    ) {
+                        Text(
+                            text = "Nincs jelentkezve",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = exam.subjectName,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            val details = listOfNotNull(
+                exam.examDate.takeIf { it.isNotBlank() },
+                exam.startTime.takeIf { it.isNotBlank() },
+                listOf(exam.room, exam.location).filter { it.isNotBlank() }.distinct().joinToString(", ").takeIf { it.isNotBlank() },
+                exam.courseCode.takeIf { it.isNotBlank() }
+            ).joinToString(" · ")
+
+            Text(
+                text = details.ifEmpty { "Nincs részletinformáció" },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }

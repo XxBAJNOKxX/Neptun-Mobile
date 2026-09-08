@@ -200,6 +200,41 @@ object NotificationHelper {
         notificationManager.notify(notificationId, notification)
     }
 
+    /** Több új elem együttes összefoglaló értesítése (pl. "3 új üzenet"). */
+    fun showSummaryNotification(
+        context: Context,
+        channelId: String,
+        notificationId: Int,
+        title: String,
+        text: String,
+        priorityHigh: Boolean = false
+    ) {
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            notificationId,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notification = NotificationCompat.Builder(context, channelId)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle(title)
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setPriority(
+                if (priorityHigh) NotificationCompat.PRIORITY_HIGH else NotificationCompat.PRIORITY_DEFAULT
+            )
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
+            .build()
+
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        notificationManager.notify(notificationId, notification)
+    }
+
     fun showFinanceNotification(
         context: Context,
         notificationId: Int,

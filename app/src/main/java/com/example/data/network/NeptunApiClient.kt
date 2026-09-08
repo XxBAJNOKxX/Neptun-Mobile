@@ -4,6 +4,7 @@ import android.util.Base64
 import android.util.Log
 import com.example.domain.model.CalendarEvent
 import com.example.domain.model.CourseType
+import com.example.domain.model.ExamItem
 import com.example.domain.model.FinanceItem
 import com.example.domain.model.FinanceStatus
 import com.example.domain.model.Neptun2FASession
@@ -82,31 +83,18 @@ class NeptunApiClient {
         coerceInputValues = true
     }
 
-    private val trustAllCerts = arrayOf<TrustManager>(object : X509TrustManager {
-        override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
-        override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
-        override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
-    })
-
-    private val okHttpClient: OkHttpClient = try {
-        val sslContext = SSLContext.getInstance("TLS").apply {
-            init(null, trustAllCerts, SecureRandom())
-        }
-        OkHttpClient.Builder()
-            .sslSocketFactory(sslContext.socketFactory, trustAllCerts[0] as X509TrustManager)
-            .hostnameVerifier(HostnameVerifier { _, _ -> true })
-            .connectTimeout(20, TimeUnit.SECONDS)
-            .readTimeout(25, TimeUnit.SECONDS)
-            .writeTimeout(20, TimeUnit.SECONDS)
-            .followRedirects(true)
-            .followSslRedirects(true)
-            .build()
-    } catch (e: Exception) {
-        OkHttpClient.Builder()
-            .connectTimeout(20, TimeUnit.SECONDS)
-            .readTimeout(25, TimeUnit.SECONDS)
-            .build()
-    }
+    /**
+     * Biztonságos kliens: a rendszer tanúsítványtárával ellenőrzi a TLS kapcsolatot.
+     * Korábban itt minden tanúsítványt elfogadó (trust-all) megoldás volt, ami
+     * MITM támadásnak tette ki a bejelentkezési adatokat – ez eltávolítva.
+     */
+    private val okHttpClient: OkHttpClient = OkHttpClient.Builder()
+        .connectTimeout(20, TimeUnit.SECONDS)
+        .readTimeout(25, TimeUnit.SECONDS)
+        .writeTimeout(20, TimeUnit.SECONDS)
+        .followRedirects(true)
+        .followSslRedirects(true)
+        .build()
 
     fun normalizeBaseUrl(rawUrl: String): String {
         var url = rawUrl.trim()
@@ -1094,6 +1082,28 @@ class NeptunApiClient {
         }
     }
 
+    /**
+     * A/B hét (páratlan/páros) jelzés kiolvasása a naptár elemből.
+     * 0 = minden héten, 1 = páratlan (A) hét, 2 = páros (B) hét.
+     */
+    private fun parseWeekType(obj: JsonObject): Int {
+        val candidates = listOf("weekType", "WeekType", "EvenOddWeek", "EvenOddWeekFlag", "WeekFlag", "HetTipus", "ParosHet")
+        for (key in candidates) {
+            val value = obj[key] ?: continue
+            val primitive = value as? JsonPrimitive ?: continue
+            val intVal = primitive.intOrNull
+            if (intVal != null) {
+                return intVal.coerceIn(0, 2)
+            }
+            val text = primitive.contentOrNull?.trim()?.lowercase() ?: continue
+            when {
+                text.contains("odd") || text.contains("paratlan") || text.contains("páratlan") || text == "a" -> return 1
+                text.contains("even") || text.contains("paros") || text.contains("páros") || text == "b" -> return 2
+            }
+        }
+        return 0
+    }
+
     private suspend fun fetchModernCalendarEvents(
         baseUrl: String,
         token: String,
@@ -1177,6 +1187,7 @@ class NeptunApiClient {
 
                 val dayOfWeekNum = startDt.dayOfWeek.value
                 val courseType = detectCourseType(item, courseCode, name)
+                val weekType = parseWeekType(obj)
 
                 list.add(
                     CalendarEvent(
@@ -1193,7 +1204,8 @@ class NeptunApiClient {
                         endMinute = endDt.minute,
                         dayOfWeek = dayOfWeekNum,
                         courseType = courseType,
-                        dateString = startDt.toLocalDate().toString()
+                        dateString = startDt.toLocalDate().toString(),
+                        weekType = weekType
                     )
                 )
             }
@@ -2020,6 +2032,205 @@ class NeptunApiClient {
             .replace("&lt;", "<")
             .replace("&gt;", ">")
             .trim()
+    }
+
+    // --- EXAMS (kísérleti támogatás) ---
+
+    /**
+     * Vizsgák lekérése. Először a modern API végpontjait próbálja, majd a legacy
+     * MobileService hívást. Ha egyetlen forrás sem ad értelmezhető adatot, üres
+     * listát ad vissza (a hívó oldalon ez "nincs elérhető vizsgaadat" üzenetet jelent).
+     */
+    suspend fun getExams(
+        baseUrl: String,
+        token: String,
+        username: String,
+        password: String,
+        isModern: Boolean
+    ): List<ExamItem> = withContext(Dispatchers.IO) {
+        if (!isModern) {
+            return@withContext getLegacyExams(baseUrl, username, password)
+        }
+
+        val modernPaths = listOf(
+            "/api/Exam/GetExams",
+            "/api/Student/GetExams",
+            "/api/Exams/GetExams"
+        )
+        for (path in modernPaths) {
+            try {
+                val req = Request.Builder()
+                    .url("$baseUrl$path")
+                    .get()
+                    .addHeader("Authorization", "Bearer $token")
+                    .addHeader("Content-Type", "application/json")
+                    .build()
+                val resp = okHttpClient.newCall(req).execute()
+                if (!resp.isSuccessful) continue
+                val body = resp.body?.string() ?: ""
+                val parsed = safeParseJson(body) ?: continue
+                val items = parseExamItems(parsed)
+                if (items.isNotEmpty()) return@withContext items
+            } catch (e: Exception) {
+                Log.e(tag, "Modern exams fetch error ($path): ${e.message}")
+            }
+        }
+
+        if (username.isNotEmpty() && password.isNotEmpty()) {
+            return@withContext getLegacyExams(baseUrl, username, password)
+        }
+        emptyList()
+    }
+
+    private suspend fun getLegacyExams(baseUrl: String, user: String, pass: String): List<ExamItem> = withContext(Dispatchers.IO) {
+        try {
+            val body = """
+                {
+                    "UserLogin": "$user",
+                    "Password": "$pass",
+                    "TotalRowCount": -1,
+                    "CurrentPage": 0
+                }
+            """.trimIndent()
+
+            val url = getLegacyServiceUrl(baseUrl, "GetExamData")
+            val req = Request.Builder()
+                .url(url)
+                .post(body.toRequestBody("application/json".toMediaType()))
+                .addHeader("Content-Type", "application/json")
+                .build()
+
+            val resp = okHttpClient.newCall(req).execute()
+            if (!resp.isSuccessful) return@withContext emptyList()
+            val respBody = resp.body?.string() ?: ""
+            val parsed = safeParseJson(respBody) ?: return@withContext emptyList()
+            parseExamItems(parsed)
+        } catch (e: Exception) {
+            Log.e(tag, "Legacy exams error: ${e.message}")
+            emptyList()
+        }
+    }
+
+    /** Előnézet nélküli, elnéző vizsgalista-parsolás: több mezőnév variánst is támogat. */
+    private fun parseExamItems(root: JsonElement): List<ExamItem> {
+        val items = mutableListOf<ExamItem>()
+        try {
+            val arraysToCheck = mutableListOf<JsonArray>()
+            collectArrays(root, arraysToCheck, depth = 0)
+            for (array in arraysToCheck) {
+                for (element in array) {
+                    val obj = element as? JsonObject ?: continue
+                    val name = firstNonBlank(
+                        obj,
+                        "subjectName", "SubjectName", "name", "Name", "targyNeve", "TargyNeve", "examName", "title"
+                    ) ?: continue
+                    if (name.length < 2) continue
+
+                    val dateRaw = firstNonBlank(
+                        obj,
+                        "examDate", "ExamDate", "date", "Date", "idopont", "Idopont", "datum", "Datum", "startDate", "start"
+                    ) ?: ""
+                    val timeRaw = firstNonBlank(
+                        obj,
+                        "startTime", "StartTime", "time", "Time", "kezdes", "Kezdes", "start"
+                    ) ?: ""
+                    val room = firstNonBlank(obj, "room", "Room", "terem", "Terem", "rooms", "location", "helyszin") ?: ""
+                    val location = firstNonBlank(obj, "location", "Location", "epulet", "Epulet", "building") ?: room
+                    val subjectCode = firstNonBlank(obj, "subjectCode", "SubjectCode", "targyKod", "TargyKod") ?: ""
+                    val courseCode = firstNonBlank(obj, "courseCode", "CourseCode", "kurzusKod") ?: ""
+                    val examType = firstNonBlank(
+                        obj,
+                        "examType", "ExamType", "examTypeName", "vizsgaTipus", "VizsgaTipus", "type"
+                    ) ?: ""
+
+                    val (examDate, startTime) = normalizeExamDateTime(dateRaw, timeRaw)
+                    val isSignedUp = obj["isSignedUp"]?.jsonPrimitive?.booleanOrNull
+                        ?: obj["signedUp"]?.jsonPrimitive?.booleanOrNull
+                        ?: true
+
+                    items.add(
+                        ExamItem(
+                            id = firstNonBlank(obj, "id", "Id", "examId", "ExamId", "vizsgaId")
+                                ?: "exam_${name.hashCode()}_${dateRaw.hashCode()}",
+                            subjectName = name,
+                            subjectCode = subjectCode,
+                            courseCode = courseCode,
+                            examDate = examDate,
+                            startTime = startTime,
+                            room = room,
+                            location = location,
+                            examType = examType,
+                            isSignedUp = isSignedUp
+                        )
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "parseExamItems error: ${e.message}")
+        }
+        return items.distinctBy { it.id }
+    }
+
+    private fun collectArrays(element: JsonElement, out: MutableList<JsonArray>, depth: Int) {
+        if (depth > 4) return
+        when (element) {
+            is JsonArray -> {
+                if (element.isNotEmpty() && element.first() is JsonObject) {
+                    out.add(element)
+                }
+                element.forEach { collectArrays(it, out, depth + 1) }
+            }
+            is JsonObject -> element.values.forEach { collectArrays(it, out, depth + 1) }
+            else -> Unit
+        }
+    }
+
+    private fun firstNonBlank(obj: JsonObject, vararg keys: String): String? {
+        for (key in keys) {
+            val value = obj[key] as? JsonPrimitive ?: continue
+            val content = value.contentOrNull ?: continue
+            if (content.isNotBlank() && content != "null") return content.trim()
+        }
+        return null
+    }
+
+    private fun normalizeExamDateTime(dateRaw: String, timeRaw: String): Pair<String, String> {
+        var examDate = ""
+        var startTime = ""
+
+        // "/Date(1698796800000)/" epoch formátum
+        val epochMatch = Regex("""\D(\d{10,13})\D?""").find(dateRaw)
+        if (epochMatch != null) {
+            val raw = epochMatch.groupValues[1]
+            val epoch = if (raw.length == 13) raw.toLong() else raw.toLong() * 1000
+            val ldt = Instant.ofEpochMilli(epoch).atZone(ZoneId.systemDefault()).toLocalDateTime()
+            examDate = ldt.toLocalDate().toString()
+            startTime = "%02d:%02d".format(ldt.hour, ldt.minute)
+        } else {
+            val digits = dateRaw.replace(Regex("""\D"""), "")
+            when {
+                digits.length == 8 -> {
+                    examDate = "${digits.substring(0, 4)}-${digits.substring(4, 6)}-${digits.substring(6, 8)}"
+                }
+                dateRaw.contains("-") && dateRaw.length >= 10 -> {
+                    examDate = dateRaw.substring(0, 10)
+                }
+                dateRaw.contains(".") -> {
+                    val parts = dateRaw.split(".")
+                    if (parts.size >= 3) {
+                        val year = parts[0].take(4)
+                        val month = parts[1].padStart(2, '0').take(2)
+                        val day = parts[2].padStart(2, '0').take(2)
+                        if (year.length == 4) examDate = "$year-$month-$day"
+                    }
+                }
+            }
+            val timeMatch = Regex("""(\d{1,2}):(\d{2})""").find(timeRaw.ifEmpty { dateRaw })
+            if (timeMatch != null) {
+                startTime = "%02d:%s".format(timeMatch.groupValues[1].toInt(), timeMatch.groupValues[2])
+            }
+        }
+        return examDate to startTime
     }
 
     // --- FINANCES & TRANSACTIONS ---
