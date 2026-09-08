@@ -333,6 +333,16 @@ object MockNeptunDataSource {
 
     fun getMockMessages(): List<NeptunMessage> = listOf(
         NeptunMessage(
+            id = "msg_0",
+            subject = "Kurzus órarendi változás",
+            sender = "Rendszerüzenet",
+            sendDate = "2026.09.08 15:49",
+            previewText = "Tisztelt Hallgató! Tájékoztatjuk, hogy 'mérnökinformatikus (IANI-MI)' képzésén 2026/27/1 félévben a 'P-ITMAT-0043A-Alkalmazott analízis I.' tárgyhoz tartozó kurzus órarendi időpontjai megváltoztak...",
+            bodyHtml = "<p>Tisztelt Hallgató!</p><p>Tájékoztatjuk, hogy 'mérnökinformatikus (IANI-MI)' képzésén 2026/27/1 félévben a 'P-ITMAT-0043A-Alkalmazott analízis I.' tárgyhoz tartozó '00' kódú kurzus órarendi időpontjai megváltoztak, a változások félkövérrel jelölve:</p><p><b>Aktuális órarendi információ:</b></p><table border=\"1\"><thead><tr><th>Óra eleje</th><th>Óra vége</th><th>Terem</th><th>Oktató</th></tr></thead><tbody><tr><td>2026. 09. 08. 13:15:00</td><td>2026. 09. 08. 15:00:00</td><td>ITK Simonyi ea. 006.</td><td><b>Dr. Fogarasi Norbert, Molnár Gyula</b></td></tr><tr><td>2026. 09. 09. 14:15:00</td><td>2026. 09. 09. 16:00:00</td><td>ITK Simonyi ea. 006.</td><td><b>Dr. Fogarasi Norbert, Molnár Gyula</b></td></tr><tr><td>2026. 09. 10. 10:15:00</td><td>2026. 09. 10. 12:00:00</td><td>ITK Simonyi ea. 006.</td><td><b>Dr. Fogarasi Norbert, Molnár Gyula</b></td></tr></tbody></table>",
+            isRead = false,
+            isOfficial = true
+        ),
+        NeptunMessage(
             id = "msg_1",
             subject = "Órarendi változás - Mesterséges intelligencia labor",
             sender = "Dr. Szabó Péter (Oktató)",
