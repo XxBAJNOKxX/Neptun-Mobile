@@ -7,10 +7,12 @@ import android.os.Build
 import android.provider.Settings
 import androidx.core.content.FileProvider
 import com.example.BuildConfig
+import com.example.core.security.UpdateChannel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
@@ -46,11 +48,17 @@ class AppUpdateManager(
         .build()
 ) {
 
-    suspend fun checkForUpdates(): UpdateInfo? = withContext(Dispatchers.IO) {
+    suspend fun checkForUpdates(channel: UpdateChannel = UpdateChannel.STABLE): UpdateInfo? = withContext(Dispatchers.IO) {
         val repo = BuildConfig.GITHUB_REPO
         try {
+            val url = if (channel == UpdateChannel.STABLE) {
+                "https://api.github.com/repos/$repo/releases/latest"
+            } else {
+                "https://api.github.com/repos/$repo/releases"
+            }
+
             val request = Request.Builder()
-                .url("https://api.github.com/repos/$repo/releases/latest")
+                .url(url)
                 .header("Accept", "application/vnd.github.v3+json")
                 .header("User-Agent", "NeptunMobileApp")
                 .build()
@@ -59,14 +67,20 @@ class AppUpdateManager(
                 if (!response.isSuccessful) return@withContext null
 
                 val body = response.body?.string() ?: return@withContext null
-                val json = JSONObject(body)
+                val releaseObj: JSONObject = if (channel == UpdateChannel.DEV) {
+                    val jsonArray = JSONArray(body)
+                    if (jsonArray.length() == 0) return@withContext null
+                    jsonArray.getJSONObject(0)
+                } else {
+                    JSONObject(body)
+                }
 
-                val tagName = json.optString("tag_name", "").trim()
-                val htmlUrl = json.optString("html_url", "https://github.com/$repo/releases")
-                val releaseNotes = json.optString("body", "").trim()
+                val tagName = releaseObj.optString("tag_name", "").trim()
+                val htmlUrl = releaseObj.optString("html_url", "https://github.com/$repo/releases")
+                val releaseNotes = releaseObj.optString("body", "").trim()
 
                 var apkDownloadUrl: String? = null
-                val assets = json.optJSONArray("assets")
+                val assets = releaseObj.optJSONArray("assets")
                 if (assets != null) {
                     for (i in 0 until assets.length()) {
                         val asset = assets.getJSONObject(i)
@@ -178,17 +192,37 @@ class AppUpdateManager(
     }
 
     fun isNewerVersion(latest: String, current: String): Boolean {
-        val cleanLatest = latest.removePrefix("v").trim()
-        val cleanCurrent = current.removePrefix("v").trim()
-        val lParts = cleanLatest.split(".").mapNotNull { it.toIntOrNull() }
-        val cParts = cleanCurrent.split(".").mapNotNull { it.toIntOrNull() }
-        val maxLen = maxOf(lParts.size, cParts.size)
-        for (i in 0 until maxLen) {
-            val l = lParts.getOrElse(i) { 0 }
-            val c = cParts.getOrElse(i) { 0 }
-            if (l > c) return true
-            if (l < c) return false
+        val lVer = ParsedVersion.parse(latest)
+        val cVer = ParsedVersion.parse(current)
+        return lVer.isNewerThan(cVer)
+    }
+
+    private data class ParsedVersion(
+        val major: Int,
+        val minor: Int,
+        val patch: Int,
+        val isDev: Boolean
+    ) {
+        fun isNewerThan(other: ParsedVersion): Boolean {
+            if (this.major != other.major) return this.major > other.major
+            if (this.minor != other.minor) return this.minor > other.minor
+            if (this.patch != other.patch) return this.patch > other.patch
+            if (this.isDev != other.isDev) {
+                return !this.isDev && other.isDev
+            }
+            return false
         }
-        return false
+
+        companion object {
+            fun parse(raw: String): ParsedVersion {
+                val clean = raw.removePrefix("v").trim()
+                val isDev = clean.contains("dev", ignoreCase = true)
+                val numbers = Regex("\\d+").findAll(clean).map { it.value.toInt() }.toList()
+                val major = numbers.getOrElse(0) { 0 }
+                val minor = numbers.getOrElse(1) { 0 }
+                val patch = numbers.getOrElse(2) { 0 }
+                return ParsedVersion(major, minor, patch, isDev)
+            }
+        }
     }
 }
