@@ -88,7 +88,12 @@ class SyncWorker(
         val unread = messages.filter { !it.isRead }
         if (unread.isEmpty()) return
 
-        val newOnes = tracker.filterNewItems(KEY_MESSAGES, unread) { it.id }
+        val newOnes = tracker.filterNewItems(
+            key = KEY_MESSAGES,
+            items = unread,
+            idOf = { it.id },
+            altIdOf = { "${it.sender.trim()}_${it.subject.trim()}_${it.sendDate.trim()}" }
+        )
         if (newOnes.isEmpty()) return
 
         if (newOnes.size == 1) {
@@ -109,7 +114,10 @@ class SyncWorker(
                 text = newOnes.take(4).joinToString("\n") { "• ${it.sender}: ${it.subject}" }
             )
         }
-        tracker.markNotified(KEY_MESSAGES, newOnes.map { it.id })
+        val idsToMark = newOnes.flatMap { msg ->
+            listOf(msg.id, "${msg.sender.trim()}_${msg.subject.trim()}_${msg.sendDate.trim()}")
+        }
+        tracker.markNotified(KEY_MESSAGES, idsToMark)
     }
 
     private suspend fun notifyNewGrades(app: NeptunApp, tracker: NotifiedItemsTracker) {
@@ -117,7 +125,12 @@ class SyncWorker(
         val graded = grades.filter { it.grade != null }
         if (graded.isEmpty()) return
 
-        val newOnes = tracker.filterNewItems(KEY_GRADES, graded) { it.id }
+        val newOnes = tracker.filterNewItems(
+            key = KEY_GRADES,
+            items = graded,
+            idOf = { it.id },
+            altIdOf = { "${it.subjectName.trim()}_${it.gradeText.trim()}" }
+        )
         if (newOnes.isEmpty()) return
 
         if (newOnes.size == 1) {
@@ -140,7 +153,10 @@ class SyncWorker(
                 priorityHigh = true
             )
         }
-        tracker.markNotified(KEY_GRADES, newOnes.map { it.id })
+        val idsToMark = newOnes.flatMap { grade ->
+            listOf(grade.id, "${grade.subjectName.trim()}_${grade.gradeText.trim()}")
+        }
+        tracker.markNotified(KEY_GRADES, idsToMark)
     }
 
     private suspend fun notifyPendingFinances(app: NeptunApp, tracker: NotifiedItemsTracker) {
@@ -151,7 +167,12 @@ class SyncWorker(
         }
         if (pending.isEmpty()) return
 
-        val newOnes = tracker.filterNewItems(KEY_FINANCES, pending) { it.id }
+        val newOnes = tracker.filterNewItems(
+            key = KEY_FINANCES,
+            items = pending,
+            idOf = { it.id },
+            altIdOf = { "${it.title.trim()}_${it.amountHuf}_${it.dueDate.trim()}" }
+        )
         if (newOnes.isEmpty()) return
 
         if (newOnes.size == 1) {
@@ -172,7 +193,10 @@ class SyncWorker(
                 text = newOnes.take(4).joinToString("\n") { "• ${it.title} – ${it.amountHuf} Ft (határidő: ${it.dueDate})" }
             )
         }
-        tracker.markNotified(KEY_FINANCES, newOnes.map { it.id })
+        val idsToMark = newOnes.flatMap { item ->
+            listOf(item.id, "${item.title.trim()}_${item.amountHuf}_${item.dueDate.trim()}")
+        }
+        tracker.markNotified(KEY_FINANCES, idsToMark)
     }
 
     private suspend fun scheduleClassAlarms(app: NeptunApp, notifPrefs: com.example.core.security.NotificationPreferences) {
