@@ -118,16 +118,18 @@ class AuthRepositoryImpl(
                 Result.failure(TwoFactorSessionRequiredException(authResult.session))
             }
             is NeptunAuthResult.Success -> {
+                val loginUrl = university.neptunUrl.ifEmpty { authResult.normalizedBaseUrl }
                 prefsManager.saveCredentials(
                     neptunCode = trimmedCode,
                     password = trimmedPassword,
                     universityId = university.id,
                     universityName = university.name,
-                    neptunUrl = authResult.normalizedBaseUrl,
+                    neptunUrl = loginUrl,
                     studentName = authResult.studentName,
                     sessionToken = authResult.accessToken,
                     trainingProgram = authResult.trainingProgram
                 )
+                prefsManager.setLoginUrl(loginUrl)
                 prefsManager.setAccessToken(authResult.accessToken)
                 authResult.refreshToken?.let { prefsManager.setRefreshToken(it) }
                 authResult.deviceCookie?.let { prefsManager.setDeviceCookie(trimmedCode, it) }
@@ -141,7 +143,7 @@ class AuthRepositoryImpl(
                     neptunCode = trimmedCode,
                     universityId = university.id,
                     universityName = university.name,
-                    neptunUrl = authResult.normalizedBaseUrl,
+                    neptunUrl = loginUrl,
                     studentName = authResult.studentName,
                     trainingProgram = authResult.trainingProgram,
                     isLoggedIn = true,
@@ -178,16 +180,18 @@ class AuthRepositoryImpl(
                 )
 
                 val savedPassword = prefsManager.getPassword().ifEmpty { "******" }
+                val loginUrl = session.baseUrl.ifEmpty { uni.neptunUrl.ifEmpty { authResult.normalizedBaseUrl } }
                 prefsManager.saveCredentials(
                     neptunCode = session.neptunCode,
                     password = savedPassword,
                     universityId = uni.id,
                     universityName = uni.name,
-                    neptunUrl = authResult.normalizedBaseUrl,
+                    neptunUrl = loginUrl,
                     studentName = authResult.studentName,
                     sessionToken = authResult.accessToken,
                     trainingProgram = authResult.trainingProgram
                 )
+                prefsManager.setLoginUrl(loginUrl)
                 prefsManager.setAccessToken(authResult.accessToken)
                 authResult.refreshToken?.let { prefsManager.setRefreshToken(it) }
                 authResult.deviceCookie?.let { prefsManager.setDeviceCookie(session.neptunCode, it) }
@@ -201,7 +205,7 @@ class AuthRepositoryImpl(
                     neptunCode = session.neptunCode,
                     universityId = uni.id,
                     universityName = uni.name,
-                    neptunUrl = authResult.normalizedBaseUrl,
+                    neptunUrl = loginUrl,
                     studentName = authResult.studentName,
                     trainingProgram = authResult.trainingProgram,
                     isLoggedIn = true,
