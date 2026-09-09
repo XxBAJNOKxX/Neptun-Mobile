@@ -62,10 +62,12 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.MenuAnchorType
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
@@ -926,38 +928,79 @@ fun SettingsScreen(
                         val selectedStartItem = NavigationItem.entries.firstOrNull {
                             it.name == personalization.startScreen
                         } ?: NavigationItem.HOME
-                        Box {
-                            OutlinedButton(
-                                onClick = { startScreenDropdownOpen = true },
+
+                        ExposedDropdownMenuBox(
+                            expanded = startScreenDropdownOpen,
+                            onExpandedChange = { startScreenDropdownOpen = it },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            OutlinedTextField(
+                                value = selectedStartItem.title,
+                                onValueChange = {},
+                                readOnly = true,
+                                singleLine = true,
+                                label = { Text("Kezdőlap kiválasztása") },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = selectedStartItem.selectedIcon,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                },
+                                trailingIcon = {
+                                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = startScreenDropdownOpen)
+                                },
+                                colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
                                 shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text(
-                                    text = selectedStartItem.title,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.weight(1f)
-                                )
-                                Icon(
-                                    imageVector = Icons.Default.ArrowDropDown,
-                                    contentDescription = "Kiválasztás"
-                                )
-                            }
-                            DropdownMenu(
+                                modifier = Modifier
+                                    .menuAnchor(MenuAnchorType.PrimaryNotEditable)
+                                    .fillMaxWidth()
+                            )
+                            ExposedDropdownMenu(
                                 expanded = startScreenDropdownOpen,
                                 onDismissRequest = { startScreenDropdownOpen = false }
                             ) {
                                 NavigationItem.entries.forEach { item ->
+                                    val isSelected = item == selectedStartItem
+                                    val isHidden = item.name in personalization.hiddenPages
                                     DropdownMenuItem(
                                         text = {
-                                            Text(
-                                                item.title,
-                                                fontWeight = if (item == selectedStartItem) FontWeight.Bold else FontWeight.Normal
+                                            Column {
+                                                Text(
+                                                    text = item.title,
+                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                                )
+                                                if (isHidden) {
+                                                    Text(
+                                                        text = "Jelenleg rejtett oldal",
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                }
+                                            }
+                                        },
+                                        leadingIcon = {
+                                            Icon(
+                                                imageVector = if (isSelected) item.selectedIcon else item.unselectedIcon,
+                                                contentDescription = null,
+                                                tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                                             )
                                         },
+                                        trailingIcon = if (isSelected) {
+                                            {
+                                                Icon(
+                                                    imageVector = Icons.Default.Check,
+                                                    contentDescription = "Kiválasztva",
+                                                    tint = MaterialTheme.colorScheme.primary
+                                                )
+                                            }
+                                        } else null,
                                         onClick = {
                                             startScreenDropdownOpen = false
                                             onStartScreenChange(item.name)
-                                        }
+                                        },
+                                        contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
                                     )
                                 }
                             }
