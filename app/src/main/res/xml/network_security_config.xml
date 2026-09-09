@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <base-config>
+        <trust-anchors>
+            <!-- Android system root certificates -->
+            <certificates src="system" />
+            <!-- User installed certificates (e.g. for university VPNs, corporate certs, AdGuard) -->
+            <certificates src="user" />
+            <!-- Modern institutional / GEANT root & intermediate certificates missing from older Android versions (e.g. Android 11) -->
+            <certificates src="@raw/harica_tls_rsa_root_2021" />
+            <certificates src="@raw/harica_tls_ecc_root_2021" />
+            <certificates src="@raw/geant_tls_rsa_1" />
+            <certificates src="@raw/geant_tls_ecc_1" />
+            <certificates src="@raw/isrg_root_x1" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>
