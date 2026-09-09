@@ -42,17 +42,34 @@ class NotifiedItemsTracker(
         key: String,
         items: List<T>,
         idOf: (T) -> String
+    ): List<T> = filterNewItems(key, items, idOf, null)
+
+    fun <T> filterNewItems(
+        key: String,
+        items: List<T>,
+        idOf: (T) -> String,
+        altIdOf: ((T) -> String)?
     ): List<T> {
         if (items.isEmpty()) return emptyList()
 
         if (!store.isBaselineDone(key)) {
-            store.setNotifiedIds(key, items.map(idOf).toSet())
+            val allKeys = items.flatMap { item ->
+                val main = idOf(item)
+                val alt = altIdOf?.invoke(item)
+                listOfNotNull(main, alt)
+            }.toSet()
+            store.setNotifiedIds(key, allKeys)
             store.markBaselineDone(key)
             return emptyList()
         }
 
         val notified = store.getNotifiedIds(key)
-        return items.filter { idOf(it) !in notified }
+        return items.filter { item ->
+            val main = idOf(item)
+            val alt = altIdOf?.invoke(item)
+            val isNotified = (main in notified) || (alt != null && alt in notified)
+            !isNotified
+        }
     }
 
     fun markNotified(key: String, ids: List<String>) {
