@@ -233,11 +233,12 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
     // ------------------------------------------------------------------ //
 
     override fun getNotifiedIds(key: String): Set<String> {
-        return prefs.getStringSet(KEY_NOTIFIED_PREFIX + key, emptySet()) ?: emptySet()
+        val stored = prefs.getStringSet(KEY_NOTIFIED_PREFIX + key, null) ?: emptySet()
+        return HashSet(stored)
     }
 
     override fun setNotifiedIds(key: String, ids: Set<String>) {
-        prefs.edit().putStringSet(KEY_NOTIFIED_PREFIX + key, ids).apply()
+        prefs.edit().putStringSet(KEY_NOTIFIED_PREFIX + key, HashSet(ids)).commit()
     }
 
     override fun isBaselineDone(key: String): Boolean {
@@ -245,7 +246,7 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
     }
 
     override fun markBaselineDone(key: String) {
-        prefs.edit().putBoolean(KEY_NOTIFIED_BASELINE_PREFIX + key, true).apply()
+        prefs.edit().putBoolean(KEY_NOTIFIED_BASELINE_PREFIX + key, true).commit()
     }
 
     // ------------------------------------------------------------------ //
