@@ -308,12 +308,14 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
             .putString(KEY_UNIVERSITY_ID, universityId)
             .putString(KEY_UNIVERSITY_NAME, universityName)
             .putString(KEY_NEPTUN_URL, neptunUrl)
+            .putString(KEY_LOGIN_URL, neptunUrl)
             .putString(KEY_BASE_URL, neptunUrl)
             .putString(KEY_SELECTED_UNIVERSITY_ID, universityId)
             .putString(KEY_SELECTED_UNIVERSITY_NAME, universityName)
             .putString(KEY_SELECTED_UNIVERSITY_URL, neptunUrl)
             .putString(KEY_STUDENT_NAME, studentName)
             .putString(KEY_SESSION_TOKEN, sessionToken)
+            .putString(KEY_ACCESS_TOKEN, sessionToken)
             .putString(KEY_TRAINING_PROGRAM, trainingProgram)
             .putBoolean(KEY_IS_LOGGED_IN, true)
             .putLong(KEY_LAST_SYNC, System.currentTimeMillis())
@@ -364,15 +366,36 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
     }
 
     fun getSessionToken(): String {
+        val access = prefs.getString(KEY_ACCESS_TOKEN, "") ?: ""
+        if (access.isNotBlank()) return access
         return prefs.getString(KEY_SESSION_TOKEN, "") ?: ""
     }
 
     fun getAccessToken(): String {
-        return prefs.getString(KEY_ACCESS_TOKEN, "") ?: ""
+        val access = prefs.getString(KEY_ACCESS_TOKEN, "") ?: ""
+        if (access.isNotBlank()) return access
+        return prefs.getString(KEY_SESSION_TOKEN, "") ?: ""
     }
 
     fun setAccessToken(token: String) {
-        prefs.edit().putString(KEY_ACCESS_TOKEN, token).apply()
+        prefs.edit()
+            .putString(KEY_ACCESS_TOKEN, token)
+            .putString(KEY_SESSION_TOKEN, token)
+            .apply()
+    }
+
+    fun getLoginUrl(): String {
+        val saved = prefs.getString(KEY_LOGIN_URL, "") ?: ""
+        if (saved.isNotBlank()) return saved
+        val nepUrl = prefs.getString(KEY_NEPTUN_URL, "") ?: ""
+        if (nepUrl.contains("hallgato1.neptun.elte.hu", ignoreCase = true)) {
+            return "https://hallgato.neptun.elte.hu"
+        }
+        return nepUrl
+    }
+
+    fun setLoginUrl(url: String) {
+        prefs.edit().putString(KEY_LOGIN_URL, url).apply()
     }
 
     fun getRefreshToken(): String {
@@ -511,6 +534,7 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
         private const val KEY_UNIVERSITY_ID = "key_uni_id"
         private const val KEY_UNIVERSITY_NAME = "key_uni_name"
         private const val KEY_NEPTUN_URL = "key_neptun_url"
+        private const val KEY_LOGIN_URL = "key_login_url"
         private const val KEY_SELECTED_UNIVERSITY_ID = "key_selected_uni_id"
         private const val KEY_SELECTED_UNIVERSITY_NAME = "key_selected_uni_name"
         private const val KEY_SELECTED_UNIVERSITY_URL = "key_selected_uni_url"
