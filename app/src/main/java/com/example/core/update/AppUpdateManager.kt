@@ -7,6 +7,7 @@ import android.os.Build
 import android.provider.Settings
 import androidx.core.content.FileProvider
 import com.example.BuildConfig
+import com.example.core.network.SslTrustHelper
 import com.example.core.security.UpdateChannel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -42,10 +43,11 @@ sealed class InAppUpdateState {
 }
 
 class AppUpdateManager(
-    private val client: OkHttpClient = OkHttpClient.Builder()
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .build()
+    private val client: OkHttpClient = SslTrustHelper.configureOkHttpClient(
+        OkHttpClient.Builder()
+            .connectTimeout(10, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+    ).build()
 ) {
 
     suspend fun checkForUpdates(channel: UpdateChannel = UpdateChannel.STABLE): UpdateInfo? = withContext(Dispatchers.IO) {

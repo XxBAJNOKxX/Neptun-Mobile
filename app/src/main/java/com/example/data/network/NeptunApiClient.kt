@@ -17,6 +17,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import com.example.core.network.SslTrustHelper
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
@@ -86,17 +87,18 @@ class NeptunApiClient {
     }
 
     /**
-     * Biztonságos kliens: a rendszer tanúsítványtárával ellenőrzi a TLS kapcsolatot.
-     * Korábban itt minden tanúsítványt elfogadó (trust-all) megoldás volt, ami
-     * MITM támadásnak tette ki a bejelentkezési adatokat – ez eltávolítva.
+     * Biztonságos kliens: a rendszer tanúsítványtára mellett betölti az intézményi
+     * és akadémiai (pl. ELTE / GEANT / HARICA) modern gyökértanúsítványokat is,
+     * amelyek a régebbi Android rendszerekből (pl. Android 11) hiányozhatnak.
      */
-    private val okHttpClient: OkHttpClient = OkHttpClient.Builder()
-        .connectTimeout(20, TimeUnit.SECONDS)
-        .readTimeout(25, TimeUnit.SECONDS)
-        .writeTimeout(20, TimeUnit.SECONDS)
-        .followRedirects(true)
-        .followSslRedirects(true)
-        .build()
+    private val okHttpClient: OkHttpClient = SslTrustHelper.configureOkHttpClient(
+        OkHttpClient.Builder()
+            .connectTimeout(20, TimeUnit.SECONDS)
+            .readTimeout(25, TimeUnit.SECONDS)
+            .writeTimeout(20, TimeUnit.SECONDS)
+            .followRedirects(true)
+            .followSslRedirects(true)
+    ).build()
 
     fun normalizeBaseUrl(rawUrl: String): String {
         var url = rawUrl.trim()
