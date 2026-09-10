@@ -967,6 +967,60 @@ class NeptunApiClient {
         false
     }
 
+    // --- TOKEN VALIDATION ---
+    /**
+     * Ellenőrzi, hogy a hozzáférési token ténylegesen működik-e a Neptun szerveren.
+     * Csak akkor tér vissza false-szal, ha a szerver kifejezetten 401 Unauthorized hibát
+     * ad vagy bejelentkezésre irányít át. Átmeneti hálózati hiba esetén true-t ad vissza,
+     * megelőzve az indokolatlan munkamenet-lejárati riasztásokat.
+     */
+    suspend fun isTokenValid(baseUrl: String, token: String, deviceCookie: String = ""): Boolean = withContext(Dispatchers.IO) {
+        if (token.isBlank() || token.startsWith("legacy-token") || token.startsWith("aspnet-session")) {
+            return@withContext false
+        }
+        try {
+            val cleanBase = normalizeBaseUrl(baseUrl)
+            // A Message/GetReceivedMessages a legtöbb modern Neptunon azonnal 401-et ad, ha lejárt a token
+            val url = "$cleanBase/api/Message/GetReceivedMessages?firstRow=0&lastRow=1&filterType=0"
+            val reqBuilder = Request.Builder()
+                .url(url)
+                .get()
+                .addHeader("Authorization", "Bearer $token")
+                .addHeader("Accept", "application/json, text/plain, */*")
+                .addHeader("Content-Type", "application/json")
+            if (deviceCookie.isNotBlank()) {
+                reqBuilder.addHeader("Cookie", deviceCookie)
+            }
+            val resp = okHttpClient.newCall(reqBuilder.build()).execute()
+            if (resp.code == 401) {
+                return@withContext false
+            }
+            if (resp.isSuccessful) {
+                val body = resp.body?.string() ?: ""
+                val isRedirect = resp.request.url.encodedPath.contains("Login", ignoreCase = true) ||
+                        (body.trim().startsWith("<") && (body.contains("Account/Login", ignoreCase = true) || body.contains("Login2FA", ignoreCase = true)))
+                return@withContext !isRedirect
+            }
+            // Másodlagos ellenőrzés: /api/UserInfo
+            val userUrl = "$cleanBase/api/UserInfo"
+            val userReq = Request.Builder()
+                .url(userUrl)
+                .get()
+                .addHeader("Authorization", "Bearer $token")
+                .addHeader("Accept", "application/json, text/plain, */*")
+                .build()
+            val userResp = okHttpClient.newCall(userReq).execute()
+            if (userResp.code == 401) {
+                return@withContext false
+            }
+            return@withContext userResp.isSuccessful
+        } catch (e: Exception) {
+            // Hálózati hiba / timeout esetén nem tekintjük lejártnak a tokent
+            Log.e(tag, "isTokenValid ellenőrzési hiba: ${e.message}")
+            return@withContext true
+        }
+    }
+
     // --- USER INFO ---
     suspend fun getUserInfo(baseUrl: String, token: String): NeptunUserInfo? = withContext(Dispatchers.IO) {
         if (token.isBlank() || token.startsWith("legacy-token") || token.startsWith("aspnet-session")) {
@@ -1082,7 +1136,21 @@ class NeptunApiClient {
 
             return@withContext events
         } catch (e: NeptunUnauthorizedException) {
-            throw e
+            Log.w(tag, "Modern calendar unauthorized error: ${e.message}, checking fallbacks")
+            if (username.isNotEmpty() && password.isNotEmpty()) {
+                try {
+                    val leg = getLegacyCalendarEvents(baseUrl, username, password)
+                    if (leg.isNotEmpty()) return@withContext leg
+                } catch (legacyEx: Exception) {
+                    Log.w(tag, "Legacy calendar fallback failed: ${legacyEx.message}")
+                }
+            }
+            // Ellenőrizzük, hogy a token globálisan érvénytelen-e
+            if (!isTokenValid(baseUrl, token, deviceCookie)) {
+                throw e
+            }
+            // Ha a token más végpontokon még működik, ne szakítsuk meg a folyamatot
+            return@withContext emptyList()
         } catch (e: Exception) {
             Log.e(tag, "Failed to get modern calendar events: ${e.message}")
             if (username.isNotEmpty() && password.isNotEmpty()) {
@@ -1185,7 +1253,9 @@ class NeptunApiClient {
             }
             if (!resp.isSuccessful) return@withContext emptyList()
             val respBody = resp.body?.string() ?: ""
-            if (respBody.contains("Account/Login", ignoreCase = true) || respBody.contains("Login2FA", ignoreCase = true)) {
+            val isRedirect = resp.request.url.encodedPath.contains("Login", ignoreCase = true) ||
+                (respBody.trim().startsWith("<") && (respBody.contains("Account/Login", ignoreCase = true) || respBody.contains("Login2FA", ignoreCase = true)))
+            if (isRedirect) {
                 throw NeptunUnauthorizedException("Redirected to Login for Calendar request")
             }
             val parsed = safeParseJsonObject(respBody) ?: return@withContext emptyList()
@@ -1370,9 +1440,8 @@ class NeptunApiClient {
 
                 val termsResp = okHttpClient.newCall(termsReqBuilder.build()).execute()
                 if (termsResp.code == 401) {
-                    throw NeptunUnauthorizedException("401 Terms")
-                }
-                if (termsResp.isSuccessful) {
+                    Log.w(tag, "Terms endpoint returned 401, skipping terms list and using fallback")
+                } else if (termsResp.isSuccessful) {
                     val termsBody = termsResp.body?.string() ?: ""
                     val termsData = safeParseJsonObject(termsBody)?.get("data")?.jsonArray
 
@@ -1439,10 +1508,17 @@ class NeptunApiClient {
 
                         val subResp = okHttpClient.newCall(subReqBuilder.build()).execute()
                         if (subResp.code == 401) {
-                            throw NeptunUnauthorizedException("401 Grades")
+                            Log.w(tag, "URL returned 401 in getGrades ($subjectsUrl), trying alternate URLs")
+                            continue
                         }
                         if (!subResp.isSuccessful) continue
                         val subBody = subResp.body?.string() ?: ""
+                        val isRedirect = subResp.request.url.encodedPath.contains("Login", ignoreCase = true) ||
+                            (subBody.trim().startsWith("<") && (subBody.contains("Account/Login", ignoreCase = true) || subBody.contains("Login2FA", ignoreCase = true)))
+                        if (isRedirect) {
+                            Log.w(tag, "URL redirected to login in getGrades ($subjectsUrl), trying alternate URLs")
+                            continue
+                        }
                         val parsed = safeParseJson(subBody) ?: continue
                         val subjectsData = when {
                             parsed is JsonObject && parsed["data"] is JsonArray -> parsed["data"]?.jsonArray
@@ -1585,7 +1661,19 @@ class NeptunApiClient {
                 allGrades
             }
         } catch (e: NeptunUnauthorizedException) {
-            throw e
+            Log.w(tag, "Modern grades unauthorized error: ${e.message}, checking legacy or token validity")
+            if (username.isNotEmpty() && password.isNotEmpty()) {
+                try {
+                    val leg = getLegacyGrades(baseUrl, username, password)
+                    if (leg.isNotEmpty()) return@withContext leg
+                } catch (legacyEx: Exception) {
+                    Log.w(tag, "Legacy grades fallback failed: ${legacyEx.message}")
+                }
+            }
+            if (!isTokenValid(baseUrl, token, deviceCookie)) {
+                throw e
+            }
+            return@withContext emptyList()
         } catch (e: Exception) {
             Log.e(tag, "Modern grades fetch error: ${e.message}")
             if (username.isNotEmpty() && password.isNotEmpty()) {
@@ -1706,7 +1794,9 @@ class NeptunApiClient {
             }
             if (!resp.isSuccessful) return@withContext emptyList()
             val respBody = resp.body?.string() ?: ""
-            if (respBody.contains("Account/Login", ignoreCase = true) || respBody.contains("Login2FA", ignoreCase = true)) {
+            val isRedirect = resp.request.url.encodedPath.contains("Login", ignoreCase = true) ||
+                (respBody.trim().startsWith("<") && (respBody.contains("Account/Login", ignoreCase = true) || respBody.contains("Login2FA", ignoreCase = true)))
+            if (isRedirect) {
                 throw NeptunUnauthorizedException("Redirected to Login for Messages request")
             }
             val parsed = safeParseJsonObject(respBody) ?: return@withContext emptyList()
@@ -1754,6 +1844,14 @@ class NeptunApiClient {
             }
             return@withContext list
         } catch (e: NeptunUnauthorizedException) {
+            if (username.isNotEmpty() && password.isNotEmpty()) {
+                try {
+                    val leg = getLegacyMessages(baseUrl, username, password, page)
+                    if (leg.isNotEmpty()) return@withContext leg
+                } catch (legacyEx: Exception) {
+                    Log.w(tag, "Legacy messages fallback failed: ${legacyEx.message}")
+                }
+            }
             throw e
         } catch (e: Exception) {
             Log.e(tag, "Modern messages error: ${e.message}")
