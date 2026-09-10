@@ -97,6 +97,13 @@ class NeptunRepositoryImpl(
             refreshFinances()
             refreshExams()
             prefsManager.updateLastSyncTime()
+            val finalToken = prefsManager.getAccessToken()
+            if (finalToken.isNotBlank() && baseUrl.isNotBlank() && prefsManager.isModernApi()) {
+                val devCookie = creds?.let { prefsManager.getDeviceCookie(it.neptunCode) } ?: ""
+                if (neptunApiClient.isTokenValid(baseUrl, finalToken, devCookie)) {
+                    prefsManager.clearSessionExpired()
+                }
+            }
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -113,8 +120,18 @@ class NeptunRepositoryImpl(
         val baseUrl = prefsManager.getBaseUrl().ifEmpty { creds.neptunUrl }
         val password = prefsManager.getPassword()
         val currentToken = prefsManager.getAccessToken()
+        val deviceCookie = prefsManager.getDeviceCookie(creds.neptunCode)
 
         if (!forceRefresh && currentToken.isNotBlank()) return currentToken
+
+        // Ha kényszerített a frissítés, de a jelenlegi token a valóságban még érvényes:
+        // nem kell lejárttá tenni, használhatjuk tovább!
+        if (currentToken.isNotBlank() && prefsManager.isModernApi()) {
+            if (neptunApiClient.isTokenValid(baseUrl, currentToken, deviceCookie)) {
+                prefsManager.clearSessionExpired()
+                return currentToken
+            }
+        }
 
         val refreshToken = prefsManager.getRefreshToken()
         if (prefsManager.isModernApi() && refreshToken.isNotBlank()) {
@@ -130,7 +147,6 @@ class NeptunRepositoryImpl(
         if (creds.neptunCode.isNotEmpty() && password.isNotEmpty() && password != "******") {
             try {
                 val loginUrl = prefsManager.getLoginUrl().ifEmpty { baseUrl }
-                val deviceCookie = prefsManager.getDeviceCookie(creds.neptunCode)
                 val authRes = neptunApiClient.authenticate(loginUrl, creds.neptunCode, password, deviceCookie)
                 if (authRes is NeptunAuthResult.Success && authRes.accessToken.isNotBlank()) {
                     prefsManager.setAccessToken(authRes.accessToken)
@@ -142,9 +158,14 @@ class NeptunRepositoryImpl(
                     prefsManager.clearSessionExpired()
                     return authRes.accessToken
                 } else if (authRes is NeptunAuthResult.TwoFactorRequired || authRes is NeptunAuthResult.TwoFactorSessionRequired) {
-                    prefsManager.markSessionExpired()
+                    // Csak akkor jelöljük lejártnak, ha a jelenlegi token már tényleg nem érvényes
+                    if (!neptunApiClient.isTokenValid(baseUrl, currentToken, deviceCookie)) {
+                        prefsManager.markSessionExpired()
+                    }
                 } else if (authRes is NeptunAuthResult.Failure && !authRes.message.contains("Hálózati", ignoreCase = true)) {
-                    prefsManager.markSessionExpired()
+                    if (!neptunApiClient.isTokenValid(baseUrl, currentToken, deviceCookie)) {
+                        prefsManager.markSessionExpired()
+                    }
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -210,7 +231,13 @@ class NeptunRepositoryImpl(
                         retryEx.printStackTrace()
                     }
                 } else {
-                    prefsManager.markSessionExpired()
+                    val curToken = prefsManager.getAccessToken()
+                    val isValid = if (curToken.isNotBlank() && prefsManager.isModernApi()) {
+                        neptunApiClient.isTokenValid(baseUrl, curToken, deviceCookie)
+                    } else false
+                    if (!isValid) {
+                        prefsManager.markSessionExpired()
+                    }
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -219,6 +246,7 @@ class NeptunRepositoryImpl(
 
         if (fetchSucceeded) {
             prefsManager.setDataMode(DataMode.REAL)
+            prefsManager.clearSessionExpired()
             if (eventsToInsert.isNotEmpty()) {
                 database.calendarDao().clearAll()
                 database.calendarDao().insertEvents(eventsToInsert.map { CalendarEventEntity.fromDomain(it) })
@@ -287,7 +315,13 @@ class NeptunRepositoryImpl(
                         retryEx.printStackTrace()
                     }
                 } else {
-                    prefsManager.markSessionExpired()
+                    val curToken = prefsManager.getAccessToken()
+                    val isValid = if (curToken.isNotBlank() && prefsManager.isModernApi()) {
+                        neptunApiClient.isTokenValid(baseUrl, curToken, deviceCookie)
+                    } else false
+                    if (!isValid) {
+                        prefsManager.markSessionExpired()
+                    }
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -295,6 +329,7 @@ class NeptunRepositoryImpl(
         }
 
         if (fetchSucceeded) {
+            prefsManager.clearSessionExpired()
             if (gradesToInsert.isNotEmpty()) {
                 prefsManager.setDataMode(DataMode.REAL)
                 database.gradesDao().clearAll()
@@ -364,7 +399,13 @@ class NeptunRepositoryImpl(
                         retryEx.printStackTrace()
                     }
                 } else {
-                    prefsManager.markSessionExpired()
+                    val curToken = prefsManager.getAccessToken()
+                    val isValid = if (curToken.isNotBlank() && prefsManager.isModernApi()) {
+                        neptunApiClient.isTokenValid(baseUrl, curToken, deviceCookie)
+                    } else false
+                    if (!isValid) {
+                        prefsManager.markSessionExpired()
+                    }
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -372,6 +413,7 @@ class NeptunRepositoryImpl(
         }
 
         if (fetchSucceeded || messagesToInsert.isNotEmpty()) {
+            prefsManager.clearSessionExpired()
             val existingEntities = database.messagesDao().getAllMessages().first()
             val existingById = existingEntities.associateBy { it.id }
             val existingByKey = existingEntities.associateBy { "${it.sender}_${it.subject}_${it.sendDate}" }
@@ -465,7 +507,13 @@ class NeptunRepositoryImpl(
                         retryEx.printStackTrace()
                     }
                 } else {
-                    prefsManager.markSessionExpired()
+                    val curToken = prefsManager.getAccessToken()
+                    val isValid = if (curToken.isNotBlank() && prefsManager.isModernApi()) {
+                        neptunApiClient.isTokenValid(baseUrl, curToken, deviceCookie)
+                    } else false
+                    if (!isValid) {
+                        prefsManager.markSessionExpired()
+                    }
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -473,6 +521,7 @@ class NeptunRepositoryImpl(
         }
 
         if (fetchSucceeded) {
+            prefsManager.clearSessionExpired()
             if (financesToInsert.isNotEmpty()) {
                 prefsManager.setDataMode(DataMode.REAL)
             }
@@ -544,7 +593,13 @@ class NeptunRepositoryImpl(
                         retryEx.printStackTrace()
                     }
                 } else {
-                    prefsManager.markSessionExpired()
+                    val curToken = prefsManager.getAccessToken()
+                    val isValid = if (curToken.isNotBlank() && prefsManager.isModernApi()) {
+                        neptunApiClient.isTokenValid(baseUrl, curToken, deviceCookie)
+                    } else false
+                    if (!isValid) {
+                        prefsManager.markSessionExpired()
+                    }
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -552,6 +607,7 @@ class NeptunRepositoryImpl(
         }
 
         if (fetchSucceeded) {
+            prefsManager.clearSessionExpired()
             database.examsDao().clearAll()
             if (examsToInsert.isNotEmpty()) {
                 database.examsDao().insertExams(examsToInsert.map { ExamItemEntity.fromDomain(it) })
