@@ -1,5 +1,6 @@
 package com.example.data.repository
 
+import android.util.Log
 import com.example.BuildConfig
 import com.example.core.security.DataMode
 import com.example.core.security.EncryptedPreferencesManager
@@ -118,53 +119,108 @@ class NeptunRepositoryImpl(
             return "demo-token"
         }
         val baseUrl = prefsManager.getBaseUrl().ifEmpty { creds.neptunUrl }
-        val password = prefsManager.getPassword()
         val currentToken = prefsManager.getAccessToken()
         val deviceCookie = prefsManager.getDeviceCookie(creds.neptunCode)
+        val loginUrl = prefsManager.getLoginUrl().ifEmpty { creds.neptunUrl }
+        val isModern = prefsManager.isModernApi()
 
-        if (!forceRefresh && currentToken.isNotBlank()) return currentToken
+        // 1. Gyors helyi ellenőrzés (ha nincs forceRefresh és a token még nem járt le a JWT szerint)
+        if (!forceRefresh && currentToken.isNotBlank()) {
+            if (isModern) {
+                if (!neptunApiClient.isJwtExpired(currentToken)) {
+                    return currentToken
+                }
+            } else {
+                return currentToken
+            }
+        }
 
-        // Ha kényszerített a frissítés, de a jelenlegi token a valóságban még érvényes:
-        // nem kell lejárttá tenni, használhatjuk tovább!
-        if (currentToken.isNotBlank() && prefsManager.isModernApi()) {
+        // Ha forceRefresh van, de a meglévő token még a valóságban érvényes a hálózaton
+        if (currentToken.isNotBlank() && isModern && !forceRefresh) {
             if (neptunApiClient.isTokenValid(baseUrl, currentToken, deviceCookie)) {
                 prefsManager.clearSessionExpired()
                 return currentToken
             }
         }
 
-        val refreshToken = prefsManager.getRefreshToken()
-        if (prefsManager.isModernApi() && refreshToken.isNotBlank()) {
-            val refreshed = neptunApiClient.refreshAccessToken(baseUrl, refreshToken)
-            if (refreshed != null && refreshed.first.isNotBlank()) {
-                prefsManager.setAccessToken(refreshed.first)
-                refreshed.second?.let { prefsManager.setRefreshToken(it) }
-                prefsManager.clearSessionExpired()
-                return refreshed.first
+        // 2. 1. szintű megújítás (GetNewTokens a meglévő vagy refresh tokennel)
+        val tokenToRefresh = prefsManager.getRefreshToken().takeIf { it.isNotBlank() } ?: currentToken
+        if (isModern && tokenToRefresh.isNotBlank()) {
+            try {
+                val refreshed = neptunApiClient.refreshAccessToken(baseUrl, tokenToRefresh)
+                if (refreshed != null && refreshed.first.isNotBlank()) {
+                    prefsManager.setAccessToken(refreshed.first)
+                    refreshed.second?.let { prefsManager.setRefreshToken(it) }
+                    prefsManager.clearSessionExpired()
+                    Log.d("NeptunRepo", "Token megújítva GetNewTokens végponttal")
+                    return refreshed.first
+                }
+            } catch (e: Exception) {
+                Log.w("NeptunRepo", "GetNewTokens sikertelen: ${e.message}")
             }
         }
 
+        // 3. 2. szintű megújítás ELTE esetén (renewSessionWithCookies)
+        val isElte = loginUrl.contains("neptun.elte.hu", ignoreCase = true) ||
+                     baseUrl.contains("neptun.elte.hu", ignoreCase = true) ||
+                     creds.neptunUrl.contains("neptun.elte.hu", ignoreCase = true)
+
+        if (isElte && deviceCookie.isNotBlank()) {
+            try {
+                val aspBaseUrl = normalizeAspBaseUrl(loginUrl.ifEmpty { creds.neptunUrl })
+                val renewResult = neptunApiClient.renewSessionWithCookies(aspBaseUrl, deviceCookie, creds.neptunCode)
+                when (renewResult) {
+                    is NeptunAuthResult.Success -> {
+                        prefsManager.setAccessToken(renewResult.accessToken)
+                        prefsManager.setBaseUrl(renewResult.normalizedBaseUrl)
+                        prefsManager.setIsModernApi(renewResult.isModernApi)
+                        renewResult.refreshToken?.let { prefsManager.setRefreshToken(it) }
+                        renewResult.deviceCookie?.let { prefsManager.setDeviceCookie(creds.neptunCode, it) }
+                        renewResult.studentTrainingId?.let { prefsManager.setStudentTrainingId(it) }
+                        prefsManager.clearSessionExpired()
+                        Log.i("NeptunRepo", "ELTE munkamenet sikeresen megújítva cookie-kkal: ${renewResult.normalizedBaseUrl}")
+                        return renewResult.accessToken
+                    }
+                    is NeptunAuthResult.Failure -> {
+                        Log.w("NeptunRepo", "ELTE cookie megújítás sikertelen: ${renewResult.message}")
+                    }
+                    else -> {}
+                }
+            } catch (e: Exception) {
+                Log.w("NeptunRepo", "ELTE cookie megújítás kivétel: ${e.message}")
+            }
+        }
+
+        // 4. Jelszavas belépés (végső fallback)
+        val password = prefsManager.getPassword()
         if (creds.neptunCode.isNotEmpty() && password.isNotEmpty() && password != "******") {
             try {
-                val loginUrl = prefsManager.getLoginUrl().ifEmpty { baseUrl }
                 val authRes = neptunApiClient.authenticate(loginUrl, creds.neptunCode, password, deviceCookie)
-                if (authRes is NeptunAuthResult.Success && authRes.accessToken.isNotBlank()) {
-                    prefsManager.setAccessToken(authRes.accessToken)
-                    prefsManager.setBaseUrl(authRes.normalizedBaseUrl)
-                    prefsManager.setIsModernApi(authRes.isModernApi)
-                    authRes.refreshToken?.let { prefsManager.setRefreshToken(it) }
-                    authRes.deviceCookie?.let { prefsManager.setDeviceCookie(creds.neptunCode, it) }
-                    authRes.studentTrainingId?.let { prefsManager.setStudentTrainingId(it) }
-                    prefsManager.clearSessionExpired()
-                    return authRes.accessToken
-                } else if (authRes is NeptunAuthResult.TwoFactorRequired || authRes is NeptunAuthResult.TwoFactorSessionRequired) {
-                    // Csak akkor jelöljük lejártnak, ha a jelenlegi token már tényleg nem érvényes
-                    if (!neptunApiClient.isTokenValid(baseUrl, currentToken, deviceCookie)) {
-                        prefsManager.markSessionExpired()
+                when {
+                    authRes is NeptunAuthResult.Success && authRes.accessToken.isNotBlank() -> {
+                        prefsManager.setAccessToken(authRes.accessToken)
+                        prefsManager.setBaseUrl(authRes.normalizedBaseUrl)
+                        prefsManager.setIsModernApi(authRes.isModernApi)
+                        authRes.refreshToken?.let { prefsManager.setRefreshToken(it) }
+                        authRes.deviceCookie?.let { prefsManager.setDeviceCookie(creds.neptunCode, it) }
+                        authRes.studentTrainingId?.let { prefsManager.setStudentTrainingId(it) }
+                        prefsManager.clearSessionExpired()
+                        return authRes.accessToken
                     }
-                } else if (authRes is NeptunAuthResult.Failure && !authRes.message.contains("Hálózati", ignoreCase = true)) {
-                    if (!neptunApiClient.isTokenValid(baseUrl, currentToken, deviceCookie)) {
-                        prefsManager.markSessionExpired()
+                    authRes is NeptunAuthResult.TwoFactorRequired || authRes is NeptunAuthResult.TwoFactorSessionRequired -> {
+                        // CSAK akkor jelöljük lejártnak a munkamenetet, ha a token tényleg nem érvényes
+                        val isStillValid = if (isModern) !neptunApiClient.isJwtExpired(currentToken, bufferSeconds = 0)
+                                           else neptunApiClient.isTokenValid(baseUrl, currentToken, deviceCookie)
+                        if (!isStillValid) {
+                            prefsManager.markSessionExpired()
+                        }
+                    }
+                    authRes is NeptunAuthResult.Failure && !authRes.message.contains("Hálózati", ignoreCase = true) -> {
+                        val isStillValid = if (isModern) !neptunApiClient.isJwtExpired(currentToken, bufferSeconds = 0)
+                                           else neptunApiClient.isTokenValid(baseUrl, currentToken, deviceCookie)
+                        if (!isStillValid) {
+                            prefsManager.markSessionExpired()
+                        }
                     }
                 }
             } catch (e: Exception) {
@@ -172,6 +228,15 @@ class NeptunRepositoryImpl(
             }
         }
         return if (!forceRefresh) currentToken else ""
+    }
+
+    private fun normalizeAspBaseUrl(loginUrl: String): String {
+        return try {
+            val uri = java.net.URI(loginUrl)
+            "${uri.scheme}://${uri.host}"
+        } catch (e: Exception) {
+            neptunApiClient.normalizeBaseUrl(loginUrl)
+        }
     }
 
     override suspend fun refreshCalendar(): Result<Unit> = withContext(Dispatchers.IO) {
@@ -684,15 +749,9 @@ class NeptunRepositoryImpl(
                 )
 
                 // If content is empty and modern API, attempt token refresh and retry
-                if (content.isBlank() && isModern && creds.neptunCode.isNotEmpty() && password.isNotEmpty()) {
-                    val loginUrl = prefsManager.getLoginUrl().ifEmpty { baseUrl }
-                    val deviceCookie = prefsManager.getDeviceCookie(creds.neptunCode)
-                    val authRes = neptunApiClient.authenticate(loginUrl, creds.neptunCode, password, deviceCookie)
-                    if (authRes is NeptunAuthResult.Success && authRes.accessToken.isNotBlank()) {
-                        token = authRes.accessToken
-                        prefsManager.setAccessToken(token)
-                        authRes.refreshToken?.let { prefsManager.setRefreshToken(it) }
-                        authRes.deviceCookie?.let { prefsManager.setDeviceCookie(creds.neptunCode, it) }
+                if (content.isBlank() && isModern && creds.neptunCode.isNotEmpty()) {
+                    token = ensureValidToken(forceRefresh = true)
+                    if (token.isNotBlank()) {
                         content = neptunApiClient.getMessageContent(
                             baseUrl = baseUrl,
                             token = token,

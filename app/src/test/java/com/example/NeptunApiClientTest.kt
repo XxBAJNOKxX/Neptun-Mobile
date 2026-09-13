@@ -61,5 +61,58 @@ class NeptunApiClientTest {
         assertEquals("USER_KEY_XYZ", inputs["Key"])
         assertEquals("Step2", inputs["Phase"])
     }
+
+    @Test
+    fun testFormToNeptunParsing() {
+        val formHtml = """
+            <form id="FormToNeptun" action="/ToNeptunWeb/ToNeptunHWeb" method="post">
+                <input type="hidden" name="NeptunWebType" value="HWeb" />
+                <input type="hidden" name="NeptunWebIndex" value="2" />
+                <input type="hidden" name="__RequestVerificationToken" value="cf_anti_token_999" />
+            </form>
+        """.trimIndent()
+        val inputs = client.parseFormInputs(formHtml)
+        assertEquals("HWeb", inputs["NeptunWebType"])
+        assertEquals("2", inputs["NeptunWebIndex"])
+        assertEquals("cf_anti_token_999", inputs["__RequestVerificationToken"])
+    }
+
+    @Test
+    fun testIsJwtExpired() {
+        // Empty / invalid tokens should be marked as expired
+        assertTrue(client.isJwtExpired(""))
+        assertTrue(client.isJwtExpired("invalid.token"))
+
+        val encoder = java.util.Base64.getUrlEncoder().withoutPadding()
+
+        // Future token (exp in 2049) -> not expired
+        val futureJson = """{"exp":2500000000,"unique_name":"TEST01"}"""
+        val futureToken = "eyJhbGciOiJIUzI1NiJ9." + encoder.encodeToString(futureJson.toByteArray()) + ".sig"
+        org.junit.Assert.assertFalse(client.isJwtExpired(futureToken))
+
+        // Past token (exp in 2017) -> expired
+        val pastJson = """{"exp":1500000000,"unique_name":"TEST01"}"""
+        val pastToken = "eyJhbGciOiJIUzI1NiJ9." + encoder.encodeToString(pastJson.toByteArray()) + ".sig"
+        assertTrue(client.isJwtExpired(pastToken))
+
+        // Token expiring in 10 seconds with default 30s buffer -> expired due to buffer
+        val nowSec = System.currentTimeMillis() / 1000L
+        val expiringSoonJson = """{"exp":${nowSec + 10},"unique_name":"TEST01"}"""
+        val expiringSoonToken = "eyJhbGciOiJIUzI1NiJ9." + encoder.encodeToString(expiringSoonJson.toByteArray()) + ".sig"
+        assertTrue(client.isJwtExpired(expiringSoonToken, bufferSeconds = 30L))
+
+        // But with 0s buffer -> not expired yet
+        org.junit.Assert.assertFalse(client.isJwtExpired(expiringSoonToken, bufferSeconds = 0L))
+    }
+
+    @Test
+    fun testMergeCookies() {
+        val oldCookies = mapOf("sess" to "old_val", "pref" to "dark")
+        val newCookies = mapOf("sess" to "new_val", "extra" to "123")
+        val merged = client.mergeCookies(oldCookies, newCookies)
+        assertEquals("new_val", merged["sess"])
+        assertEquals("dark", merged["pref"])
+        assertEquals("123", merged["extra"])
+    }
 }
 
