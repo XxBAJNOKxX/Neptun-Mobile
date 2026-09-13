@@ -17,11 +17,18 @@ interface StringProvider {
 class AndroidStringProvider(context: Context) : StringProvider {
     private val appContext = context.applicationContext
 
-    override fun getString(@StringRes id: Int): String = appContext.getString(id)
+    /**
+     * Az app-nyelv futásidejű váltásakor az Application-kontextus
+     * konfigurációja elavul (csak az Activity készül újra), ezért minden
+     * olvasáskor az aktuális nyelvre csomagolt kontextust használunk.
+     */
+    private fun localized(): Context = AppLocales.wrap(appContext)
+
+    override fun getString(@StringRes id: Int): String = localized().getString(id)
 
     override fun getString(@StringRes id: Int, vararg args: Any?): String =
-        appContext.getString(id, *args)
+        localized().getString(id, *args)
 
     override fun getQuantityString(@PluralsRes id: Int, quantity: Int, vararg args: Any?): String =
-        appContext.resources.getQuantityString(id, quantity, *args)
+        localized().resources.getQuantityString(id, quantity, *args)
 }

@@ -85,7 +85,7 @@ object NeptunLanguages {
         1051 to ("sk-SK" to "sk"),
         1053 to ("sv-SE" to "sv"),
         1055 to ("tr-TR" to "tr"),
-        1059 to ("by-BY" to "by"),
+        1059 to ("be-BY" to "be"),
         1060 to ("sl-SI" to "sl"),
         1061 to ("et-EE" to "et"),
         1062 to ("lv-LV" to "lv"),

@@ -494,11 +494,13 @@ private suspend fun exportTimetableAsIcs(app: NeptunApp) {
         val events = app.appContainer.neptunRepository.getCalendarEvents().first()
         if (events.isEmpty()) return
 
+        // Az Application-kontextus nyelve futásidejű váltás után elavulhat.
+        val localized = com.example.core.locale.AppLocales.wrap(app)
         val icsContent = IcsExporter.buildIcs(
             events,
-            courseTypeLabel = { app.getString(it.labelRes) },
-            teacherLabel = app.getString(R.string.ics_teacher),
-            reminderLabel = app.getString(R.string.ics_reminder)
+            courseTypeLabel = { localized.getString(it.labelRes) },
+            teacherLabel = localized.getString(R.string.ics_teacher),
+            reminderLabel = localized.getString(R.string.ics_reminder)
         )
         val dir = File(app.cacheDir, "export").apply { mkdirs() }
         val file = File(dir, "neptun-orarend.ics")

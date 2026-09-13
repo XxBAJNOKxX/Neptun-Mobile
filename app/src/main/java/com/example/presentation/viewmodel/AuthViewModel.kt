@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.domain.model.Neptun2FASession
+import com.example.domain.model.NeptunLanguages
 import com.example.domain.model.StudentCredentials
 import com.example.domain.model.TwoFactorMethod
 import com.example.R
@@ -18,7 +19,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 data class AuthUiState(
     val universities: List<University> = emptyList(),
@@ -54,6 +57,8 @@ class AuthViewModel(
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AuthUiState())
+    /** Az intézmény nyelvi listáját frissítő háttérfeladat (elavulás-védelemhez). */
+    private var languageRefreshJob: Job? = null
     val uiState: StateFlow<AuthUiState> = _uiState.asStateFlow()
 
     init {
@@ -144,7 +149,9 @@ class AuthViewModel(
      */
     fun loadServerLanguages(university: University?) {
         if (university == null) return
-        val cached = languageRepository.getCachedLanguages(university.neptunUrl)
+        languageRefreshJob?.cancel()
+        val url = university.neptunUrl
+        val cached = languageRepository.getCachedLanguages(url)
         _uiState.update {
             it.copy(
                 serverLanguage = ServerLanguageUiState(
@@ -155,8 +162,10 @@ class AuthViewModel(
                 )
             )
         }
-        viewModelScope.launch {
-            val fresh = languageRepository.refreshLanguages(university.neptunUrl)
+        languageRefreshJob = viewModelScope.launch {
+            val fresh = languageRepository.refreshLanguages(url)
+            // Elavult válasz (közben másik intézményt választott a felhasználó): eldobjuk.
+            if (_uiState.value.selectedUniversity?.neptunUrl != url) return@launch
             _uiState.update {
                 it.copy(
                     serverLanguage = ServerLanguageUiState(
@@ -167,6 +176,22 @@ class AuthViewModel(
                     )
                 )
             }
+        }
+    }
+
+    /**
+     * Végső őr a hitelesítési útvonalon: ha mérvadó (nem tartalék) lista áll
+     * rendelkezésre, a kiválasztott LCID-nek szerepelnie kell benne; ha nem,
+     * a szerver alapértelmezett nyelvére igazítunk, mielőtt a kérést küldenénk.
+     */
+    private suspend fun validateSelectedLcid() {
+        val list = _uiState.value.serverLanguage
+        if (!list.isFallback && list.languages.isNotEmpty() &&
+            list.languages.none { it.lcid == list.selectedLcid }
+        ) {
+            val resolved = NeptunLanguages.resolveLcid(list.languages, list.selectedLcid)
+            languageRepository.setSelectedLcid(resolved)
+            _uiState.update { it.copy(serverLanguage = it.serverLanguage.copy(selectedLcid = resolved)) }
         }
     }
 
@@ -301,6 +326,10 @@ class AuthViewModel(
 
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+            // Ha a nyelvi lista még töltődik, korlátosan megvárjuk, hogy ne
+            // hitelesítsünk olyan LCID-vel, amit az intézmény nem támogat.
+            withTimeoutOrNull(8_000) { languageRefreshJob?.join() }
+            validateSelectedLcid()
             val result = authRepository.login(
                 university = university,
                 neptunCode = state.neptunCode,

@@ -171,7 +171,8 @@ class NeptunRepositoryImpl(
         if (isElte && deviceCookie.isNotBlank()) {
             try {
                 val aspBaseUrl = normalizeAspBaseUrl(loginUrl.ifEmpty { creds.neptunUrl })
-                val renewResult = neptunApiClient.renewSessionWithCookies(aspBaseUrl, deviceCookie, creds.neptunCode, prefsManager.getServerLanguageLcid())
+                val renewLcid = prefsManager.getLoginLcid().takeIf { it > 0 } ?: prefsManager.getServerLanguageLcid()
+                val renewResult = neptunApiClient.renewSessionWithCookies(aspBaseUrl, deviceCookie, creds.neptunCode, renewLcid)
                 when (renewResult) {
                     is NeptunAuthResult.Success -> {
                         prefsManager.setAccessToken(renewResult.accessToken)

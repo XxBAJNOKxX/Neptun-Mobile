@@ -69,6 +69,26 @@ object NotificationHelper {
         }
     }
 
+    /**
+     * Csatornanevek és -leírások frissítése futásidejű nyelvválasztás után.
+     * A rendszer a már létező csatornák nevét nem írja felül, ezért törlés +
+     * újralétrehozás kell (a felhasználó fontossági beállításai megmaradnak).
+     * A [context] legyen az aktuális nyelvre csomagolt kontextus.
+     */
+    fun refreshNotificationChannels(context: Context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val notificationManager =
+                context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            listOf(
+                CHANNEL_ID_CLASSES,
+                CHANNEL_ID_MESSAGES,
+                CHANNEL_ID_GRADES,
+                CHANNEL_ID_FINANCES
+            ).forEach { runCatching { notificationManager.deleteNotificationChannel(it) } }
+        }
+        createNotificationChannels(context)
+    }
+
     fun areNotificationsEnabled(context: Context): Boolean {
         return NotificationManagerCompat.from(context).areNotificationsEnabled()
     }
