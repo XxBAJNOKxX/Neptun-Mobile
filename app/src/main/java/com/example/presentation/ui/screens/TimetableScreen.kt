@@ -129,15 +129,16 @@ fun TimetableScreen(
         }
     }
 
+    // A LaunchedEffect nem @Composable környezet: a szöveget itt oldjuk fel.
+    val scheduledReminderMins = uiState.scheduledReminderMins
+    val reminderScheduledText = pluralStringResource(
+        R.plurals.tt_reminder_scheduled,
+        scheduledReminderMins,
+        scheduledReminderMins
+    )
     LaunchedEffect(uiState.notificationScheduledId) {
         if (uiState.notificationScheduledId != null) {
-            snackbarHostState.showSnackbar(
-                pluralStringResource(
-                    R.plurals.tt_reminder_scheduled,
-                    uiState.scheduledReminderMins,
-                    uiState.scheduledReminderMins
-                )
-            )
+            snackbarHostState.showSnackbar(reminderScheduledText)
         }
     }
 

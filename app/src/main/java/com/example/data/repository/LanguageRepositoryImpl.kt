@@ -23,11 +23,13 @@ class LanguageRepositoryImpl(
 
     override fun getSelectedLcid(): Int = prefsManager.getServerLanguageLcid()
 
-    override suspend fun setSelectedLcid(lcid: Int) = withContext(Dispatchers.IO) {
-        if (lcid > 0) {
-            prefsManager.setServerLanguageLcid(lcid)
-        } else {
-            Log.w(TAG, "Érvénytelen LCID elutasítva: $lcid")
+    override suspend fun setSelectedLcid(lcid: Int) {
+        withContext(Dispatchers.IO) {
+            if (lcid > 0) {
+                prefsManager.setServerLanguageLcid(lcid)
+            } else {
+                Log.w(TAG, "Érvénytelen LCID elutasítva: $lcid")
+            }
         }
     }
 

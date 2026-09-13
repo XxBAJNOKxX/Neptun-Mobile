@@ -158,7 +158,7 @@ fun FinancesScreen(
                 items(uiState.filteredFinances) { item ->
                     FinanceItemCard(
                         item = item,
-                        formattedAmount = "${hungarianNumberFormat.format(item.amountHuf)} Ft"
+                        formattedAmount = stringResource(R.string.fin_amount, numberFormatLocalized.format(item.amountHuf))
                     )
                 }
             }
