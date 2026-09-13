@@ -97,7 +97,7 @@ class LocaleParityTest {
                 assertEquals(
                     "Eltérő formátum-argumentumok: $name ($locale)",
                     baseArgs,
-                    other[name] ?: emptySet()
+                    other[name] ?: emptySet<String>()
                 )
             }
         }
