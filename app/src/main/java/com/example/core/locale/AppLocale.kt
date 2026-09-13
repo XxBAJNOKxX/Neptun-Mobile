@@ -64,7 +64,7 @@ object AppLocales {
      * tiszteletben tartva, ha az a támogatott nyelvek közé esik).
      */
     fun resolve(context: Context, appLocale: AppLocale = AppLocaleStore.read(context)): Locale {
-        appLocale.languageTag?.let { return Locale(it) }
+        appLocale.languageTag?.let { return Locale.forLanguageTag(it) }
         systemAppLocaleOverride(context)?.let { return it }
         return deviceLocale()
     }
@@ -104,7 +104,7 @@ object AppLocales {
             val first = tags?.split(",")?.firstOrNull()?.trim()?.takeIf { it.isNotEmpty() } ?: return null
             val supported = setOf("hu", "en", "de")
             val match = Locale.forLanguageTag(first).language?.lowercase()
-            if (match in supported) Locale(match!!) else null
+            if (match in supported) Locale.forLanguageTag(match!!) else null
         } catch (e: Exception) {
             null
         }
