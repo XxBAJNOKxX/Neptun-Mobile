@@ -215,7 +215,7 @@
     <string name="grades_ghost_add">Geisternote hinzufügen</string>
     <string name="grades_ghost_dialog_title">Geisternote festlegen</string>
     <string name="grades_ghost_desc">Gib eine virtuelle Note ein, um den erwarteten Semesterdurchschnitt und Kreditindex sofort zu simulieren.</string>
-    <string name="grades_ghost_prefix">" Geist: "</string>
+    <string name="grades_ghost_prefix">Geist: </string>
     <string name="grades_ghost_remove">Geisternote entfernen</string>
     <string name="grades_stats">Semesterstatistik</string>
     <string name="grades_stats_empty">Noch nicht genügend Daten für Statistiken.</string>
@@ -400,7 +400,7 @@
     <string name="notif_finance_title">Finanzposition: %1$s</string>
     <string name="notif_finance_text">Betrag: %1$s | Frist: %2$s</string>
     <string name="notif_finance_big">Achtung! Zu zahlende Finanzposition: %1$s\nBetrag: %2$s HUF\nZahlungsfrist: %3$s</string>
-    <string name="sync_finance_line">• %1$s – %2$d Ft (Frist: %3$s)</string>
+    <string name="sync_finance_line">• %1$s – %2$s Ft (Frist: %3$s)</string>
 
     <!-- Widget -->
     <string name="widget_today">· Heutige Kurse</string>

@@ -193,7 +193,7 @@ class NeptunApiClient(
                 .addHeader("Accept", "application/json, text/plain, */*")
                 .build()
             val resp = okHttpClient.newCall(req).execute()
-            if (!resp.isSuccessful) return@withContext emptyList()
+            if (!resp.isSuccessful) { resp.close(); return@withContext emptyList() }
             val body = resp.body?.string() ?: return@withContext emptyList()
             NeptunLanguages.parseSupportedLanguages(body)
         } catch (e: Exception) {
@@ -754,6 +754,7 @@ class NeptunApiClient(
 
         val outerResp = okHttpClient.newCall(outerReq).execute()
         if (!outerResp.isSuccessful) {
+            outerResp.close()
             return@withContext NeptunAuthResult.Failure("OuterLogin sikertelen: HTTP ${outerResp.code}")
         }
 
@@ -1198,7 +1199,7 @@ class NeptunApiClient(
                 .build()
 
             val resp = okHttpClient.newCall(req).execute()
-            if (!resp.isSuccessful) return@withContext false
+            if (!resp.isSuccessful) { resp.close(); return@withContext false }
             val respBody = resp.body?.string() ?: ""
             val parsed = safeParseJsonObject(respBody) ?: return@withContext false
             return@withContext parsed["ErrorMessage"] == null || parsed["ErrorMessage"]?.jsonPrimitive?.contentOrNull.isNullOrEmpty()
@@ -1486,7 +1487,7 @@ class NeptunApiClient(
             if (resp.code == 401) {
                 throw NeptunUnauthorizedException("401 Calendar")
             }
-            if (!resp.isSuccessful) return@withContext emptyList()
+            if (!resp.isSuccessful) { resp.close(); return@withContext emptyList() }
             val respBody = resp.body?.string() ?: ""
             val isRedirect = resp.request.url.encodedPath.contains("Login", ignoreCase = true) ||
                 (respBody.trim().startsWith("<") && (respBody.contains("Account/Login", ignoreCase = true) || respBody.contains("Login2FA", ignoreCase = true)))
@@ -1594,7 +1595,7 @@ class NeptunApiClient(
                 .build()
 
             val resp = okHttpClient.newCall(req).execute()
-            if (!resp.isSuccessful) return@withContext emptyList()
+            if (!resp.isSuccessful) { resp.close(); return@withContext emptyList() }
             val respBody = resp.body?.string() ?: ""
             val parsed = safeParseJsonObject(respBody) ?: return@withContext emptyList()
             val calData = parsed["calendarData"]?.jsonArray ?: parsed["CalendarData"]?.jsonArray ?: return@withContext emptyList()
@@ -1744,9 +1745,10 @@ class NeptunApiClient(
                         val subResp = okHttpClient.newCall(subReqBuilder.build()).execute()
                         if (subResp.code == 401) {
                             Log.w(tag, "URL returned 401 in getGrades ($subjectsUrl), trying alternate URLs")
+                            subResp.close()
                             continue
                         }
-                        if (!subResp.isSuccessful) continue
+                        if (!subResp.isSuccessful) { subResp.close(); continue }
                         val subBody = subResp.body?.string() ?: ""
                         val isRedirect = subResp.request.url.encodedPath.contains("Login", ignoreCase = true) ||
                             (subBody.trim().startsWith("<") && (subBody.contains("Account/Login", ignoreCase = true) || subBody.contains("Login2FA", ignoreCase = true)))
@@ -1930,7 +1932,7 @@ class NeptunApiClient(
                 .build()
 
             val resp = okHttpClient.newCall(req).execute()
-            if (!resp.isSuccessful) return@withContext emptyList()
+            if (!resp.isSuccessful) { resp.close(); return@withContext emptyList() }
             val respBody = resp.body?.string() ?: ""
             val parsed = safeParseJsonObject(respBody) ?: return@withContext emptyList()
             val markbookList = parsed["MarkBookList"]?.jsonArray ?: parsed["markBookList"]?.jsonArray ?: return@withContext emptyList()
@@ -2015,7 +2017,7 @@ class NeptunApiClient(
             if (resp.code == 401) {
                 throw NeptunUnauthorizedException("401 Messages")
             }
-            if (!resp.isSuccessful) return@withContext emptyList()
+            if (!resp.isSuccessful) { resp.close(); return@withContext emptyList() }
             val respBody = resp.body?.string() ?: ""
             val isRedirect = resp.request.url.encodedPath.contains("Login", ignoreCase = true) ||
                 (respBody.trim().startsWith("<") && (respBody.contains("Account/Login", ignoreCase = true) || respBody.contains("Login2FA", ignoreCase = true)))
@@ -2240,7 +2242,7 @@ class NeptunApiClient(
                 .build()
 
             val resp = okHttpClient.newCall(req).execute()
-            if (!resp.isSuccessful) return@withContext emptyList()
+            if (!resp.isSuccessful) { resp.close(); return@withContext emptyList() }
             val respBody = resp.body?.string() ?: ""
             val parsed = safeParseJsonObject(respBody) ?: return@withContext emptyList()
             val msgs = parsed["MessagesList"]?.jsonArray ?: parsed["messagesList"]?.jsonArray ?: return@withContext emptyList()
@@ -2534,7 +2536,7 @@ class NeptunApiClient(
                 .build()
 
             val resp = okHttpClient.newCall(req).execute()
-            if (!resp.isSuccessful) return@withContext emptyList()
+            if (!resp.isSuccessful) { resp.close(); return@withContext emptyList() }
             val respBody = resp.body?.string() ?: ""
             val parsed = safeParseJson(respBody) ?: return@withContext emptyList()
             parseExamItems(parsed)
@@ -2891,7 +2893,7 @@ class NeptunApiClient(
                 .build()
 
             val resp = okHttpClient.newCall(req).execute()
-            if (!resp.isSuccessful) return@withContext emptyList()
+            if (!resp.isSuccessful) { resp.close(); return@withContext emptyList() }
             val respBody = resp.body?.string() ?: ""
             val parsed = safeParseJsonObject(respBody) ?: return@withContext emptyList()
             val rows = parsed["CashinDataRows"]?.jsonArray ?: parsed["cashinDataRows"]?.jsonArray ?: return@withContext emptyList()

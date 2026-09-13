@@ -19,6 +19,8 @@ import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.time.temporal.TemporalAdjusters
 import java.util.Calendar
+import android.os.LocaleList
+import com.example.core.locale.AppLocale
 import java.util.Locale
 
 data class WeekDayInfo(
@@ -102,7 +104,11 @@ class TimetableViewModel(
         }
     }
 
-    private fun calculateWeekInfo(offset: Int, includeWeekend: Boolean): Pair<List<WeekDayInfo>, String> {
+    private fun calculateWeekInfo(
+        offset: Int,
+        includeWeekend: Boolean,
+        locale: Locale = Locale.getDefault()
+    ): Pair<List<WeekDayInfo>, String> {
         val today = LocalDate.now()
         val isWeekend = today.dayOfWeek == DayOfWeek.SATURDAY || today.dayOfWeek == DayOfWeek.SUNDAY
         val baseMonday = if (isWeekend) {
@@ -111,7 +117,6 @@ class TimetableViewModel(
             today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
         }
         val monday = baseMonday.plusWeeks(offset.toLong())
-        val locale = Locale.getDefault()
 
         val dayCount = if (includeWeekend) 7 else 5
         val days = (0 until dayCount).map { i ->
@@ -173,17 +178,32 @@ class TimetableViewModel(
         val flow = prefsManager?.appLocaleFlow ?: return
         var first = true
         viewModelScope.launch {
-            flow.collect {
+            flow.collect { appLocale ->
                 // Az első (aktuális) értékre nincs teendő: az init állapot már kész.
                 if (first) {
                     first = false
                     return@collect
                 }
+                val locale = localeFor(appLocale)
                 _uiState.update { state ->
-                    val (weekDays, weekLabel) = calculateWeekInfo(state.selectedWeekOffset, state.showWeekend)
+                    val (weekDays, weekLabel) = calculateWeekInfo(state.selectedWeekOffset, state.showWeekend, locale)
                     state.copy(weekDays = weekDays, weekLabel = weekLabel)
                 }
             }
+        }
+    }
+
+    /**
+     * A flow hamarabb jelez, mint hogy az Activity újrakészülne (és ezzel a
+     * [Locale.getDefault] frissülne), ezért a nyelvet az emitált értékből
+     * oldjuk fel determinisztikusan, nem a még elavult alapértelmezettből.
+     */
+    private fun localeFor(appLocale: AppLocale): Locale {
+        appLocale.languageTag?.let { return Locale.forLanguageTag(it) }
+        return try {
+            LocaleList.getDefault().get(0) ?: Locale.getDefault()
+        } catch (e: Exception) {
+            Locale.getDefault()
         }
     }
 

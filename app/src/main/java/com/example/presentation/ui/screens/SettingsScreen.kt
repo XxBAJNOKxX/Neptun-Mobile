@@ -111,6 +111,7 @@ import androidx.core.content.ContextCompat
 import com.example.BuildConfig
 import com.example.R
 import com.example.core.locale.AppLocale
+import com.example.core.locale.AppLocales
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.example.core.notification.NotificationHelper
@@ -425,8 +426,9 @@ fun SettingsScreen(
                                         appLocaleDropdownOpen = false
                                         if (locale != appLocale) {
                                             onAppLocaleChange(locale)
-                                            // Az új nyelv az Activity újralétrehozásával lép életbe
+                                            // Csatornanevek az új nyelven, majd Activity-újrakészítés
                                             // (az attachBaseContext ilyenkor csomagolja újra a contextet).
+                                            NotificationHelper.refreshNotificationChannels(AppLocales.wrap(context))
                                             (context as? Activity)?.recreate()
                                         }
                                     },

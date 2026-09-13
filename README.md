@@ -64,7 +64,7 @@ A GitHub [Releases](../../releases) oldalról tölthető le az APK (debug és re
 ## 🗺️ Tervezett funkciók
 
 - [ ] Vizsgára jelentkezés / tárgyfelvétel (a szerveroldali API függvényében)
-- [ ] Teljes i18n (jelenleg az app felülete magyar nyelvű; a Neptun szervernyelv már váltható a bejelentkezési és a Profil képernyőn)
+- [x] Teljes i18n (az app felülete magyar, angol és német nyelven; a Neptun szervernyelv a bejelentkezési és a Profil képernyőn váltható intézményenkénti listából)
 - [ ] Tárgyak részletes adatai (óra- és vizsgaidőpontok, követelmények)
 
 ## 📜 Licenc

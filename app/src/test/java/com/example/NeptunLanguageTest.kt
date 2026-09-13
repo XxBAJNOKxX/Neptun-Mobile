@@ -144,6 +144,9 @@ class NeptunLanguageTest {
         // A tagadó alakok nem keverhetők össze az állító kulcsszavakkal.
         assertEquals(1, ServerTextParser.gradeFromText("Insufficient"))
         assertEquals(2, ServerTextParser.gradeFromText("Genügend"))
+        assertEquals(1, ServerTextParser.gradeFromText("Not passed"))
+        assertEquals(1, ServerTextParser.gradeFromText("Did not pass"))
+        assertEquals(1, ServerTextParser.gradeFromText("Nem felelt meg"))
     }
 
     @Test
@@ -163,6 +166,11 @@ class NeptunLanguageTest {
         assertEquals(FinanceStatus.COMPLETED, ServerTextParser.financeStatusFromText("Abgeschlossen"))
         assertEquals(FinanceStatus.PENDING, ServerTextParser.financeStatusFromText("Offen"))
         assertEquals(FinanceStatus.PENDING, ServerTextParser.financeStatusFromText("Fällig"))
+        // Tagadó alakok nem lehetnek COMPLETED státuszúak.
+        assertEquals(FinanceStatus.PENDING, ServerTextParser.financeStatusFromText("Not completed"))
+        assertEquals(FinanceStatus.PENDING, ServerTextParser.financeStatusFromText("Not paid"))
+        assertEquals(FinanceStatus.PENDING, ServerTextParser.financeStatusFromText("Nicht abgeschlossen"))
+        assertEquals(FinanceStatus.PENDING, ServerTextParser.financeStatusFromText("Teljesítetlen"))
 
         assertNull(ServerTextParser.financeStatusFromText(""))
         assertNull(ServerTextParser.financeStatusFromText("???"))
@@ -175,6 +183,10 @@ class NeptunLanguageTest {
         assertTrue(ServerTextParser.isSignedStatus("Signed"))
         assertTrue(ServerTextParser.isSignedStatus("Unterschrieben"))
         assertFalse(ServerTextParser.isSignedStatus("Folyamatban"))
+        assertFalse(ServerTextParser.isSignedStatus("Not signed"))
+        assertFalse(ServerTextParser.isSignedStatus("Not completed"))
+        assertFalse(ServerTextParser.isSignedStatus("Nicht unterschrieben"))
+        assertFalse(ServerTextParser.isSignedStatus("Nincs aláírva"))
         assertFalse(ServerTextParser.isSignedStatus(""))
     }
 

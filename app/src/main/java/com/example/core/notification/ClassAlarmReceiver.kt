@@ -14,9 +14,12 @@ class ClassAlarmReceiver : BroadcastReceiver() {
         val room = intent.getStringExtra(EXTRA_ROOM) ?: "-"
         val startTime = intent.getStringExtra(EXTRA_START_TIME) ?: ""
         // Az óratípus nevét az értesítés pillanatában fordítjuk: nyelvválasztás után is helyes.
+        val courseTypeExtra = intent.getStringExtra(EXTRA_COURSE_TYPE)
         val courseType = runCatching {
-            intent.getStringExtra(EXTRA_COURSE_TYPE)?.let { CourseType.valueOf(it) }
+            courseTypeExtra?.let { CourseType.valueOf(it) }
         }.getOrNull()?.let { context.getString(it.labelRes) }
+            // Régebbi verziók a honosított feliratot tárolták: azt tartsuk meg.
+            ?: courseTypeExtra
             ?: context.getString(R.string.notif_class_default)
         val notificationId = intent.getIntExtra(EXTRA_NOTIFICATION_ID, 1001)
         val minutesBefore = intent.getIntExtra(EXTRA_MINUTES_BEFORE, 15)

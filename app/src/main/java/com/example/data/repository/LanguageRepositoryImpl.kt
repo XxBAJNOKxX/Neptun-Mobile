@@ -10,6 +10,8 @@ import com.example.domain.repository.LanguageList
 import com.example.domain.repository.LanguageRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 class LanguageRepositoryImpl(
@@ -17,6 +19,13 @@ class LanguageRepositoryImpl(
     private val strings: StringProvider,
     private val neptunApiClient: NeptunApiClient = NeptunApiClient(strings)
 ) : LanguageRepository {
+
+    /**
+     * A frissítések szerializálása: az egymás utáni hívások időrendi
+     * sorrendben futnak le, így egy lassú, régi intézményhez tartozó válasz
+     * nem írhatja felül az aktuális egyetem LCID-jét.
+     */
+    private val refreshMutex = Mutex()
 
     override val selectedLcidFlow: Flow<Int>
         get() = prefsManager.serverLanguageFlow
@@ -36,6 +45,10 @@ class LanguageRepositoryImpl(
     override fun getCachedLanguages(baseUrl: String): LanguageList {
         val cached = prefsManager.getCachedSupportedLanguages(baseUrl)
         return if (!cached.isNullOrEmpty()) {
+            // Valódi gyorsítótárazott lista: a perzisztált LCID-t egyeztetjük
+            // vele, hogy a bejelentkezés ne vihessen nem támogatott nyelvet.
+            // (A tartalék listához sosem igazítunk: az felülírná offline is.)
+            ensureValidSelection(cached)
             LanguageList(languages = cached, isFallback = false)
         } else {
             LanguageList(languages = NeptunLanguages.FALLBACK_LANGUAGES, isFallback = true)
@@ -43,15 +56,21 @@ class LanguageRepositoryImpl(
     }
 
     override suspend fun refreshLanguages(baseUrl: String): LanguageList = withContext(Dispatchers.IO) {
-        if (baseUrl.isBlank()) {
-            return@withContext getCachedLanguages(baseUrl)
+        refreshMutex.withLock {
+            if (baseUrl.isBlank()) {
+                return@withContext getCachedLanguages(baseUrl)
+            }
+            internalRefreshLocked(baseUrl)
         }
+    }
+
+    private suspend fun internalRefreshLocked(baseUrl: String): LanguageList {
         try {
             val remote = neptunApiClient.getSupportedLanguages(baseUrl)
             if (remote.isNotEmpty()) {
                 prefsManager.cacheSupportedLanguages(baseUrl, remote)
                 ensureValidSelection(remote)
-                return@withContext LanguageList(languages = remote, isFallback = false)
+                return LanguageList(languages = remote, isFallback = false)
             } else {
                 Log.d(TAG, "EnvironmentData nem adott nyelvi listát ($baseUrl), gyorsítótár/tartalék használata")
             }

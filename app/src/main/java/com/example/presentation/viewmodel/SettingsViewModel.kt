@@ -117,6 +117,11 @@ class SettingsViewModel(
             }
         }
         viewModelScope.launch {
+            prefsManager.loginLcidFlow.collect { loginLcid ->
+                _uiState.update { it.copy(loginLcid = loginLcid) }
+            }
+        }
+        viewModelScope.launch {
             languageRepository.selectedLcidFlow.collect { lcid ->
                 _uiState.update {
                     it.copy(serverLanguage = it.serverLanguage.copy(selectedLcid = lcid))

@@ -105,6 +105,9 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
     private val _appLocaleFlow = MutableStateFlow(getAppLocale())
     val appLocaleFlow: StateFlow<AppLocale> = _appLocaleFlow.asStateFlow()
 
+    private val _loginLcidFlow = MutableStateFlow(getLoginLcid())
+    val loginLcidFlow: StateFlow<Int> = _loginLcidFlow.asStateFlow()
+
     fun updateLastSyncTime(timestamp: Long = System.currentTimeMillis()) {
         prefs.edit().putLong(KEY_LAST_SYNC, timestamp).apply()
         _credentialsFlow.value = loadCredentials()
@@ -245,6 +248,7 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
 
     fun setLoginLcid(lcid: Int) {
         prefs.edit().putInt(KEY_LOGIN_LCID, lcid).apply()
+        _loginLcidFlow.value = lcid
     }
 
     /**

@@ -33,7 +33,11 @@ object ServerTextParser {
         val lower = text.lowercase()
         // 1 – elégtelen / fail (először, lásd a fenti megjegyzést)
         if (lower.contains("elégtelen") ||
+            lower.contains("nem felelt meg") ||
             lower.contains("failed") ||
+            lower.contains("not passed") ||
+            lower.contains("did not pass") ||
+            lower.contains("didn't pass") ||
             lower.contains("fail") ||
             lower.contains("insufficient") ||
             lower.contains("unsatisfactory") ||
@@ -93,8 +97,11 @@ object ServerTextParser {
     // ------------------------------------------------------------------
 
     private val UNPAID_KEYWORDS = listOf(
+        "teljesítetlen", "nem teljesít", "nem fizetett",
         "unpaid", "incomplete", "unsettled",
-        "nicht bezahlt", "unbezahlt", "offen"
+        "not completed", "not complete", "not paid", "not settled",
+        "nicht bezahlt", "nicht abgeschlossen", "nicht beglichen",
+        "unbezahlt", "offen"
     )
 
     private val COMPLETED_KEYWORDS = listOf(
@@ -145,6 +152,20 @@ object ServerTextParser {
     fun isSignedStatus(text: String): Boolean {
         if (text.isBlank()) return false
         val lower = text.lowercase()
+        if (lower.contains("nincs aláírva") ||
+            lower.contains("nem teljesít") ||
+            lower.contains("nem felelt") ||
+            lower.contains("not signed") ||
+            lower.contains("unsigned") ||
+            lower.contains("not completed") ||
+            lower.contains("not passed") ||
+            lower.contains("nicht unterschrieben") ||
+            lower.contains("nicht unterzeichnet") ||
+            lower.contains("nicht abgeschlossen") ||
+            lower.contains("nicht bestanden")
+        ) {
+            return false
+        }
         return lower.contains("teljesít") ||
             lower.contains("aláír") ||
             lower.contains("alair") ||
