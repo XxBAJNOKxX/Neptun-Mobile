@@ -8,6 +8,8 @@ import com.example.domain.model.ExamItem
 import com.example.domain.model.FinanceItem
 import com.example.domain.model.FinanceStatus
 import com.example.domain.model.Neptun2FASession
+import com.example.domain.model.NeptunLanguage
+import com.example.domain.model.NeptunLanguages
 import com.example.domain.model.NeptunMessage
 import com.example.domain.model.SubjectGrade
 import kotlinx.coroutines.Dispatchers
@@ -166,12 +168,39 @@ class NeptunApiClient {
         return safeParseJson(raw) as? JsonObject
     }
 
+    /**
+     * Az intézmény által támogatott nyelvek lekérése az `EnvironmentData`
+     * végpontról. Hitelesítést nem igényel, ezért bejelentkezés előtt is
+     * hívható. Hiba vagy nem modern szerver esetén üres listát ad vissza
+     * (ilyenkor a hívó a beépített tartalék listát használja).
+     */
+    suspend fun getSupportedLanguages(rawUrl: String): List<NeptunLanguage> = withContext(Dispatchers.IO) {
+        try {
+            val cleanBase = normalizeBaseUrl(rawUrl)
+            if (cleanBase.isBlank()) return@withContext emptyList()
+            val url = "$cleanBase/api/General/EnvironmentData"
+            val req = Request.Builder()
+                .url(url)
+                .get()
+                .addHeader("Accept", "application/json, text/plain, */*")
+                .build()
+            val resp = okHttpClient.newCall(req).execute()
+            if (!resp.isSuccessful) return@withContext emptyList()
+            val body = resp.body?.string() ?: return@withContext emptyList()
+            NeptunLanguages.parseSupportedLanguages(body)
+        } catch (e: Exception) {
+            Log.d(tag, "getSupportedLanguages hiba: ${e.message}")
+            emptyList()
+        }
+    }
+
     suspend fun authenticate(
         rawUrl: String,
         neptunCode: String,
         password: String,
         twoFactorCode: String = "",
-        savedDeviceCookie: String = ""
+        savedDeviceCookie: String = "",
+        lcid: Int = NeptunLanguages.DEFAULT_LCID
     ): NeptunAuthResult = withContext(Dispatchers.IO) {
         val candidateUrls = if (rawUrl.contains("ppke.hu", ignoreCase = true)) {
             listOf(
@@ -187,7 +216,7 @@ class NeptunApiClient {
 
         var lastFailure: NeptunAuthResult? = null
         for (targetUrl in candidateUrls) {
-            val result = authenticateSingle(targetUrl, neptunCode, password, twoFactorCode, savedDeviceCookie)
+            val result = authenticateSingle(targetUrl, neptunCode, password, twoFactorCode, savedDeviceCookie, lcid)
             if (result is NeptunAuthResult.Success || result is NeptunAuthResult.TwoFactorRequired || result is NeptunAuthResult.TwoFactorSessionRequired) {
                 return@withContext result
             }
@@ -282,11 +311,13 @@ class NeptunApiClient {
     suspend fun authenticateAspDotNet(
         baseUrl: String,
         username: String,
-        password: String
+        password: String,
+        lcid: Int = NeptunLanguages.DEFAULT_LCID
     ): NeptunAuthResult = withContext(Dispatchers.IO) {
         val cleanBase = normalizeBaseUrl(baseUrl)
         val loginPageUrl = "$cleanBase/Account/Login"
         var cookieMap = mutableMapOf<String, String>()
+        val acceptLanguage = NeptunLanguages.acceptLanguageHeader(lcid)
 
         // 1. GET /Account/Login to obtain __RequestVerificationToken and anti-forgery cookies
         val getReq = Request.Builder()
@@ -294,7 +325,7 @@ class NeptunApiClient {
             .get()
             .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36")
             .addHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
-            .addHeader("Accept-Language", "hu-HU,hu;q=0.9,en-US;q=0.8,en;q=0.7")
+            .addHeader("Accept-Language", acceptLanguage)
             .build()
 
         val getResp: okhttp3.Response
@@ -332,7 +363,7 @@ class NeptunApiClient {
             .post(postParams.build())
             .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36")
             .addHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
-            .addHeader("Accept-Language", "hu-HU,hu;q=0.9,en-US;q=0.8,en;q=0.7")
+            .addHeader("Accept-Language", acceptLanguage)
             .addHeader("Referer", loginPageUrl)
             .addHeader("Origin", cleanBase)
             .addHeader("Cookie", cookieHeaderString(cookieMap))
@@ -360,7 +391,7 @@ class NeptunApiClient {
                     .get()
                     .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36")
                     .addHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
-                    .addHeader("Accept-Language", "hu-HU,hu;q=0.9,en-US;q=0.8,en;q=0.7")
+                    .addHeader("Accept-Language", acceptLanguage)
                     .addHeader("Referer", loginPageUrl)
                     .addHeader("Cookie", cookieHeaderString(cookieMap))
                     .build()
@@ -400,7 +431,7 @@ class NeptunApiClient {
 
                 return@withContext NeptunAuthResult.TwoFactorSessionRequired(session)
             } else {
-                return@withContext exchangeAspSessionToModernToken(cleanBase, cookieMap, username)
+                return@withContext exchangeAspSessionToModernToken(cleanBase, cookieMap, username, lcid)
             }
         }
 
@@ -415,7 +446,11 @@ class NeptunApiClient {
         NeptunAuthResult.Failure(errorMsg)
     }
 
-    suspend fun request2FAEmailCode(session: Neptun2FASession): Result<Neptun2FASession> = withContext(Dispatchers.IO) {
+    suspend fun request2FAEmailCode(
+        session: Neptun2FASession,
+        lcid: Int = NeptunLanguages.DEFAULT_LCID
+    ): Result<Neptun2FASession> = withContext(Dispatchers.IO) {
+        val acceptLanguage = NeptunLanguages.acceptLanguageHeader(lcid)
         try {
             val postUrl = "${session.baseUrl}/Account/Login2FA"
             val formBuilder = FormBody.Builder()
@@ -439,7 +474,7 @@ class NeptunApiClient {
                 .post(formBuilder.build())
                 .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36")
                 .addHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
-                .addHeader("Accept-Language", "hu-HU,hu;q=0.9,en-US;q=0.8,en;q=0.7")
+                .addHeader("Accept-Language", acceptLanguage)
                 .addHeader("Referer", "$postUrl?NeptunCode=${session.neptunCode}&Key=${session.key}")
                 .addHeader("Origin", session.baseUrl)
                 .addHeader("Cookie", cookieHeaderString(cookieMap))
@@ -474,8 +509,10 @@ class NeptunApiClient {
     suspend fun verify2FACode(
         session: Neptun2FASession,
         code: String,
-        isTotp: Boolean
+        isTotp: Boolean,
+        lcid: Int = NeptunLanguages.DEFAULT_LCID
     ): NeptunAuthResult = withContext(Dispatchers.IO) {
+        val acceptLanguage = NeptunLanguages.acceptLanguageHeader(lcid)
         try {
             val postUrl = "${session.baseUrl}/Account/Login2FA"
             val effectivePhase = if (isTotp) "RequestTOTP" else "RequestEmailCode"
@@ -505,7 +542,7 @@ class NeptunApiClient {
                 .post(formBuilder.build())
                 .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36")
                 .addHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
-                .addHeader("Accept-Language", "hu-HU,hu;q=0.9,en-US;q=0.8,en;q=0.7")
+                .addHeader("Accept-Language", acceptLanguage)
                 .addHeader("Referer", "$postUrl?NeptunCode=${session.neptunCode}&Key=${session.key}")
                 .addHeader("Origin", session.baseUrl)
                 .addHeader("Cookie", cookieHeaderString(cookieMap))
@@ -519,13 +556,13 @@ class NeptunApiClient {
             val locationHeader = resp.header("Location") ?: ""
 
             if (statusCode in 300..399) {
-                return@withContext exchangeAspSessionToModernToken(session.baseUrl, cookieMap, session.neptunCode)
+                return@withContext exchangeAspSessionToModernToken(session.baseUrl, cookieMap, session.neptunCode, lcid)
             }
 
             val html = resp.body?.string() ?: ""
             val errors = extractValidationErrors(html)
             if (errors.isEmpty() && (html.contains("ToNeptunWeb", ignoreCase = true) || html.contains("Kijelentkezés", ignoreCase = true) || locationHeader.isNotEmpty() || resp.isSuccessful)) {
-                return@withContext exchangeAspSessionToModernToken(session.baseUrl, cookieMap, session.neptunCode)
+                return@withContext exchangeAspSessionToModernToken(session.baseUrl, cookieMap, session.neptunCode, lcid)
             }
 
             val errorMsg = if (errors.isNotEmpty()) {
@@ -543,8 +580,10 @@ class NeptunApiClient {
     private suspend fun exchangeAspSessionToModernToken(
         aspBaseUrl: String,
         cookies: Map<String, String>,
-        username: String
+        username: String,
+        lcid: Int = NeptunLanguages.DEFAULT_LCID
     ): NeptunAuthResult = withContext(Dispatchers.IO) {
+        val acceptLanguage = NeptunLanguages.acceptLanguageHeader(lcid)
         try {
             val cookieHeader = cookieHeaderString(cookies)
             val cleanBase = normalizeBaseUrl(aspBaseUrl)
@@ -556,7 +595,7 @@ class NeptunApiClient {
                 .get()
                 .addHeader("User-Agent", DEFAULT_USER_AGENT)
                 .addHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
-                .addHeader("Accept-Language", "hu-HU,hu;q=0.9,en-US;q=0.8,en;q=0.7")
+                .addHeader("Accept-Language", acceptLanguage)
                 .addHeader("Referer", "$cleanBase/")
                 .addHeader("Cookie", cookieHeader)
                 .build()
@@ -610,7 +649,7 @@ class NeptunApiClient {
             Log.d(tag, "exchangeAspSessionToModernToken locationHeader: $locationHeader")
 
             if (locationHeader.isNotEmpty()) {
-                val outerResult = followOuterLoginAndGetToken(locationHeader, modernCookieMap, username)
+                val outerResult = followOuterLoginAndGetToken(locationHeader, modernCookieMap, username, preferredLcid = lcid)
                 if (outerResult is NeptunAuthResult.Success) {
                     return@withContext outerResult
                 }
@@ -646,10 +685,11 @@ class NeptunApiClient {
     suspend fun followOuterLoginAndGetToken(
         outerLoginUrl: String,
         initialCookieMap: Map<String, String>,
-        username: String
+        username: String,
+        preferredLcid: Int? = null
     ): NeptunAuthResult = withContext(Dispatchers.IO) {
         var guid = ""
-        var languageId = 1038
+        var urlLanguageId: Int? = null
         var modernBaseUrl = "https://hallgato1.neptun.elte.hu"
 
         try {
@@ -661,8 +701,8 @@ class NeptunApiClient {
                 if (parts.size == 2) {
                     when {
                         parts[0].equals("GUID", ignoreCase = true) -> guid = parts[1]
-                        parts[0].equals("languageid", ignoreCase = true) -> languageId = parts[1].toIntOrNull() ?: 1038
-                        parts[0].equals("lcid", ignoreCase = true) -> languageId = parts[1].toIntOrNull() ?: 1038
+                        parts[0].equals("languageid", ignoreCase = true) -> parts[1].toIntOrNull()?.takeIf { it > 0 }?.let { urlLanguageId = it }
+                        parts[0].equals("lcid", ignoreCase = true) -> parts[1].toIntOrNull()?.takeIf { it > 0 }?.let { urlLanguageId = it }
                     }
                 }
             }
@@ -674,6 +714,11 @@ class NeptunApiClient {
             return@withContext NeptunAuthResult.Failure("Nem sikerült GUID-ot kinyerni az outerlogin URL-ből: $outerLoginUrl")
         }
 
+        // A felhasználó által választott nyelv élvez elsőbbséget, különben
+        // az outerlogin URL-ben érkező érték, végül a magyar alapértelmezés.
+        val languageId = preferredLcid?.takeIf { it > 0 }
+            ?: urlLanguageId
+            ?: NeptunLanguages.DEFAULT_LCID
         val outerLoginEndpoint = "$modernBaseUrl/api/Account/OuterLogin"
         val outerPayload = """{"guid":"$guid","lcid":$languageId,"languageId":$languageId}"""
 
@@ -747,8 +792,10 @@ class NeptunApiClient {
     suspend fun renewSessionWithCookies(
         aspBaseUrl: String,
         savedCookies: String,
-        username: String
+        username: String,
+        lcid: Int = NeptunLanguages.DEFAULT_LCID
     ): NeptunAuthResult = withContext(Dispatchers.IO) {
+        val acceptLanguage = NeptunLanguages.acceptLanguageHeader(lcid)
         try {
             if (savedCookies.isBlank()) {
                 return@withContext NeptunAuthResult.Failure("Nincsenek mentett munkamenet-sütik")
@@ -768,7 +815,7 @@ class NeptunApiClient {
                 .get()
                 .addHeader("User-Agent", DEFAULT_USER_AGENT)
                 .addHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
-                .addHeader("Accept-Language", "hu-HU,hu;q=0.9,en-US;q=0.8,en;q=0.7")
+                .addHeader("Accept-Language", acceptLanguage)
                 .addHeader("Referer", "$cleanBase/")
                 .addHeader("Cookie", cookieHeaderString(cookieMap))
                 .build()
@@ -812,7 +859,7 @@ class NeptunApiClient {
                         .post(postBody)
                         .addHeader("User-Agent", DEFAULT_USER_AGENT)
                         .addHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
-                        .addHeader("Accept-Language", "hu-HU,hu;q=0.9,en-US;q=0.8,en;q=0.7")
+                        .addHeader("Accept-Language", acceptLanguage)
                         .addHeader("Referer", bridgeUrl)
                         .addHeader("Origin", cleanBase)
                         .addHeader("Cookie", cookieHeaderString(cookieMap))
@@ -845,7 +892,7 @@ class NeptunApiClient {
                 return@withContext NeptunAuthResult.Failure("Nem sikerült elérni az outerlogin végpontot")
             }
 
-            return@withContext followOuterLoginAndGetToken(outerLoginUrl, cookieMap, username)
+            return@withContext followOuterLoginAndGetToken(outerLoginUrl, cookieMap, username, preferredLcid = lcid)
         } catch (e: Exception) {
             Log.e(tag, "renewSessionWithCookies hiba: ${e.message}")
             NeptunAuthResult.Failure("Hálózati hiba a munkamenet-megújításnál: ${e.localizedMessage}")
@@ -888,7 +935,8 @@ class NeptunApiClient {
         neptunCode: String,
         password: String,
         twoFactorCode: String = "",
-        savedDeviceCookie: String = ""
+        savedDeviceCookie: String = "",
+        lcid: Int = NeptunLanguages.DEFAULT_LCID
     ): NeptunAuthResult = withContext(Dispatchers.IO) {
         val username = neptunCode.trim().uppercase()
         val pwd = password.trim()
@@ -897,7 +945,7 @@ class NeptunApiClient {
         val isAspDotNetWeb = rawUrl.contains("Account/Login", ignoreCase = true) || rawUrl.contains("elte.hu", ignoreCase = true)
 
         if (isAspDotNetWeb) {
-            return@withContext authenticateAspDotNet(baseUrl, username, pwd)
+            return@withContext authenticateAspDotNet(baseUrl, username, pwd, lcid)
         }
 
         if (containsAspx) {
@@ -927,7 +975,7 @@ class NeptunApiClient {
                     "captcha": "",
                     "captchaIdentifier": "",
                     "token": "$twoFactorCode",
-                    "LCID": 1038
+                    "LCID": $lcid
                 }
             """.trimIndent()
 
@@ -950,7 +998,7 @@ class NeptunApiClient {
 
             if (responseBody.trim().startsWith("<")) {
                 // Fallback to ASP.NET Core login first, then legacy
-                val aspResult = authenticateAspDotNet(baseUrl, username, pwd)
+                val aspResult = authenticateAspDotNet(baseUrl, username, pwd, lcid)
                 if (aspResult is NeptunAuthResult.Success || aspResult is NeptunAuthResult.TwoFactorSessionRequired) {
                     return@withContext aspResult
                 }
@@ -971,7 +1019,7 @@ class NeptunApiClient {
 
             val parsed = safeParseJsonObject(responseBody)
             if (parsed == null) {
-                val aspResult = authenticateAspDotNet(baseUrl, username, pwd)
+                val aspResult = authenticateAspDotNet(baseUrl, username, pwd, lcid)
                 if (aspResult is NeptunAuthResult.Success || aspResult is NeptunAuthResult.TwoFactorSessionRequired) {
                     return@withContext aspResult
                 }
@@ -1035,7 +1083,7 @@ class NeptunApiClient {
                 ?: "Hibás felhasználónév vagy jelszó!"
 
             if (response.code == 404) {
-                val aspResult = authenticateAspDotNet(baseUrl, username, pwd)
+                val aspResult = authenticateAspDotNet(baseUrl, username, pwd, lcid)
                 if (aspResult is NeptunAuthResult.Success || aspResult is NeptunAuthResult.TwoFactorSessionRequired) {
                     return@withContext aspResult
                 }
@@ -1056,7 +1104,7 @@ class NeptunApiClient {
             NeptunAuthResult.Failure(errMsg)
         } catch (e: Exception) {
             Log.e(tag, "Modern login failed, attempting ASP.NET and legacy fallbacks: ${e.message}")
-            val aspResult = authenticateAspDotNet(baseUrl, username, pwd)
+            val aspResult = authenticateAspDotNet(baseUrl, username, pwd, lcid)
             if (aspResult is NeptunAuthResult.Success || aspResult is NeptunAuthResult.TwoFactorSessionRequired) {
                 return@withContext aspResult
             }
@@ -1349,14 +1397,8 @@ class NeptunApiClient {
 
     private fun detectCourseType(item: JsonElement, courseCode: String = "", name: String = ""): CourseType {
         val fullText = (extractAllText(item) + " " + courseCode + " " + name).lowercase()
-        return when {
-            fullText.contains("labor") || fullText.contains("lab") || courseCode.contains("lab", ignoreCase = true) || courseCode.startsWith("L", ignoreCase = true) -> CourseType.LAB
-            fullText.contains("gyakorlat") || fullText.contains("gyak") || courseCode.contains("gyak", ignoreCase = true) || courseCode.startsWith("G", ignoreCase = true) -> CourseType.PRACTICE
-            fullText.contains("szeminárium") || fullText.contains("szem") -> CourseType.SEMINAR
-            fullText.contains("vizsga") -> CourseType.EXAM
-            fullText.contains("előadás") || fullText.contains("elmélet") || fullText.contains("ea") -> CourseType.LECTURE
-            else -> CourseType.LECTURE
-        }
+        // Többnyelvű felismerés (a szerver a bejelentkezési LCID alapján lokalizál).
+        return ServerTextParser.courseTypeFromText(fullText, courseCode)
     }
 
     /**
@@ -1749,7 +1791,7 @@ class NeptunApiClient {
                                     ?: obj["completed"]?.jsonPrimitive?.booleanOrNull
                                     ?: obj["passed"]?.jsonPrimitive?.booleanOrNull
                                     ?: false
-                                if (statusStr.contains("Teljesít", ignoreCase = true) || statusStr.contains("Aláír", ignoreCase = true)) {
+                                if (ServerTextParser.isSignedStatus(statusStr)) {
                                     isSigned = true
                                 }
 
@@ -1915,20 +1957,8 @@ class NeptunApiClient {
     }
 
     private fun parseTextToGrade(text: String): Int {
-        val lower = text.lowercase()
-        val digitMatch = Regex("""\b([1-5])\b""").find(text)
-        if (digitMatch != null) {
-            return digitMatch.groupValues[1].toInt()
-        }
-        return when {
-            lower.contains("jeles") -> 5
-            lower.contains("jó") -> 4
-            lower.contains("közepes") -> 3
-            lower.contains("elégséges") -> 2
-            lower.contains("elégtelen") -> 1
-            lower.contains("megfelelt") -> 5
-            else -> 0
-        }
+        // Többnyelvű felismerés (a szerver a bejelentkezési LCID alapján lokalizál).
+        return ServerTextParser.gradeFromText(text)
     }
 
     // --- MESSAGES ---
@@ -2011,7 +2041,7 @@ class NeptunApiClient {
                         previewText = "Koppints a teljes üzenet megtekintéséhez...",
                         bodyHtml = "",
                         isRead = unreadCount == 0,
-                        isOfficial = isSystem || sender.contains("hivatal", ignoreCase = true) || sender.contains("tanulmányi", ignoreCase = true)
+                        isOfficial = isSystem || ServerTextParser.isOfficialSender(sender)
                     )
                 )
             }
@@ -2233,7 +2263,7 @@ class NeptunApiClient {
                         previewText = stripHtmlForPreview(detail).take(120),
                         bodyHtml = detail,
                         isRead = !isNew,
-                        isOfficial = sender.equals("Rendszerüzenet", ignoreCase = true) || sender.contains("hivatal", ignoreCase = true) || sender.contains("tanulmányi", ignoreCase = true)
+                        isOfficial = sender.equals("Rendszerüzenet", ignoreCase = true) || ServerTextParser.isOfficialSender(sender)
                     )
                 )
             }
@@ -2729,11 +2759,7 @@ class NeptunApiClient {
                         val statusText = obj["status"]?.jsonPrimitive?.contentOrNull
                             ?: obj["statusName"]?.jsonPrimitive?.contentOrNull
                             ?: "Aktív"
-                        val status = if (statusText.contains("teljesít", ignoreCase = true) || statusText.contains("befizet", ignoreCase = true)) {
-                            FinanceStatus.COMPLETED
-                        } else {
-                            FinanceStatus.PENDING
-                        }
+                        val status = ServerTextParser.financeStatusFromText(statusText) ?: FinanceStatus.PENDING
                         val dateRaw = obj["deadline"]?.jsonPrimitive?.contentOrNull
                             ?: obj["dueDate"]?.jsonPrimitive?.contentOrNull
                             ?: obj["impositionDate"]?.jsonPrimitive?.contentOrNull
@@ -2806,11 +2832,7 @@ class NeptunApiClient {
                             dateStr
                         }
 
-                        val status = when {
-                            statusText.contains("teljesít", ignoreCase = true) -> FinanceStatus.COMPLETED
-                            statusText.contains("aktív", ignoreCase = true) || statusText.contains("fizetendő", ignoreCase = true) -> FinanceStatus.PENDING
-                            else -> FinanceStatus.COMPLETED
-                        }
+                        val status = ServerTextParser.financeStatusFromText(statusText) ?: FinanceStatus.COMPLETED
 
                         list.add(
                             FinanceItem(
@@ -2870,7 +2892,7 @@ class NeptunApiClient {
                     ""
                 }
 
-                val status = if (statusName.contains("teljesít", ignoreCase = true)) FinanceStatus.COMPLETED else FinanceStatus.PENDING
+                val status = ServerTextParser.financeStatusFromText(statusName) ?: FinanceStatus.PENDING
 
                 list.add(
                     FinanceItem(

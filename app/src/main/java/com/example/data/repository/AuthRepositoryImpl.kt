@@ -83,6 +83,7 @@ class AuthRepositoryImpl(
             prefsManager.setBaseUrl(university.neptunUrl)
             prefsManager.setIsModernApi(true)
             prefsManager.setDataMode(DataMode.DEMO)
+            prefsManager.setLoginLcid(prefsManager.getServerLanguageLcid())
             prefsManager.clearSessionExpired()
 
             val creds = prefsManager.loadCredentials() ?: StudentCredentials(
@@ -100,12 +101,14 @@ class AuthRepositoryImpl(
 
         // Real network authentication via NeptunApiClient
         val deviceCookie = prefsManager.getDeviceCookie(trimmedCode)
+        val loginLcid = prefsManager.getServerLanguageLcid()
         val authResult = neptunApiClient.authenticate(
             rawUrl = university.neptunUrl,
             neptunCode = trimmedCode,
             password = trimmedPassword,
             twoFactorCode = twoFactorCode,
-            savedDeviceCookie = deviceCookie
+            savedDeviceCookie = deviceCookie,
+            lcid = loginLcid
         )
 
         when (authResult) {
@@ -137,6 +140,7 @@ class AuthRepositoryImpl(
                 prefsManager.setIsModernApi(authResult.isModernApi)
                 prefsManager.setBaseUrl(authResult.normalizedBaseUrl)
                 prefsManager.setDataMode(DataMode.REAL)
+                prefsManager.setLoginLcid(loginLcid)
                 prefsManager.clearSessionExpired()
 
                 val creds = prefsManager.loadCredentials() ?: StudentCredentials(
@@ -158,7 +162,7 @@ class AuthRepositoryImpl(
     }
 
     override suspend fun request2FAEmailCode(session: Neptun2FASession): Result<Neptun2FASession> {
-        return neptunApiClient.request2FAEmailCode(session)
+        return neptunApiClient.request2FAEmailCode(session, prefsManager.getServerLanguageLcid())
     }
 
     override suspend fun verify2FACode(
@@ -166,7 +170,8 @@ class AuthRepositoryImpl(
         code: String,
         isTotp: Boolean
     ): Result<StudentCredentials> = withContext(Dispatchers.IO) {
-        val authResult = neptunApiClient.verify2FACode(session, code, isTotp)
+        val loginLcid = prefsManager.getServerLanguageLcid()
+        val authResult = neptunApiClient.verify2FACode(session, code, isTotp, loginLcid)
         when (authResult) {
             is NeptunAuthResult.Success -> {
                 val savedUniName = prefsManager.getSelectedUniversityName().ifEmpty { "Egyetem" }
@@ -199,6 +204,7 @@ class AuthRepositoryImpl(
                 prefsManager.setIsModernApi(authResult.isModernApi)
                 prefsManager.setBaseUrl(authResult.normalizedBaseUrl)
                 prefsManager.setDataMode(DataMode.REAL)
+                prefsManager.setLoginLcid(loginLcid)
                 prefsManager.clearSessionExpired()
 
                 val creds = prefsManager.loadCredentials() ?: StudentCredentials(

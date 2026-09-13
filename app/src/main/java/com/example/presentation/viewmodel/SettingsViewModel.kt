@@ -13,6 +13,7 @@ import com.example.core.security.UpdateChannel
 import com.example.core.update.AppUpdateManager
 import com.example.domain.model.StudentCredentials
 import com.example.domain.repository.AuthRepository
+import com.example.domain.repository.LanguageRepository
 import com.example.domain.repository.NeptunRepository
 import com.example.ui.theme.AppAccentColor
 import com.example.ui.theme.ThemeMode
@@ -47,13 +48,18 @@ data class SettingsUiState(
     val syncSuccessMessage: String? = null,
     val updateCheckState: UpdateCheckState = UpdateCheckState(),
     val isClearingCache: Boolean = false,
-    val cacheClearedMessage: String? = null
+    val cacheClearedMessage: String? = null,
+    // Neptun szervernyelv-választó
+    val serverLanguage: ServerLanguageUiState = ServerLanguageUiState(),
+    /** A bejelentkezéskor használt LCID (0 = ismeretlen). */
+    val loginLcid: Int = 0
 )
 
 class SettingsViewModel(
     private val prefsManager: EncryptedPreferencesManager,
     private val authRepository: AuthRepository,
-    private val neptunRepository: NeptunRepository
+    private val neptunRepository: NeptunRepository,
+    private val languageRepository: LanguageRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(
@@ -62,7 +68,8 @@ class SettingsViewModel(
             themeSettings = prefsManager.loadThemeSettings(),
             notificationPreferences = prefsManager.loadNotificationPreferences(),
             personalization = prefsManager.loadPersonalization(),
-            updateChannel = prefsManager.loadUpdateChannel()
+            updateChannel = prefsManager.loadUpdateChannel(),
+            loginLcid = prefsManager.getLoginLcid()
         )
     )
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
@@ -92,6 +99,60 @@ class SettingsViewModel(
             prefsManager.updateChannelFlow.collect { channel ->
                 _uiState.update { it.copy(updateChannel = channel) }
             }
+        }
+        viewModelScope.launch {
+            languageRepository.selectedLcidFlow.collect { lcid ->
+                _uiState.update {
+                    it.copy(serverLanguage = it.serverLanguage.copy(selectedLcid = lcid))
+                }
+            }
+        }
+        loadServerLanguages()
+    }
+
+    private fun currentBaseUrl(): String {
+        return prefsManager.getBaseUrl().ifEmpty { prefsManager.getSelectedUniversityUrl() }
+    }
+
+    /**
+     * Az intézmény támogatott nyelveinek betöltése: először a gyorsítótárból
+     * (azonnal), majd háttérben a szerverről frissítve.
+     */
+    fun loadServerLanguages() {
+        val baseUrl = currentBaseUrl()
+        val cached = languageRepository.getCachedLanguages(baseUrl)
+        _uiState.update {
+            it.copy(
+                serverLanguage = ServerLanguageUiState(
+                    languages = cached.languages,
+                    selectedLcid = languageRepository.getSelectedLcid(),
+                    isLoading = true,
+                    isFallback = cached.isFallback
+                )
+            )
+        }
+        viewModelScope.launch {
+            val fresh = languageRepository.refreshLanguages(baseUrl)
+            _uiState.update {
+                it.copy(
+                    serverLanguage = ServerLanguageUiState(
+                        languages = fresh.languages,
+                        selectedLcid = languageRepository.getSelectedLcid(),
+                        isLoading = false,
+                        isFallback = fresh.isFallback
+                    )
+                )
+            }
+        }
+    }
+
+    fun refreshServerLanguages() {
+        loadServerLanguages()
+    }
+
+    fun selectServerLanguage(lcid: Int) {
+        viewModelScope.launch {
+            languageRepository.setSelectedLcid(lcid)
         }
     }
 
@@ -362,11 +423,12 @@ class SettingsViewModel(
         fun provideFactory(
             prefsManager: EncryptedPreferencesManager,
             authRepository: AuthRepository,
-            neptunRepository: NeptunRepository
+            neptunRepository: NeptunRepository,
+            languageRepository: LanguageRepository
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                return SettingsViewModel(prefsManager, authRepository, neptunRepository) as T
+                return SettingsViewModel(prefsManager, authRepository, neptunRepository, languageRepository) as T
             }
         }
     }

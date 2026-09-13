@@ -133,7 +133,8 @@ fun MainAppContent() {
     val authViewModel: AuthViewModel = viewModel(
         factory = AuthViewModel.provideFactory(
             authRepository = appContainer.authRepository,
-            neptunRepository = appContainer.neptunRepository
+            neptunRepository = appContainer.neptunRepository,
+            languageRepository = appContainer.languageRepository
         )
     )
 
@@ -166,7 +167,10 @@ fun MainAppContent() {
             onTwoFactorMethodChange = authViewModel::onTwoFactorMethodChange,
             onRequestEmailCode = authViewModel::requestEmailCode,
             onSubmitTwoFactor = authViewModel::submitTwoFactor,
-            onCancelTwoFactor = authViewModel::cancelTwoFactor
+            onCancelTwoFactor = authViewModel::cancelTwoFactor,
+            serverLanguage = authState.serverLanguage,
+            onSelectServerLanguage = authViewModel::selectServerLanguage,
+            onRefreshServerLanguages = authViewModel::refreshServerLanguages
         )
     } else {
         // Biometrikus zár (ha be van kapcsolva)
@@ -235,7 +239,8 @@ private fun MainDashboard(
         factory = SettingsViewModel.provideFactory(
             prefsManager = appContainer.prefsManager,
             authRepository = appContainer.authRepository,
-            neptunRepository = appContainer.neptunRepository
+            neptunRepository = appContainer.neptunRepository,
+            languageRepository = appContainer.languageRepository
         )
     )
 
@@ -445,6 +450,10 @@ private fun MainDashboard(
                             onTargetCreditsChange = settingsViewModel::setTargetCredits,
                             onBiometricLockChange = settingsViewModel::setBiometricLockEnabled,
                             onUpdateChannelChange = settingsViewModel::setUpdateChannel,
+                            serverLanguage = settingsState.serverLanguage,
+                            loginLcid = settingsState.loginLcid,
+                            onSelectServerLanguage = settingsViewModel::selectServerLanguage,
+                            onRefreshServerLanguages = settingsViewModel::refreshServerLanguages,
                             onExportIcs = {
                                 coroutineScope.launch {
                                     exportTimetableAsIcs(app)

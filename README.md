@@ -15,6 +15,7 @@
 | 💰 **Pénzügyek** | Befizetendő és teljesített tételek, határidők, összesítés |
 | 🔔 **Értesítések** | Óra-emlékeztetők (pontos alarm), ÚJ jegyekről / üzenetekről / pénzügyi tételekről szóló push (diff-alapú, spam-mentes), halk órák |
 | 🔐 **Biztonság** | Titkosított hitelesítő-tárolás (Keystore + EncryptedSharedPreferences), TLS tanúsítvány-ellenőrzés, biometrikus zár opció |
+| 🌍 **Neptun nyelv** | Szervernyelv-váltó (LCID): az intézmény támogatott nyelvei automatikusan töltődnek (`EnvironmentData`), általában magyar/angol/német – a kiválasztott nyelv a bejelentkezéskor lép életbe |
 | 📱 **Widget** | Kezdőképernyő-widget a mai órákkal (Glance) |
 | 📤 **Export** | Órarend exportálása `.ics` naptárfájlba |
 
@@ -63,7 +64,7 @@ A GitHub [Releases](../../releases) oldalról tölthető le az APK (debug és re
 ## 🗺️ Tervezett funkciók
 
 - [ ] Vizsgára jelentkezés / tárgyfelvétel (a szerveroldali API függvényében)
-- [ ] Teljes i18n (jelenleg a felület magyar nyelvű)
+- [ ] Teljes i18n (jelenleg az app felülete magyar nyelvű; a Neptun szervernyelv már váltható a bejelentkezési és a Profil képernyőn)
 - [ ] Tárgyak részletes adatai (óra- és vizsgaidőpontok, követelmények)
 
 ## 📜 Licenc
