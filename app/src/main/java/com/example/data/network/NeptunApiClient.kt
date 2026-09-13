@@ -19,6 +19,8 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import com.example.R
+import com.example.core.locale.StringProvider
 import com.example.core.network.SslTrustHelper
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
@@ -67,7 +69,11 @@ sealed class NeptunAuthResult {
         val session: Neptun2FASession
     ) : NeptunAuthResult()
 
-    data class Failure(val message: String) : NeptunAuthResult()
+    data class Failure(
+        val message: String,
+        /** Hálózati hiba: nem jelent lejárt munkamenetet (nem lokalizációfüggő jelzés). */
+        val isNetworkError: Boolean = false
+    ) : NeptunAuthResult()
 }
 
 data class NeptunUserInfo(
@@ -77,9 +83,11 @@ data class NeptunUserInfo(
     val avatarPrintName: String?
 )
 
-class NeptunUnauthorizedException(message: String = "Munkamenet lejárt (401)") : Exception(message)
+class NeptunUnauthorizedException(message: String = "Session expired (401)") : Exception(message)
 
-class NeptunApiClient {
+class NeptunApiClient(
+    private val strings: StringProvider
+) {
 
     private val tag = "NeptunApiClient"
 
@@ -222,7 +230,7 @@ class NeptunApiClient {
             }
             lastFailure = result
         }
-        return@withContext lastFailure ?: NeptunAuthResult.Failure("Nem sikerült kapcsolódni a Neptun szerverhez!")
+        return@withContext lastFailure ?: NeptunAuthResult.Failure(strings.getString(R.string.api_no_connection))
     }
 
     fun parseCookiesFromHeaders(setCookieHeaders: List<String>): Map<String, String> {
@@ -332,7 +340,7 @@ class NeptunApiClient {
         try {
             getResp = okHttpClient.newBuilder().followRedirects(false).build().newCall(getReq).execute()
         } catch (e: Exception) {
-            return@withContext NeptunAuthResult.Failure("Nem sikerült elérni a Neptun bejelentkezési oldalt (${e.localizedMessage})")
+            return@withContext NeptunAuthResult.Failure(strings.getString(R.string.api_login_page, e.localizedMessage))
         }
 
         val getCookies = getResp.headers("Set-Cookie")
@@ -372,7 +380,7 @@ class NeptunApiClient {
         val postResp = try {
             okHttpClient.newBuilder().followRedirects(false).build().newCall(postReq).execute()
         } catch (e: Exception) {
-            return@withContext NeptunAuthResult.Failure("Hiba a hitelesítési adatok elküldésekor: ${e.localizedMessage}")
+            return@withContext NeptunAuthResult.Failure(strings.getString(R.string.api_send_creds, e.localizedMessage))
         }
 
         val postCookies = postResp.headers("Set-Cookie")
@@ -399,7 +407,7 @@ class NeptunApiClient {
                 val res2Fa = try {
                     okHttpClient.newBuilder().followRedirects(false).build().newCall(get2FaReq).execute()
                 } catch (e: Exception) {
-                    return@withContext NeptunAuthResult.Failure("Hiba a 2FA oldal betöltésekor: ${e.localizedMessage}")
+                    return@withContext NeptunAuthResult.Failure(strings.getString(R.string.api_2fa_load, e.localizedMessage))
                 }
 
                 val res2FaCookies = res2Fa.headers("Set-Cookie")
@@ -440,7 +448,7 @@ class NeptunApiClient {
         val errorMsg = if (errors.isNotEmpty()) {
             errors.joinToString(" | ")
         } else {
-            "Sikertelen bejelentkezés: hibás Neptun kód vagy jelszó!"
+            strings.getString(R.string.api_bad_credentials)
         }
 
         NeptunAuthResult.Failure(errorMsg)
@@ -561,20 +569,32 @@ class NeptunApiClient {
 
             val html = resp.body?.string() ?: ""
             val errors = extractValidationErrors(html)
-            if (errors.isEmpty() && (html.contains("ToNeptunWeb", ignoreCase = true) || html.contains("Kijelentkezés", ignoreCase = true) || locationHeader.isNotEmpty() || resp.isSuccessful)) {
+            if (errors.isEmpty() && (html.contains("ToNeptunWeb", ignoreCase = true) || containsLogoutMarker(html) || locationHeader.isNotEmpty() || resp.isSuccessful)) {
                 return@withContext exchangeAspSessionToModernToken(session.baseUrl, cookieMap, session.neptunCode, lcid)
             }
 
             val errorMsg = if (errors.isNotEmpty()) {
                 errors.joinToString(" | ")
             } else {
-                "A megadott biztonsági kód érvénytelen vagy lejárt!"
+                strings.getString(R.string.api_bad_2fa)
             }
 
             NeptunAuthResult.Failure(errorMsg)
         } catch (e: Exception) {
-            NeptunAuthResult.Failure("Hiba a biztonsági kód ellenőrzésekor: ${e.localizedMessage}")
+            NeptunAuthResult.Failure(strings.getString(R.string.api_verify_2fa, e.localizedMessage))
         }
+    }
+
+    /**
+     * Kijelentkezés-link felismerése a HTML-ben: a bejelentkezett állapot jele.
+     * A szerver a bejelentkezési LCID nyelvén küldi, ezért többnyelvű.
+     */
+    private fun containsLogoutMarker(html: String): Boolean {
+        return html.contains("Kijelentkezés", ignoreCase = true) ||
+            html.contains("Log out", ignoreCase = true) ||
+            html.contains("Logout", ignoreCase = true) ||
+            html.contains("Sign out", ignoreCase = true) ||
+            html.contains("Abmelden", ignoreCase = true)
     }
 
     private suspend fun exchangeAspSessionToModernToken(
@@ -659,8 +679,8 @@ class NeptunApiClient {
                 accessToken = "aspnet-session-$username",
                 refreshToken = null,
                 deviceCookie = cookieHeaderString(modernCookieMap),
-                studentName = "Hallgató ($username)",
-                trainingProgram = "ELTE Egyetemi Képzés",
+                studentName = strings.getString(R.string.api_student, username),
+                trainingProgram = strings.getString(R.string.api_program_elte1),
                 isModernApi = false,
                 normalizedBaseUrl = cleanBase
             )
@@ -670,8 +690,8 @@ class NeptunApiClient {
                 accessToken = "aspnet-session-$username",
                 refreshToken = null,
                 deviceCookie = cookieHeaderString(cookies),
-                studentName = "Hallgató ($username)",
-                trainingProgram = "ELTE Egyetemi Képzés",
+                studentName = strings.getString(R.string.api_student, username),
+                trainingProgram = strings.getString(R.string.api_program_elte1),
                 isModernApi = false,
                 normalizedBaseUrl = aspBaseUrl
             )
@@ -711,7 +731,7 @@ class NeptunApiClient {
         }
 
         if (guid.isEmpty()) {
-            return@withContext NeptunAuthResult.Failure("Nem sikerült GUID-ot kinyerni az outerlogin URL-ből: $outerLoginUrl")
+            return@withContext NeptunAuthResult.Failure(strings.getString(R.string.api_no_guid, outerLoginUrl))
         }
 
         // A felhasználó által választott nyelv élvez elsőbbséget, különben
@@ -764,13 +784,13 @@ class NeptunApiClient {
         } catch (e: Exception) {
             null
         }
-        val studentName = userInfo?.name?.takeIf { it.isNotBlank() } ?: "Hallgató ($tokenUser)"
+        val studentName = userInfo?.name?.takeIf { it.isNotBlank() } ?: strings.getString(R.string.api_student, tokenUser)
         val trainingInfo = try {
             getStudentTrainingInfo(modernBaseUrl, accessToken)
         } catch (e: Exception) {
             null
         }
-        val trainingName = trainingInfo?.second ?: "ELTE Felsőoktatási Képzés"
+        val trainingName = trainingInfo?.second ?: strings.getString(R.string.api_program_elte2)
         val trainingId = userInfo?.studentTrainingId?.takeIf { it.isNotBlank() } ?: trainingInfo?.first
 
         NeptunAuthResult.Success(
@@ -798,7 +818,7 @@ class NeptunApiClient {
         val acceptLanguage = NeptunLanguages.acceptLanguageHeader(lcid)
         try {
             if (savedCookies.isBlank()) {
-                return@withContext NeptunAuthResult.Failure("Nincsenek mentett munkamenet-sütik")
+                return@withContext NeptunAuthResult.Failure(strings.getString(R.string.api_no_cookies))
             }
             val cleanBase = normalizeBaseUrl(aspBaseUrl)
             val bridgeUrl = "$cleanBase/ToNeptunWeb/ToNeptunHWeb"
@@ -829,7 +849,7 @@ class NeptunApiClient {
             val getLocation = bridgeGetResp.header("Location") ?: ""
             // Ha a Login oldalra irányít át, a szerveroldali munkamenet valóban lejárt
             if (getLocation.contains("Account/Login", ignoreCase = true)) {
-                return@withContext NeptunAuthResult.Failure("ASP.NET munkamenet lejárt – újra be kell lépni.")
+                return@withContext NeptunAuthResult.Failure(strings.getString(R.string.api_session_expired))
             }
 
             var outerLoginUrl = ""
@@ -845,7 +865,7 @@ class NeptunApiClient {
                     val verificationToken = formInputs["__RequestVerificationToken"] ?: ""
 
                     if (verificationToken.isEmpty() && !bridgeHtml.contains("FormToNeptun", ignoreCase = true)) {
-                        return@withContext NeptunAuthResult.Failure("Nem található FormToNeptun az oldalon")
+                        return@withContext NeptunAuthResult.Failure(strings.getString(R.string.api_no_form))
                     }
 
                     val postBody = FormBody.Builder()
@@ -873,7 +893,7 @@ class NeptunApiClient {
                     val postLocation = bridgePostResp.header("Location") ?: ""
 
                     if (postLocation.contains("Account/Login", ignoreCase = true)) {
-                        return@withContext NeptunAuthResult.Failure("ASP.NET munkamenet lejárt – újra be kell lépni.")
+                        return@withContext NeptunAuthResult.Failure(strings.getString(R.string.api_session_expired))
                     }
 
                     if (postLocation.contains("outerlogin", ignoreCase = true)) {
@@ -889,13 +909,13 @@ class NeptunApiClient {
             }
 
             if (outerLoginUrl.isBlank()) {
-                return@withContext NeptunAuthResult.Failure("Nem sikerült elérni az outerlogin végpontot")
+                return@withContext NeptunAuthResult.Failure(strings.getString(R.string.api_outerlogin_fail))
             }
 
             return@withContext followOuterLoginAndGetToken(outerLoginUrl, cookieMap, username, preferredLcid = lcid)
         } catch (e: Exception) {
             Log.e(tag, "renewSessionWithCookies hiba: ${e.message}")
-            NeptunAuthResult.Failure("Hálózati hiba a munkamenet-megújításnál: ${e.localizedMessage}")
+            NeptunAuthResult.Failure(strings.getString(R.string.api_renew_net, e.localizedMessage), isNetworkError = true)
         }
     }
 
@@ -955,13 +975,13 @@ class NeptunApiClient {
                     accessToken = "legacy-token-$username",
                     refreshToken = null,
                     deviceCookie = null,
-                    studentName = "Hallgató ($username)",
-                    trainingProgram = "Egyetemi képzés",
+                    studentName = strings.getString(R.string.api_student, username),
+                    trainingProgram = strings.getString(R.string.api_program),
                     isModernApi = false,
                     normalizedBaseUrl = getLegacyBaseUrl(baseUrl)
                 )
             } else {
-                NeptunAuthResult.Failure("Nem sikerült a bejelentkezés a Neptun kiszolgálóra!")
+                NeptunAuthResult.Failure(strings.getString(R.string.api_login_failed_server))
             }
         }
 
@@ -1008,8 +1028,8 @@ class NeptunApiClient {
                         accessToken = "legacy-token-$username",
                         refreshToken = null,
                         deviceCookie = null,
-                        studentName = "Hallgató ($username)",
-                        trainingProgram = "Egyetemi képzés",
+                        studentName = strings.getString(R.string.api_student, username),
+                        trainingProgram = strings.getString(R.string.api_program),
                         isModernApi = false,
                         normalizedBaseUrl = getLegacyBaseUrl(baseUrl)
                     )
@@ -1029,13 +1049,13 @@ class NeptunApiClient {
                         accessToken = "legacy-token-$username",
                         refreshToken = null,
                         deviceCookie = null,
-                        studentName = "Hallgató ($username)",
-                        trainingProgram = "Egyetemi képzés",
+                        studentName = strings.getString(R.string.api_student, username),
+                        trainingProgram = strings.getString(R.string.api_program),
                         isModernApi = false,
                         normalizedBaseUrl = getLegacyBaseUrl(baseUrl)
                     )
                 }
-                return@withContext NeptunAuthResult.Failure("Érvénytelen válasz a szervertől.")
+                return@withContext NeptunAuthResult.Failure(strings.getString(R.string.api_invalid_response))
             }
 
             val dataObj = parsed["data"]?.jsonObject
@@ -1058,11 +1078,11 @@ class NeptunApiClient {
                     getUserInfo(baseUrl, accessToken)
                 } catch (e: Exception) { null }
                 val studentName = userInfo?.name?.takeIf { it.isNotBlank() }
-                    ?: "Hallgató ($username)"
+                    ?: strings.getString(R.string.api_student, username)
                 val trainingInfo = try {
                     getStudentTrainingInfo(baseUrl, accessToken)
                 } catch (e: Exception) { null }
-                val trainingName = trainingInfo?.second ?: "Egyetemi képzés"
+                val trainingName = trainingInfo?.second ?: strings.getString(R.string.api_program)
                 val trainingId = userInfo?.studentTrainingId?.takeIf { it.isNotBlank() } ?: trainingInfo?.first
 
                 return@withContext NeptunAuthResult.Success(
@@ -1080,7 +1100,7 @@ class NeptunApiClient {
             val errMsg = parsed["errorMessage"]?.jsonPrimitive?.contentOrNull
                 ?: parsed["ErrorMessage"]?.jsonPrimitive?.contentOrNull
                 ?: parsed["message"]?.jsonPrimitive?.contentOrNull
-                ?: "Hibás felhasználónév vagy jelszó!"
+                ?: strings.getString(R.string.api_bad_user_pass)
 
             if (response.code == 404) {
                 val aspResult = authenticateAspDotNet(baseUrl, username, pwd, lcid)
@@ -1093,8 +1113,8 @@ class NeptunApiClient {
                         accessToken = "legacy-token-$username",
                         refreshToken = null,
                         deviceCookie = null,
-                        studentName = "Hallgató ($username)",
-                        trainingProgram = "Egyetemi képzés",
+                        studentName = strings.getString(R.string.api_student, username),
+                        trainingProgram = strings.getString(R.string.api_program),
                         isModernApi = false,
                         normalizedBaseUrl = getLegacyBaseUrl(baseUrl)
                     )
@@ -1114,13 +1134,13 @@ class NeptunApiClient {
                     accessToken = "legacy-token-$username",
                     refreshToken = null,
                     deviceCookie = null,
-                    studentName = "Hallgató ($username)",
-                    trainingProgram = "Egyetemi képzés",
+                    studentName = strings.getString(R.string.api_student, username),
+                    trainingProgram = strings.getString(R.string.api_program),
                     isModernApi = false,
                     normalizedBaseUrl = getLegacyBaseUrl(baseUrl)
                 )
             } else {
-                NeptunAuthResult.Failure("Hálózati hiba a Neptunhoz kapcsolódáskor: ${e.localizedMessage}")
+                NeptunAuthResult.Failure(strings.getString(R.string.api_connect_net, e.localizedMessage), isNetworkError = true)
             }
         }
     }
@@ -1311,7 +1331,7 @@ class NeptunApiClient {
                         }
                     }
                     val id = selected["studentTrainingId"]?.jsonPrimitive?.contentOrNull ?: ""
-                    val name = selected["trainingName"]?.jsonPrimitive?.contentOrNull ?: "Mérnökinformatikus képzés"
+                    val name = selected["trainingName"]?.jsonPrimitive?.contentOrNull ?: strings.getString(R.string.api_program_eng)
                     return@withContext Pair(id, name)
                 }
             }
@@ -1494,16 +1514,16 @@ class NeptunApiClient {
                 val name = obj["name"]?.jsonPrimitive?.contentOrNull
                     ?: obj["subjectName"]?.jsonPrimitive?.contentOrNull
                     ?: obj["title"]?.jsonPrimitive?.contentOrNull
-                    ?: "Óra"
+                    ?: strings.getString(R.string.notif_class_default)
                 val subjectCode = obj["subjectCode"]?.jsonPrimitive?.contentOrNull ?: ""
                 val courseCode = obj["courseCode"]?.jsonPrimitive?.contentOrNull ?: ""
                 val room = obj["rooms"]?.jsonPrimitive?.contentOrNull
                     ?: obj["room"]?.jsonPrimitive?.contentOrNull
                     ?: obj["location"]?.jsonPrimitive?.contentOrNull
-                    ?: "Nincs megadva"
+                    ?: ""
                 val tutor = obj["courseTutor"]?.jsonPrimitive?.contentOrNull
                     ?: obj["teacher"]?.jsonPrimitive?.contentOrNull
-                    ?: "Oktató nincs megadva"
+                    ?: ""
 
                 val startDt = try {
                     LocalDateTime.parse(startRaw.substringBefore("."))
@@ -1582,12 +1602,12 @@ class NeptunApiClient {
             val list = mutableListOf<CalendarEvent>()
             for (item in calData) {
                 val obj = item.jsonObject
-                val title = obj["title"]?.jsonPrimitive?.contentOrNull ?: "Óra"
-                val location = obj["location"]?.jsonPrimitive?.contentOrNull ?: "Nincs megadva"
+                val title = obj["title"]?.jsonPrimitive?.contentOrNull ?: strings.getString(R.string.notif_class_default)
+                val location = obj["location"]?.jsonPrimitive?.contentOrNull ?: ""
                 val cCode = obj["courseCode"]?.jsonPrimitive?.contentOrNull ?: ""
                 val teacher = obj["teacher"]?.jsonPrimitive?.contentOrNull
                     ?: obj["tutor"]?.jsonPrimitive?.contentOrNull
-                    ?: "Oktató"
+                    ?: ""
 
                 val rawStart = obj["start"]?.jsonPrimitive?.contentOrNull?.replace(Regex("""\D"""), "")?.toLongOrNull() ?: now
                 val rawEnd = obj["end"]?.jsonPrimitive?.contentOrNull?.replace(Regex("""\D"""), "")?.toLongOrNull() ?: (now + 5400000L)
@@ -1690,7 +1710,7 @@ class NeptunApiClient {
             val allGrades = mutableListOf<SubjectGrade>()
 
             if (candidateTerms.isEmpty()) {
-                candidateTerms.add("" to "Aktuális félév")
+                candidateTerms.add("" to strings.getString(R.string.api_term_current))
             }
 
             for ((termId, termName) in candidateTerms) {
@@ -1759,12 +1779,12 @@ class NeptunApiClient {
                                     ?: obj["name"]?.jsonPrimitive?.contentOrNull
                                     ?: obj["title"]?.jsonPrimitive?.contentOrNull
                                     ?: obj["SubjectName"]?.jsonPrimitive?.contentOrNull
-                                    ?: "Tantárgy"
+                                    ?: strings.getString(R.string.api_subject_default)
                                 val subjectCode = obj["subjectCode"]?.jsonPrimitive?.contentOrNull
                                     ?: obj["objectCode"]?.jsonPrimitive?.contentOrNull
                                     ?: obj["code"]?.jsonPrimitive?.contentOrNull
                                     ?: obj["SubjectCode"]?.jsonPrimitive?.contentOrNull
-                                    ?: "KÓD"
+                                    ?: "-"
                                 val credit = obj["subjectCredit"]?.jsonPrimitive?.intOrNull
                                     ?: obj["credit"]?.jsonPrimitive?.intOrNull
                                     ?: obj["creditValue"]?.jsonPrimitive?.intOrNull
@@ -1858,7 +1878,7 @@ class NeptunApiClient {
                                     val cur = allGrades[idx]
                                     allGrades[idx] = cur.copy(
                                         grade = resVal ?: parseTextToGrade(resName),
-                                        gradeText = resName.ifEmpty { "Megajánlott ($resVal)" },
+                                        gradeText = resName.ifEmpty { strings.getString(R.string.api_offered, resVal) },
                                         isSigned = true
                                     )
                                 }
@@ -1920,7 +1940,7 @@ class NeptunApiClient {
                 val obj = item.jsonObject
                 val subName = obj["SubjectName"]?.jsonPrimitive?.contentOrNull
                     ?: obj["subjectName"]?.jsonPrimitive?.contentOrNull
-                    ?: "Tantárgy"
+                    ?: strings.getString(R.string.api_subject_default)
                 val subId = obj["ID"]?.jsonPrimitive?.contentOrNull
                     ?: obj["id"]?.jsonPrimitive?.contentOrNull
                     ?: "mb_${System.nanoTime()}"
@@ -1939,7 +1959,7 @@ class NeptunApiClient {
                     SubjectGrade(
                         id = subId,
                         termId = "term_legacy",
-                        termName = "Félévi jegyek",
+                        termName = strings.getString(R.string.api_term_grades),
                         subjectName = subName,
                         subjectCode = subId,
                         credit = credit,
@@ -2008,14 +2028,14 @@ class NeptunApiClient {
             val list = mutableListOf<NeptunMessage>()
             for (item in recMessages) {
                 val obj = item.jsonObject
-                val subject = obj["subject"]?.jsonPrimitive?.contentOrNull?.trim()?.ifEmpty { "Nincs tárgy" } ?: "Nincs tárgy"
+                val subject = obj["subject"]?.jsonPrimitive?.contentOrNull?.trim()?.ifEmpty { "" } ?: ""
                 val rawSender = obj["senderName"]?.jsonPrimitive?.contentOrNull?.trim()
                     ?: obj["SenderName"]?.jsonPrimitive?.contentOrNull?.trim()
                     ?: ""
                 val isSystem = obj["isSystemMessage"]?.jsonPrimitive?.booleanOrNull == true ||
                         obj["IsSystemMessage"]?.jsonPrimitive?.booleanOrNull == true ||
                         rawSender.isBlank()
-                val sender = if (rawSender.isNotBlank()) rawSender else "Rendszerüzenet"
+                val sender = if (rawSender.isNotBlank()) rawSender else ""
                 val dateStr = obj["lastPostDate"]?.jsonPrimitive?.contentOrNull ?: ""
                 val unreadCount = obj["unreadedPostCount"]?.jsonPrimitive?.intOrNull ?: 0
 
@@ -2038,7 +2058,7 @@ class NeptunApiClient {
                         subject = subject,
                         sender = sender,
                         sendDate = formattedDate,
-                        previewText = "Koppints a teljes üzenet megtekintéséhez...",
+                        previewText = "",
                         bodyHtml = "",
                         isRead = unreadCount == 0,
                         isOfficial = isSystem || ServerTextParser.isOfficialSender(sender)
@@ -2092,7 +2112,7 @@ class NeptunApiClient {
                     var resp = okHttpClient.newCall(req).execute()
                     var bodyStr = resp.body?.string() ?: ""
 
-                    if (resp.code >= 500 || bodyStr.contains("Hiba történt") || bodyStr.contains("\"statusCode\":500")) {
+                    if (resp.code >= 500 || bodyStr.contains("Hiba történt") || bodyStr.contains("error occurred", ignoreCase = true) || bodyStr.contains("Fehler aufgetreten", ignoreCase = true) || bodyStr.contains("Es ist ein Fehler", ignoreCase = true) || bodyStr.contains("\"statusCode\":500")) {
                         kotlinx.coroutines.delay(200)
                         resp = okHttpClient.newCall(req).execute()
                         bodyStr = resp.body?.string() ?: ""
@@ -2230,12 +2250,12 @@ class NeptunApiClient {
                 val obj = item.jsonObject
                 val subject = obj["Subject"]?.jsonPrimitive?.contentOrNull
                     ?: obj["subject"]?.jsonPrimitive?.contentOrNull
-                    ?: "Tárgy"
+                    ?: ""
                 val senderRaw = obj["Name"]?.jsonPrimitive?.contentOrNull?.trim()
                     ?: obj["name"]?.jsonPrimitive?.contentOrNull?.trim()
                     ?: obj["Sender"]?.jsonPrimitive?.contentOrNull?.trim()
                     ?: ""
-                val sender = if (senderRaw.isNotBlank()) senderRaw else "Rendszerüzenet"
+                val sender = if (senderRaw.isNotBlank()) senderRaw else ""
                 val sendDateRaw = obj["SendDate"]?.jsonPrimitive?.contentOrNull?.replace(Regex("""\D"""), "")?.toLongOrNull() ?: System.currentTimeMillis()
 
                 val id = obj["PersonMessageId"]?.jsonPrimitive?.contentOrNull
@@ -2263,7 +2283,7 @@ class NeptunApiClient {
                         previewText = stripHtmlForPreview(detail).take(120),
                         bodyHtml = detail,
                         isRead = !isNew,
-                        isOfficial = sender.equals("Rendszerüzenet", ignoreCase = true) || ServerTextParser.isOfficialSender(sender)
+                        isOfficial = sender.isBlank() || ServerTextParser.isOfficialSender(sender)
                     )
                 )
             }
@@ -2688,7 +2708,7 @@ class NeptunApiClient {
                         val title = obj["itemTitle"]?.jsonPrimitive?.contentOrNull
                             ?: obj["impositionName"]?.jsonPrimitive?.contentOrNull
                             ?: obj["title"]?.jsonPrimitive?.contentOrNull
-                            ?: "Befizetendő tétel"
+                            ?: strings.getString(R.string.api_finance_payable)
                         val amount = (obj["amount"]?.jsonPrimitive?.doubleOrNull
                             ?: obj["itemValue"]?.jsonPrimitive?.doubleOrNull
                             ?: obj["price"]?.jsonPrimitive?.doubleOrNull
@@ -2707,7 +2727,7 @@ class NeptunApiClient {
                             FinanceItem(
                                 id = id,
                                 title = title,
-                                termName = "Aktuális",
+                                termName = strings.getString(R.string.api_term_current_short),
                                 amountHuf = amount,
                                 status = FinanceStatus.PENDING,
                                 dueDate = dueDateFormatted,
@@ -2751,7 +2771,7 @@ class NeptunApiClient {
                         val title = obj["itemTitle"]?.jsonPrimitive?.contentOrNull
                             ?: obj["impositionName"]?.jsonPrimitive?.contentOrNull
                             ?: obj["title"]?.jsonPrimitive?.contentOrNull
-                            ?: "Kiírt tétel"
+                            ?: strings.getString(R.string.api_finance_assessed)
                         val amount = (obj["amount"]?.jsonPrimitive?.doubleOrNull
                             ?: obj["itemValue"]?.jsonPrimitive?.doubleOrNull
                             ?: obj["price"]?.jsonPrimitive?.doubleOrNull
@@ -2775,7 +2795,7 @@ class NeptunApiClient {
                             FinanceItem(
                                 id = id,
                                 title = title,
-                                termName = "Aktuális",
+                                termName = strings.getString(R.string.api_term_current_short),
                                 amountHuf = amount,
                                 status = status,
                                 dueDate = dateFormatted,
@@ -2821,7 +2841,7 @@ class NeptunApiClient {
                             amount = -amount
                         }
 
-                        val title = obj["transactionPayingType"]?.jsonPrimitive?.contentOrNull ?: "Tranzakció"
+                        val title = obj["transactionPayingType"]?.jsonPrimitive?.contentOrNull ?: strings.getString(R.string.api_finance_transaction)
                         val statusText = obj["transactionStatus"]?.jsonPrimitive?.contentOrNull ?: "Teljesített"
                         val dateStr = obj["transferDate"]?.jsonPrimitive?.contentOrNull ?: ""
 
@@ -2838,7 +2858,7 @@ class NeptunApiClient {
                             FinanceItem(
                                 id = transId,
                                 title = title,
-                                termName = "Aktuális",
+                                termName = strings.getString(R.string.api_term_current_short),
                                 amountHuf = amount,
                                 status = status,
                                 dueDate = formattedDate,
@@ -2880,7 +2900,7 @@ class NeptunApiClient {
             for (item in rows) {
                 val obj = item.jsonObject
                 val amount = obj["amount"]?.jsonPrimitive?.intOrNull ?: 0
-                val title = obj["appellation"]?.jsonPrimitive?.contentOrNull ?: "Befizetés"
+                val title = obj["appellation"]?.jsonPrimitive?.contentOrNull ?: strings.getString(R.string.api_finance_payment)
                 val id = obj["ID"]?.jsonPrimitive?.contentOrNull ?: "leg_cash_${System.nanoTime()}"
                 val statusName = obj["status_name"]?.jsonPrimitive?.contentOrNull ?: "aktív"
                 val deadlineRaw = obj["deadline"]?.jsonPrimitive?.contentOrNull?.replace(Regex("""\D"""), "")?.toLongOrNull() ?: System.currentTimeMillis()
@@ -2898,7 +2918,7 @@ class NeptunApiClient {
                     FinanceItem(
                         id = id,
                         title = title,
-                        termName = "Félév",
+                        termName = strings.getString(R.string.api_term_short),
                         amountHuf = amount,
                         status = status,
                         dueDate = formattedDate,

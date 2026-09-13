@@ -5,12 +5,16 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.BuildConfig
+import com.example.R
+import com.example.core.locale.AppLocale
+import com.example.core.locale.StringProvider
 import com.example.core.notification.NotificationHelper
 import com.example.core.security.AppPersonalization
 import com.example.core.security.EncryptedPreferencesManager
 import com.example.core.security.NotificationPreferences
 import com.example.core.security.UpdateChannel
 import com.example.core.update.AppUpdateManager
+import com.example.domain.model.CourseType
 import com.example.domain.model.StudentCredentials
 import com.example.domain.repository.AuthRepository
 import com.example.domain.repository.LanguageRepository
@@ -28,6 +32,10 @@ import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
+import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 data class UpdateCheckState(
@@ -39,6 +47,7 @@ data class UpdateCheckState(
 )
 
 data class SettingsUiState(
+    val appLocale: AppLocale = AppLocale.SYSTEM,
     val credentials: StudentCredentials? = null,
     val themeSettings: ThemeSettings = ThemeSettings(),
     val notificationPreferences: NotificationPreferences = NotificationPreferences(),
@@ -59,11 +68,13 @@ class SettingsViewModel(
     private val prefsManager: EncryptedPreferencesManager,
     private val authRepository: AuthRepository,
     private val neptunRepository: NeptunRepository,
-    private val languageRepository: LanguageRepository
+    private val languageRepository: LanguageRepository,
+    private val strings: StringProvider
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(
         SettingsUiState(
+            appLocale = prefsManager.getAppLocale(),
             credentials = prefsManager.loadCredentials(),
             themeSettings = prefsManager.loadThemeSettings(),
             notificationPreferences = prefsManager.loadNotificationPreferences(),
@@ -98,6 +109,11 @@ class SettingsViewModel(
         viewModelScope.launch {
             prefsManager.updateChannelFlow.collect { channel ->
                 _uiState.update { it.copy(updateChannel = channel) }
+            }
+        }
+        viewModelScope.launch {
+            prefsManager.appLocaleFlow.collect { appLocale ->
+                _uiState.update { it.copy(appLocale = appLocale) }
             }
         }
         viewModelScope.launch {
@@ -234,6 +250,15 @@ class SettingsViewModel(
         prefsManager.setUpdateChannel(channel)
     }
 
+    /**
+     * Az app felületi nyelvének váltása. A perzisztálás szinkron; az Activity
+     * újralétrehozását (ami az új nyelvet érvényesíti) a hívó képernyő végzi.
+     */
+    fun setAppLocale(locale: AppLocale) {
+        if (_uiState.value.appLocale == locale) return
+        prefsManager.setAppLocale(locale)
+    }
+
     fun clearCachedData() {
         if (_uiState.value.isClearingCache) return
         viewModelScope.launch {
@@ -243,12 +268,12 @@ class SettingsViewModel(
                 _uiState.update {
                     it.copy(
                         isClearingCache = false,
-                        cacheClearedMessage = "A helyi gyorsítótár törölve. A következő szinkronizáláskor friss adatok töltődnek le."
+                        cacheClearedMessage = strings.getString(R.string.set_cache_ok)
                     )
                 }
             } catch (e: Exception) {
                 _uiState.update {
-                    it.copy(isClearingCache = false, cacheClearedMessage = "A törlés nem sikerült.")
+                    it.copy(isClearingCache = false, cacheClearedMessage = strings.getString(R.string.set_cache_fail))
                 }
             }
             kotlinx.coroutines.delay(4000)
@@ -278,7 +303,7 @@ class SettingsViewModel(
                 _uiState.update {
                     it.copy(
                         isSyncing = false,
-                        syncSuccessMessage = "Sikeres szinkronizálás! Minden adat naprakész."
+                        syncSuccessMessage = strings.getString(R.string.set_sync_ok)
                     )
                 }
             } catch (e: Exception) {
@@ -287,7 +312,7 @@ class SettingsViewModel(
                 _uiState.update {
                     it.copy(
                         isSyncing = false,
-                        syncSuccessMessage = "Szinkronizálás befejeződött."
+                        syncSuccessMessage = strings.getString(R.string.set_sync_done)
                     )
                 }
             }
@@ -302,10 +327,10 @@ class SettingsViewModel(
         NotificationHelper.showClassReminder(
             context = context,
             notificationId = (1000..9999).random(),
-            subjectName = "Mesterséges intelligencia",
+            subjectName = strings.getString(R.string.demo_class_subject),
             room = "IB025",
             startTime = "08:15",
-            courseType = "Előadás",
+            courseType = strings.getString(CourseType.LECTURE.labelRes),
             minutesBefore = _uiState.value.notificationPreferences.reminderMinutesBefore
         )
     }
@@ -314,9 +339,9 @@ class SettingsViewModel(
         NotificationHelper.showMessageNotification(
             context = context,
             notificationId = (1000..9999).random(),
-            sender = "Dr. Kovács István (Oktató)",
-            subject = "Vizsgakurzus tájékoztató és konzultáció",
-            preview = "Kedves Hallgatók! A jövő heti konzultáció időpontja módosult..."
+            sender = strings.getString(R.string.demo_msg_sender),
+            subject = strings.getString(R.string.demo_msg_subject),
+            preview = strings.getString(R.string.demo_msg_preview)
         )
     }
 
@@ -324,9 +349,9 @@ class SettingsViewModel(
         NotificationHelper.showGradeNotification(
             context = context,
             notificationId = (1000..9999).random(),
-            subjectName = "Algoritmuselmélet",
+            subjectName = strings.getString(R.string.demo_grade_subject),
             grade = 5,
-            gradeText = "Jeles (5)",
+            gradeText = strings.getString(R.string.grade_5),
             credit = 5
         )
     }
@@ -335,9 +360,9 @@ class SettingsViewModel(
         NotificationHelper.showFinanceNotification(
             context = context,
             notificationId = (1000..9999).random(),
-            title = "Kollégiumi térítési díj (2026/27/1)",
-            amount = "14 500",
-            dueDate = "2026. 09. 15"
+            title = strings.getString(R.string.demo_fin_title),
+            amount = demoFinanceAmount(),
+            dueDate = demoFinanceDueDate()
         )
     }
 
@@ -350,7 +375,7 @@ class SettingsViewModel(
             }
             val repo = BuildConfig.GITHUB_REPO
             try {
-                val info = AppUpdateManager().checkForUpdates(currentChannel)
+                val info = AppUpdateManager(strings).checkForUpdates(currentChannel)
                 if (info != null) {
                     if (info.isUpdateAvailable) {
                         _uiState.update {
@@ -360,7 +385,7 @@ class SettingsViewModel(
                                     updateAvailable = true,
                                     latestVersionName = info.latestVersion,
                                     downloadUrl = info.downloadUrl,
-                                    message = "Új verzió (${info.tagName}) érhető el a ${currentChannel.displayName} csatornán!"
+                                    message = strings.getString(R.string.set_update_available, info.tagName, strings.getString(currentChannel.labelRes))
                                 )
                             )
                         }
@@ -372,7 +397,7 @@ class SettingsViewModel(
                                     updateAvailable = false,
                                     latestVersionName = info.latestVersion,
                                     downloadUrl = info.downloadUrl,
-                                    message = "A legfrissebb verziót használod (v${BuildConfig.VERSION_NAME})."
+                                    message = strings.getString(R.string.set_update_current, BuildConfig.VERSION_NAME)
                                 )
                             )
                         }
@@ -384,7 +409,7 @@ class SettingsViewModel(
                             updateCheckState = UpdateCheckState(
                                 isChecking = false,
                                 downloadUrl = fallbackUrl,
-                                message = "Nyisd meg a GitHub Releases oldalt a letöltéshez."
+                                message = strings.getString(R.string.set_update_open_github)
                             )
                         )
                     }
@@ -396,13 +421,23 @@ class SettingsViewModel(
                         updateCheckState = UpdateCheckState(
                             isChecking = false,
                             downloadUrl = fallbackUrl,
-                            message = "Nyisd meg a GitHub Releases oldalt a letöltéshez."
+                            message = strings.getString(R.string.set_update_open_github)
                         )
                     )
                 }
             }
         }
     }
+
+    /** Bemutató pénzügyi tétel összege az app nyelvének megfelelő számformátumban. */
+    private fun demoFinanceAmount(): String =
+        java.text.NumberFormat.getInstance(Locale.getDefault()).format(14500)
+
+    /** Bemutató befizetési határidő az app nyelvének megfelelő dátumformátumban. */
+    private fun demoFinanceDueDate(): String =
+        LocalDate.of(2026, 9, 15).format(
+            DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(Locale.getDefault())
+        )
 
     private fun isNewerVersion(latest: String, current: String): Boolean {
         val cleanLatest = latest.removePrefix("v").trim()
@@ -424,11 +459,12 @@ class SettingsViewModel(
             prefsManager: EncryptedPreferencesManager,
             authRepository: AuthRepository,
             neptunRepository: NeptunRepository,
-            languageRepository: LanguageRepository
+            languageRepository: LanguageRepository,
+            strings: StringProvider
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                return SettingsViewModel(prefsManager, authRepository, neptunRepository, languageRepository) as T
+                return SettingsViewModel(prefsManager, authRepository, neptunRepository, languageRepository, strings) as T
             }
         }
     }

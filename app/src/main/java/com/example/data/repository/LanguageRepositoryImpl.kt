@@ -1,6 +1,7 @@
 package com.example.data.repository
 
 import android.util.Log
+import com.example.core.locale.StringProvider
 import com.example.core.security.EncryptedPreferencesManager
 import com.example.data.network.NeptunApiClient
 import com.example.domain.model.NeptunLanguage
@@ -13,7 +14,8 @@ import kotlinx.coroutines.withContext
 
 class LanguageRepositoryImpl(
     private val prefsManager: EncryptedPreferencesManager,
-    private val neptunApiClient: NeptunApiClient = NeptunApiClient()
+    private val strings: StringProvider,
+    private val neptunApiClient: NeptunApiClient = NeptunApiClient(strings)
 ) : LanguageRepository {
 
     override val selectedLcidFlow: Flow<Int>

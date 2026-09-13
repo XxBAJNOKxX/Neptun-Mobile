@@ -7,6 +7,8 @@ import android.os.Build
 import android.provider.Settings
 import androidx.core.content.FileProvider
 import com.example.BuildConfig
+import com.example.R
+import com.example.core.locale.StringProvider
 import com.example.core.network.SslTrustHelper
 import com.example.core.security.UpdateChannel
 import kotlinx.coroutines.Dispatchers
@@ -43,6 +45,7 @@ sealed class InAppUpdateState {
 }
 
 class AppUpdateManager(
+    private val strings: StringProvider,
     private val client: OkHttpClient = SslTrustHelper.configureOkHttpClient(
         OkHttpClient.Builder()
             .connectTimeout(10, TimeUnit.SECONDS)
@@ -124,10 +127,10 @@ class AppUpdateManager(
 
         val response = client.newCall(request).execute()
         if (!response.isSuccessful) {
-            throw IllegalStateException("A letöltés meghiúsult: HTTP ${response.code}")
+            throw IllegalStateException(strings.getString(R.string.update_http_failed, response.code))
         }
 
-        val body = response.body ?: throw IllegalStateException("Üres letöltési válasz érkezett")
+        val body = response.body ?: throw IllegalStateException(strings.getString(R.string.update_empty_body))
         val contentLength = body.contentLength()
 
         val updatesDir = File(context.cacheDir, "updates").apply { mkdirs() }

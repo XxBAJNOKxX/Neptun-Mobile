@@ -7,7 +7,7 @@ import org.junit.Test
 
 class AppUpdateManagerTest {
 
-    private val updateManager = AppUpdateManager()
+    private val updateManager = AppUpdateManager(FakeStringProvider())
 
     @Test
     fun `isNewerVersion returns true when stable version is newer than dev version`() {

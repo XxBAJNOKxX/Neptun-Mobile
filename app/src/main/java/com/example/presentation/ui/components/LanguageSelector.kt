@@ -33,12 +33,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.R
 import com.example.domain.model.NeptunLanguage
 import com.example.domain.model.NeptunLanguages
 import com.example.presentation.viewmodel.ServerLanguageUiState
@@ -90,7 +92,7 @@ fun LanguageDropdownField(
                 .padding(bottom = 6.dp)
         ) {
             Text(
-                text = "Neptun nyelve",
+                text = stringResource(R.string.srvlang_login_label),
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -108,7 +110,7 @@ fun LanguageDropdownField(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Refresh,
-                        contentDescription = "Nyelvek frissítése",
+                        contentDescription = stringResource(R.string.srvlang_refresh_desc),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(16.dp)
                     )
@@ -122,7 +124,7 @@ fun LanguageDropdownField(
             modifier = Modifier.fillMaxWidth()
         ) {
             OutlinedTextField(
-                value = selected?.let { NeptunLanguages.displayLabel(it) } ?: "Betöltés…",
+                value = selected?.let { NeptunLanguages.displayLabel(it) } ?: stringResource(R.string.srvlang_loading),
                 onValueChange = {},
                 readOnly = true,
                 singleLine = true,
@@ -175,7 +177,7 @@ fun LanguageDropdownField(
                             {
                                 Icon(
                                     imageVector = Icons.Default.Check,
-                                    contentDescription = "Kiválasztva",
+                                    contentDescription = stringResource(R.string.common_selected),
                                     tint = MaterialTheme.colorScheme.primary
                                 )
                             }
@@ -192,9 +194,9 @@ fun LanguageDropdownField(
 
         Text(
             text = if (state.isFallback) {
-                "Az intézmény nyelvi listája nem érhető el, az alapértelmezett lista látszik."
+                stringResource(R.string.srvlang_fallback_login)
             } else {
-                "A bejelentkezéskor és az adatlekéréskor használt szervernyelv."
+                stringResource(R.string.srvlang_login_hint)
             },
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -286,7 +288,7 @@ fun LanguageLoadingRow(modifier: Modifier = Modifier) {
         )
         Spacer(modifier = Modifier.width(10.dp))
         Text(
-            text = "Az intézmény nyelvi listájának betöltése…",
+            text = stringResource(R.string.srvlang_loading_row),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
