@@ -6,6 +6,8 @@ import androidx.lifecycle.viewModelScope
 import com.example.domain.model.Neptun2FASession
 import com.example.domain.model.StudentCredentials
 import com.example.domain.model.TwoFactorMethod
+import com.example.R
+import com.example.core.locale.StringProvider
 import com.example.domain.model.University
 import com.example.domain.repository.AuthRepository
 import com.example.domain.repository.LanguageRepository
@@ -47,7 +49,8 @@ data class AuthUiState(
 class AuthViewModel(
     private val authRepository: AuthRepository,
     private val neptunRepository: NeptunRepository,
-    private val languageRepository: LanguageRepository
+    private val languageRepository: LanguageRepository,
+    private val strings: StringProvider
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AuthUiState())
@@ -258,9 +261,9 @@ class AuthViewModel(
                             isEmailCodeRequested = true,
                             codePrefix = updatedSession.codePrefix,
                             twoFactorSuccessMessage = if (prefixText.isNotEmpty()) {
-                                "A Neptun elküldte a 6 jegyű kódot az egyetemi e-mail címedre! Előtag: $prefixText"
+                                strings.getString(R.string.auth_2fa_sent_prefix, prefixText)
                             } else {
-                                "A Neptun elküldte az ellenőrző kódot az e-mail címedre!"
+                                strings.getString(R.string.auth_2fa_sent)
                             }
                         )
                     }
@@ -269,7 +272,7 @@ class AuthViewModel(
                     _uiState.update {
                         it.copy(
                             isTwoFactorLoading = false,
-                            twoFactorErrorMessage = error.message ?: "Nem sikerült elküldeni az e-mail kódot."
+                            twoFactorErrorMessage = error.message ?: strings.getString(R.string.auth_err_email_send)
                         )
                     }
                 }
@@ -281,15 +284,15 @@ class AuthViewModel(
         val state = _uiState.value
         val university = state.selectedUniversity
         if (university == null) {
-            _uiState.update { it.copy(errorMessage = "Kérjük, válassz egy egyetemet!") }
+            _uiState.update { it.copy(errorMessage = strings.getString(R.string.auth_err_no_uni)) }
             return
         }
         if (state.neptunCode.length != 6) {
-            _uiState.update { it.copy(errorMessage = "A Neptun kódnak 6 karakternek kell lennie!") }
+            _uiState.update { it.copy(errorMessage = strings.getString(R.string.auth_err_code_len)) }
             return
         }
         if (state.password.isEmpty()) {
-            _uiState.update { it.copy(errorMessage = "Kérjük, add meg a jelszavadat!") }
+            _uiState.update { it.copy(errorMessage = strings.getString(R.string.auth_err_no_pass)) }
             return
         }
 
@@ -332,7 +335,7 @@ class AuthViewModel(
                                     twoFactorMethod = defaultMethod,
                                     isEmailCodeRequested = isEmailReq,
                                     codePrefix = session.codePrefix,
-                                    twoFactorSuccessMessage = if (isEmailReq && session.codePrefix.isNotEmpty()) "Előtag: ${session.codePrefix}-" else null,
+                                    twoFactorSuccessMessage = if (isEmailReq && session.codePrefix.isNotEmpty()) strings.getString(R.string.auth_2fa_prefix_only, "${session.codePrefix}-") else null,
                                     twoFactorErrorMessage = null,
                                     errorMessage = null
                                 )
@@ -353,7 +356,7 @@ class AuthViewModel(
                             _uiState.update {
                                 it.copy(
                                     isLoading = false,
-                                    errorMessage = error.message ?: "Sikertelen bejelentkezés!"
+                                    errorMessage = error.message ?: strings.getString(R.string.auth_err_login_failed)
                                 )
                             }
                         }
@@ -370,7 +373,7 @@ class AuthViewModel(
         if (session != null) {
             val code = state.twoFactorCode.trim()
             if (code.isEmpty()) {
-                _uiState.update { it.copy(twoFactorErrorMessage = "Kérjük, add meg a 6 számjegyű kódot!") }
+                _uiState.update { it.copy(twoFactorErrorMessage = strings.getString(R.string.auth_err_2fa_code_empty)) }
                 return
             }
 
@@ -397,7 +400,7 @@ class AuthViewModel(
                         _uiState.update {
                             it.copy(
                                 isTwoFactorLoading = false,
-                                twoFactorErrorMessage = error.message ?: "Hibás 2FA kód!"
+                                twoFactorErrorMessage = error.message ?: strings.getString(R.string.auth_err_2fa_failed)
                             )
                         }
                     }
@@ -431,11 +434,12 @@ class AuthViewModel(
         fun provideFactory(
             authRepository: AuthRepository,
             neptunRepository: NeptunRepository,
-            languageRepository: LanguageRepository
+            languageRepository: LanguageRepository,
+            strings: StringProvider
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                return AuthViewModel(authRepository, neptunRepository, languageRepository) as T
+                return AuthViewModel(authRepository, neptunRepository, languageRepository, strings) as T
             }
         }
     }

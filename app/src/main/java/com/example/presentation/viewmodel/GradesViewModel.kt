@@ -80,7 +80,8 @@ class GradesViewModel(
                     } else {
                         "2025/26/1"
                     }
-                    val displayTerm = rawDisplayTerm.replace(Regex("""(?i)\s*félév.*"""), "").trim()
+                    // A szerver a bejelentkezési LCID nyelvén toldja meg a félévnevet ("… félév" / "… semester" / "… Semester").
+                    val displayTerm = rawDisplayTerm.replace(Regex("""(?i)\s*(félév|felev|semester|term).*"""), "").trim()
                     grade.copy(termId = displayTerm, termName = displayTerm)
                 }
                 val terms = cleanedGrades.map { it.termId }.distinct().sortedDescending()

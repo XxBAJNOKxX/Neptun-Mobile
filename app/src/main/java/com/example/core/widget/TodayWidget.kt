@@ -34,6 +34,7 @@ import com.example.MainActivity
 import com.example.R
 import com.example.data.local.NeptunDatabase
 import com.example.domain.model.CalendarEvent
+import com.example.domain.model.CourseType
 import com.example.domain.usecase.GetTodayClassesUseCase
 import kotlinx.coroutines.flow.first
 
@@ -53,8 +54,17 @@ class TodayWidget : GlanceAppWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val classes = loadTodayClasses(context)
         val openAppIntent = Intent(context, MainActivity::class.java)
+        // A Glance-komponensek nem férnek hozzá az erőforrásokhoz: itt oldjuk fel a szövegeket.
+        val todayLabel = context.getString(R.string.widget_today)
+        val emptyLabel = context.getString(R.string.widget_empty)
+        val moreLabel = { n: Int ->
+            context.resources.getQuantityString(R.plurals.widget_more, n, n)
+        }
+        val typeLabel = { type: CourseType ->
+            context.getString(type.labelRes)
+        }
         provideContent {
-            TodayWidgetContent(classes, openAppIntent)
+            TodayWidgetContent(classes, openAppIntent, todayLabel, emptyLabel, moreLabel, typeLabel)
         }
     }
 
@@ -76,7 +86,14 @@ class TodayWidgetReceiver : GlanceAppWidgetReceiver() {
 }
 
 @Composable
-private fun TodayWidgetContent(classes: List<CalendarEvent>, openAppIntent: Intent) {
+private fun TodayWidgetContent(
+    classes: List<CalendarEvent>,
+    openAppIntent: Intent,
+    todayLabel: String,
+    emptyLabel: String,
+    moreLabel: (Int) -> String,
+    typeLabel: (CourseType) -> String
+) {
     Column(
         modifier = GlanceModifier
             .fillMaxSize()
@@ -100,7 +117,7 @@ private fun TodayWidgetContent(classes: List<CalendarEvent>, openAppIntent: Inte
             )
             Spacer(GlanceModifier.width(6.dp))
             Text(
-                "· Mai órák",
+                todayLabel,
                 style = TextStyle(
                     color = ColorProvider(R.color.widget_muted),
                     fontSize = 13.sp
@@ -112,7 +129,7 @@ private fun TodayWidgetContent(classes: List<CalendarEvent>, openAppIntent: Inte
         if (actual.isEmpty()) {
             Spacer(GlanceModifier.height(10.dp))
             Text(
-                "Ma nincs több órád!",
+                emptyLabel,
                 style = TextStyle(
                     color = ColorProvider(R.color.widget_on_background),
                     fontSize = 13.sp
@@ -153,7 +170,7 @@ private fun TodayWidgetContent(classes: List<CalendarEvent>, openAppIntent: Inte
                             maxLines = 1
                         )
                         Text(
-                            listOf(event.courseType.displayName, event.room.takeIf { it.isNotBlank() } ?: "-")
+                            listOf(typeLabel(event.courseType), event.room.takeIf { it.isNotBlank() } ?: "-")
                                 .joinToString(" · "),
                             style = TextStyle(
                                 color = ColorProvider(R.color.widget_muted),
@@ -167,7 +184,7 @@ private fun TodayWidgetContent(classes: List<CalendarEvent>, openAppIntent: Inte
             if (actual.size > 3) {
                 Spacer(GlanceModifier.height(6.dp))
                 Text(
-                    "…és még ${actual.size - 3} óra",
+                    moreLabel(actual.size - 3),
                     style = TextStyle(
                         color = ColorProvider(R.color.widget_muted),
                         fontSize = 10.sp

@@ -1,11 +1,15 @@
 package com.example.core.security
 
+import com.example.core.locale.AppLocale
+import com.example.core.locale.AppLocaleStore
 import com.example.core.notification.NotifiedStore
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.annotation.StringRes
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import com.example.R
 import com.example.domain.model.NeptunLanguage
 import com.example.domain.model.NeptunLanguages
 import com.example.domain.model.StudentCredentials
@@ -32,9 +36,9 @@ enum class DataMode {
 }
 
 /** Frissítési csatorna: Stabil (hivatalos kiadások) vagy Dev (minden build/pre-release). */
-enum class UpdateChannel(val displayName: String, val description: String) {
-    STABLE("Stabil kiadások", "Kizárólag hivatalosan tesztelt, megbízható verziók"),
-    DEV("Fejlesztői (Dev)", "A legújabb fejlesztői buildek és előzetes funkciók");
+enum class UpdateChannel(@StringRes val labelRes: Int, @StringRes val descriptionRes: Int) {
+    STABLE(R.string.channel_stable, R.string.channel_stable_desc),
+    DEV(R.string.channel_dev, R.string.channel_dev_desc);
 
     companion object {
         fun fromName(name: String?): UpdateChannel {
@@ -54,6 +58,8 @@ data class AppPersonalization(
 )
 
 class EncryptedPreferencesManager(context: Context) : NotifiedStore {
+
+    private val appContext: Context = context.applicationContext
 
     private val prefs: SharedPreferences = try {
         val masterKey = MasterKey.Builder(context)
@@ -95,6 +101,9 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
 
     private val _serverLanguageFlow = MutableStateFlow(getServerLanguageLcid())
     val serverLanguageFlow: StateFlow<Int> = _serverLanguageFlow.asStateFlow()
+
+    private val _appLocaleFlow = MutableStateFlow(getAppLocale())
+    val appLocaleFlow: StateFlow<AppLocale> = _appLocaleFlow.asStateFlow()
 
     fun updateLastSyncTime(timestamp: Long = System.currentTimeMillis()) {
         prefs.edit().putLong(KEY_LAST_SYNC, timestamp).apply()
@@ -212,6 +221,19 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
         if (lcid <= 0) return
         prefs.edit().putInt(KEY_SERVER_LANGUAGE_LCID, lcid).apply()
         _serverLanguageFlow.value = lcid
+    }
+
+    // ------------------------------------------------------------------ //
+    // Az app felületének nyelve (független a Neptun-szerver nyelvétől).
+    // Sima SharedPreferences-ben tároljuk: nem érzékeny adat, és az
+    // attachBaseContext-idejű beolvasáshoz sem kell a Keystore.
+    // ------------------------------------------------------------------ //
+
+    fun getAppLocale(): AppLocale = AppLocaleStore.read(appContext)
+
+    fun setAppLocale(locale: AppLocale) {
+        AppLocaleStore.write(appContext, locale)
+        _appLocaleFlow.value = locale
     }
 
     /**
@@ -415,9 +437,9 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
         universityId: String,
         universityName: String,
         neptunUrl: String,
-        studentName: String = "Teszt Hallgató",
+        studentName: String = "",
         sessionToken: String = "",
-        trainingProgram: String = "Egyetemi Képzés"
+        trainingProgram: String = ""
     ) {
         prefs.edit()
             .putString(KEY_NEPTUN_CODE, neptunCode)
@@ -466,8 +488,9 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
         val universityId = prefs.getString(KEY_UNIVERSITY_ID, "") ?: ""
         val universityName = prefs.getString(KEY_UNIVERSITY_NAME, "Egyetem") ?: "Egyetem"
         val neptunUrl = prefs.getString(KEY_NEPTUN_URL, "") ?: ""
-        val studentName = prefs.getString(KEY_STUDENT_NAME, "Hallgató") ?: "Hallgató"
-        val trainingProgram = prefs.getString(KEY_TRAINING_PROGRAM, "Mérnökinformatikus BSc") ?: "Mérnökinformatikus BSc"
+        // Üres tartalék: a megjelenítés réteg nyelvi fájlokból pótolja a hiányzó neveket.
+        val studentName = prefs.getString(KEY_STUDENT_NAME, "") ?: ""
+        val trainingProgram = prefs.getString(KEY_TRAINING_PROGRAM, "") ?: ""
         val lastSync = prefs.getLong(KEY_LAST_SYNC, 0L)
 
         return StudentCredentials(

@@ -1,0 +1,531 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Hungarian UI strings. Must contain the same keys as values/strings.xml. -->
+    <string name="app_name">Neptun Mobile</string>
+
+    <!-- Bottom navigation -->
+    <string name="nav_home">Kezdőlap</string>
+    <string name="nav_timetable">Órarend</string>
+    <string name="nav_grades">Jegyek</string>
+    <string name="nav_messages">Üzenetek</string>
+    <string name="nav_finances">Pénzügy</string>
+    <string name="nav_profile">Profil</string>
+
+    <!-- Theme -->
+    <string name="theme_system">Rendszer</string>
+    <string name="theme_system_desc">Követi a telefon beállításait</string>
+    <string name="theme_light">Világos</string>
+    <string name="theme_light_desc">Állandó világos megjelenés</string>
+    <string name="theme_dark">Sötét</string>
+    <string name="theme_dark_desc">Kíméli a szemet sötétben</string>
+
+    <!-- Accent colors -->
+    <string name="accent_blue">Neptun Kék</string>
+    <string name="accent_indigo">Zafír Indigó</string>
+    <string name="accent_cyan">Óceán Cián</string>
+    <string name="accent_emerald">Smaragd Zöld</string>
+    <string name="accent_gold">Borostyán Arany</string>
+    <string name="accent_purple">Királyi Lila</string>
+    <string name="accent_crimson">Rubin Vörös</string>
+    <string name="accent_rose">Rózsa Korall</string>
+
+    <!-- Course types -->
+    <string name="course_lecture">Előadás</string>
+    <string name="course_practice">Gyakorlat</string>
+    <string name="course_lab">Labor</string>
+    <string name="course_seminar">Szeminárium</string>
+    <string name="course_exam">Vizsga</string>
+
+    <!-- Finance status -->
+    <string name="finance_completed">Teljesítve</string>
+    <string name="finance_pending">Kiírva</string>
+    <string name="finance_overdue">Késedelmes</string>
+
+    <!-- 2FA methods -->
+    <string name="tfa_email">E-mail kód</string>
+    <string name="tfa_totp">Hitelesítő App (TOTP)</string>
+
+    <!-- Update channels -->
+    <string name="channel_stable">Stabil kiadások</string>
+    <string name="channel_stable_desc">Kizárólag hivatalosan tesztelt, megbízható verziók</string>
+    <string name="channel_dev">Fejlesztői (Dev)</string>
+    <string name="channel_dev_desc">A legújabb fejlesztői buildek és előzetes funkciók</string>
+
+    <!-- App UI language (native names stay the same in every locale) -->
+
+    <!-- Common -->
+    <string name="common_cancel">Mégse</string>
+    <string name="common_close">Bezárás</string>
+    <string name="common_later">Később</string>
+    <string name="common_refresh_desc">Frissítés</string>
+    <string name="common_selected">Kiválasztva</string>
+    <string name="common_delete_desc">Törlés</string>
+
+    <!-- Crash dialog -->
+    <string name="crash_title">Az alkalmazás váratlanul leállt</string>
+    <string name="crash_body">Az előző futás hibanaplója (a hibajelentéshez másolható):</string>
+    <string name="crash_copy">Másolás</string>
+    <string name="crash_time">Időpont</string>
+    <string name="crash_thread">Szál</string>
+
+    <!-- Session expiry -->
+    <string name="session_title">Lejárt a munkamenet</string>
+    <string name="session_text">A Neptun szerver visszautasította a munkamenetet, és nem sikerült automatikusan megújítani. Kérlek, jelentkezz be újra a friss adatokért.</string>
+
+    <!-- Data mode banner -->
+    <string name="demo_banner_demo">Demo mód – a megjelenített adatok nem valódiak</string>
+    <string name="demo_banner_mock">Mintaadatok láthatók (szinkronizálás nem sikerült)</string>
+    <string name="student_fallback">Hallgató</string>
+    <string name="share_timetable">Órarend megosztása</string>
+
+    <!-- Login -->
+    <string name="login_subtitle">Modern alternatív Neptun kliens 2FA támogatással</string>
+    <string name="login_title">Bejelentkezés</string>
+    <string name="login_university_label">Intézmény / Egyetem</string>
+    <string name="login_university_none">Válassz egyetemet…</string>
+    <string name="login_code_label">Neptun kód (6 karakter)</string>
+    <string name="login_code_desc">Neptun kód</string>
+    <string name="login_password">Jelszó</string>
+    <string name="login_password_hide">Jelszó elrejtése</string>
+    <string name="login_password_show">Jelszó megjelenítése</string>
+    <string name="login_demo">Offline Demo adatok betöltése</string>
+    <string name="login_demo_desc">Demo adatok</string>
+    <string name="login_keystore_note">Hitelesítő adataidat az Android Keystore (EncryptedSharedPreferences) biztonságosan, titkosítva tárolja az eszközödön.</string>
+    <string name="login_pick_uni">Válassz intézményt</string>
+    <string name="login_search_hint">Keresés név, kód vagy város alapján…</string>
+    <string name="login_search_desc">Keresés</string>
+    <string name="login_university_desc">Egyetem</string>
+    <string name="login_expand_desc">Lenyitás</string>
+    <string name="login_logo_desc">Neptun logó</string>
+
+    <!-- 2FA dialog -->
+    <string name="tfa_title">Kétlépcsős Azonosítás (2FA)</string>
+    <string name="tfa_subtitle">A Neptun kétlépcsős hitelesítést igényel a(z) %1$s fiókhoz.</string>
+    <string name="tfa_email_hint">Kérj belépési kódot az egyetemi e-mail címedre:</string>
+    <string name="tfa_requesting">Kód kérése folyamatban…</string>
+    <string name="tfa_request">E-mail kód kérése</string>
+    <string name="tfa_sent">Kód elküldve az egyetemi fiókodra!</string>
+    <string name="tfa_prefix">A Neptun által generált előtag: %1$s</string>
+    <string name="tfa_code_label">6 jegyű kód az e-mailből</string>
+    <string name="tfa_new_code">Új kód kérése</string>
+    <string name="tfa_test">Teszt: 999999</string>
+    <string name="tfa_totp_hint">Add meg a Google / Microsoft Authenticator appban megjelenő 6 számjegyű kódot:</string>
+    <string name="tfa_totp_nokey">Megjegyzés: A Neptun szerint még nincs TOTP kulcs párosítva ehhez a fiókhoz. Használd az E-mail kód opciót!</string>
+    <string name="tfa_totp_label">TOTP Kód (pl. 482910)</string>
+    <string name="tfa_submit">Belépés</string>
+
+    <!-- Auth validation / 2FA status -->
+    <string name="auth_err_no_uni">Kérjük, válassz egy egyetemet!</string>
+    <string name="auth_err_code_len">A Neptun kódnak 6 karakternek kell lennie!</string>
+    <string name="auth_err_no_pass">Kérjük, add meg a jelszavadat!</string>
+    <string name="auth_err_login_failed">Sikertelen bejelentkezés!</string>
+    <string name="auth_err_2fa_code_empty">Kérjük, add meg a 6 számjegyű kódot!</string>
+    <string name="auth_err_2fa_failed">Hibás 2FA kód!</string>
+    <string name="auth_err_email_send">Nem sikerült elküldeni az e-mail kódot.</string>
+    <string name="auth_2fa_sent_prefix">A Neptun elküldte a 6 jegyű kódot az egyetemi e-mail címedre! Előtag: %1$s</string>
+    <string name="auth_2fa_sent">A Neptun elküldte az ellenőrző kódot az e-mail címedre!</string>
+    <string name="auth_2fa_prefix_only">Előtag: %1$s</string>
+    <string name="auth_err_code_len2">A Neptun kódnak pontosan 6 karakterből kell állnia!</string>
+    <string name="auth_err_pass_empty">A jelszó mező nem lehet üres!</string>
+    <string name="auth_err_2fa_incomplete">Nem sikerült befejezni a kétlépcsős azonosítást!</string>
+    <string name="auth_uni_fallback">Egyetem</string>
+
+    <!-- Neptun server language -->
+    <string name="srvlang_title">Neptun szerver nyelve</string>
+    <string name="srvlang_subtitle">Az intézmény által támogatott nyelvek</string>
+    <string name="srvlang_icon_desc">Nyelv</string>
+    <string name="srvlang_login_label">Neptun nyelve</string>
+    <string name="srvlang_loading">Betöltés…</string>
+    <string name="srvlang_refresh_desc">Nyelvek frissítése</string>
+    <string name="srvlang_desc">A Neptun szerver felől érkező szövegek (státuszok, jegy-megnevezések, hibaüzenetek) nyelvét állítja be. Intézményenként eltérhet, hogy mely nyelvek érhetők el – a lista automatikusan a szerverről töltődik be.</string>
+    <string name="srvlang_login_hint">A bejelentkezéskor és az adatlekéréskor használt szervernyelv.</string>
+    <string name="srvlang_fallback_login">Az intézmény nyelvi listája nem érhető el, az alapértelmezett lista látszik.</string>
+    <string name="srvlang_fallback">Az intézmény nyelvi listája most nem érhető el (offline állapot vagy régebbi szerver), ezért az alapértelmezett lista látszik.</string>
+    <string name="srvlang_loading_row">Az intézmény nyelvi listájának betöltése…</string>
+    <string name="srvlang_relogin">Másik nyelvet választottál, mint amivel be vagy jelentkezve. A váltás életbe léptetéséhez jelentkezz ki, majd be újra (a Profil oldal alján).</string>
+    <string name="srvlang_next_login">A kiválasztott nyelv a következő bejelentkezéskor lép életbe.</string>
+
+    <!-- Dashboard -->
+    <string name="dash_demo">Demo adatokat látsz – a valódi adataid bejelentkezés után szinkronizálódnak.</string>
+    <string name="dash_stat_messages">Olvasatlan\nüzenet</string>
+    <string name="dash_stat_grade">Legutóbbi\njegy</string>
+    <string name="dash_stat_pending">Fizetendő\n(Ft)</string>
+    <string name="dash_today">Mai órák (%1$d)</string>
+    <string name="dash_no_more">Ma nincs több órád 🎉</string>
+    <string name="dash_no_more_plain">Ma nincs több órád</string>
+    <string name="dash_rest">Pihenj egyet, vagy nézd meg a pénzügyeidet!</string>
+    <string name="dash_ongoing">Épp most zajlik</string>
+    <string name="dash_next">Következő óra</string>
+    <string name="dash_finance_title">Fizetendő: %1$s</string>
+    <string name="dash_finance_line">%1$s Ft · Határidő: %2$s</string>
+    <string name="dash_greet_night">Jó éjszakát</string>
+    <string name="dash_greet_morning">Jó reggelt</string>
+    <string name="dash_greet_day">Szia</string>
+    <string name="dash_greet_evening">Jó estét</string>
+    <string name="dash_greeting">%1$s, %2$s!</string>
+    <string name="dash_compact_million">M</string>
+    <string name="dash_compact_thousand">e</string>
+    <string name="dash_date_pattern">yyyy. MMMM d. EEEE</string>
+
+    <!-- Timetable -->
+    <string name="tt_title">Heti Órarend</string>
+    <string name="tt_sub_week">Heti összesített nézet</string>
+    <string name="tt_sub_day">Napi bontás</string>
+    <string name="tt_fallback_title">Órarend</string>
+    <string name="tt_prev_desc">Előző hét</string>
+    <string name="tt_next_desc">Következő hét</string>
+    <string name="tt_this_week">Mai hét</string>
+    <string name="tt_full_week">Teljes heti nézet</string>
+    <string name="tt_day_classes">%1$si órák (%2$s)</string>
+    <string name="tt_to_day">Napi nézet</string>
+    <string name="tt_to_week">Heti áttekintés</string>
+    <string name="tt_toggle_desc">Nézet váltása</string>
+    <string name="tt_live_ongoing">Éppen zajló óra</string>
+    <string name="tt_live_next">Következő óra ma</string>
+    <string name="tt_empty_day_week">Ezen a napon nincs tanóra ezen a héten.</string>
+    <string name="tt_empty_day">Erre a napra nincs felvett órád ezen a héten.</string>
+    <string name="tt_badge_live">ÉPPEN ZAJLIK</string>
+    <string name="tt_badge_next">KÖVETKEZŐ</string>
+    <string name="tt_alarm_desc_card">Értesítés emlékeztető</string>
+    <string name="tt_alarm_desc_banner">Értesítés beállítása</string>
+    <string name="tt_time_desc">Idősáv</string>
+    <string name="tt_room_desc">Terem</string>
+    <string name="tt_teacher_desc">Oktató</string>
+    <string name="tt_no_room">Nincs terem megadva</string>
+
+    <!-- Grades -->
+    <string name="grades_title">Jegyek &amp; Átlagszámítás</string>
+    <string name="grades_subtitle">Kreditindex és Szellemjegy kalkulátor</string>
+    <string name="grades_tab_exams">Vizsgák</string>
+    <string name="grades_enrolled">Felvett tárgyak (%1$d db)</string>
+    <string name="grades_clear_ghosts">Szellemjegyek törlése</string>
+    <string name="grades_calc_title">Tanulmányi Eredmények</string>
+    <string name="grades_calc_desc">Átlagszámítás</string>
+    <string name="grades_formula">Formula: (Σ Jegy * Kredit) / Σ Teljesített Kredit</string>
+    <string name="grades_avg">Súlyozott Átlag</string>
+    <string name="grades_ci">Kreditindex</string>
+    <string name="grades_credits_done">Teljesített / Felvett</string>
+    <string name="grades_ghost_title">Várható átlag szellemjegyekkel</string>
+    <string name="grades_ghost_effect">Szellemjegy hatás</string>
+    <string name="grades_ghost_ci">Szimulált kreditindex: %1$s</string>
+    <string name="grades_ghost_icon">Szellemjegy</string>
+    <string name="grades_signed">Aláírva</string>
+    <string name="grades_no_grade">Még nincs jegy</string>
+    <string name="grades_ghost_modify">Szellemjegy módosítása (%1$d)</string>
+    <string name="grades_ghost_add">Szellemjegy hozzáadása</string>
+    <string name="grades_ghost_dialog_title">Szellemjegy beállítása</string>
+    <string name="grades_ghost_desc">Adj meg egy virtuális jegyet a várható féléves átlag és kreditindex azonnali szimulálásához.</string>
+    <string name="grades_ghost_prefix">" Szellem: "</string>
+    <string name="grades_ghost_remove">Szellemjegy eltávolítása</string>
+    <string name="grades_stats">Féléves statisztika</string>
+    <string name="grades_stats_empty">Még nincs elég adat a statisztikához.</string>
+    <string name="grades_progress">Kredithaladás</string>
+    <string name="grades_target_hint">A célt a Beállítások → Tanulmányok menüben módosíthatod.</string>
+    <string name="grades_no_exams">Nem található vizsgaadat.</string>
+    <string name="grades_no_exams_desc">A vizsgalista ezen az egyetemi szerveren nem elérhető, vagy nincs felvett vizsgád. (Kísérleti funkció)</string>
+    <string name="grades_not_signed_up">Nincs jelentkezve</string>
+    <string name="grades_no_details">Nincs részletinformáció</string>
+
+    <!-- Messages -->
+    <string name="msg_title">Neptun Üzenetek</string>
+    <string name="msg_all_read">Minden üzenet elolvasva</string>
+    <string name="msg_unread_only_title">Olvasatlan üzenetek</string>
+    <string name="msg_all_title">Összes üzenet (%1$d)</string>
+    <string name="msg_filter">Csak olvasatlanok</string>
+    <string name="msg_filter_desc">Szűrés</string>
+    <string name="msg_search_hint">Keresés feladó vagy tárgy szerint…</string>
+    <string name="msg_empty_unread">Nincs olvasatlan üzeneted!</string>
+    <string name="msg_empty">Nem érkezett üzenet a fiókodba.</string>
+    <string name="msg_empty_desc">Üres</string>
+    <string name="msg_system_sender">Rendszerüzenet</string>
+    <string name="msg_badge_official">Hivatalos Értesítés</string>
+    <string name="msg_badge_teacher">Oktatói Üzenet</string>
+    <string name="msg_sender">Feladó: %1$s</string>
+    <string name="msg_date">Dátum: %1$s</string>
+    <string name="msg_loading">Üzenet tartalmának letöltése a Neptunból…</string>
+    <string name="msg_empty_body">A levél tartalma üres vagy nem sikerült közvetlenül betölteni a Neptunból.</string>
+    <string name="msg_retry">Tartalom újrapróbálása</string>
+    <string name="msg_no_subject">Nincs tárgy</string>
+    <string name="msg_unavailable">Az üzenet tartalma nem érhető el vagy üres.</string>
+    <string name="repo_msg_fallback">Kedves Hallgató!\n\nTájékoztatjuk a(z) \"%1$s\" tárgyú hivatalos üzenettel kapcsolatban.\n\nFeladó: %2$s\nDátum: %3$s\n\nÜdvözlettel,\n%2$s</string>
+
+    <!-- Finances -->
+    <string name="fin_title">Pénzügyek</string>
+    <string name="fin_subtitle">Tételek, befizetések és kötelezettségek</string>
+    <string name="fin_summary">Pénzügyi Egyenleg</string>
+    <string name="fin_pending">Fizetendő kötelezettség</string>
+    <string name="fin_completed">Rendezett tételek</string>
+    <string name="fin_filter_all">Összes (%1$d)</string>
+    <string name="fin_filter_pending">Kiírva / Fizetendő</string>
+    <string name="fin_empty">Nincs ilyen státuszú pénzügyi tétel!</string>
+    <string name="fin_amount">%1$s Ft</string>
+    <string name="fin_meta">Félév: %1$s • Bizonylatszám: %2$s</string>
+    <string name="fin_due">Határidő: %1$s</string>
+    <string name="fin_due_desc">Határidő</string>
+    <string name="fin_paid">Fizetve: %1$s</string>
+
+    <!-- Settings: profile -->
+    <string name="set_title">Beállítások</string>
+    <string name="set_subtitle_default">Profil &amp; Testreszabás</string>
+    <string name="set_student_default">Egyetemi Hallgató</string>
+    <string name="set_neptun_code">Neptun kód: %1$s</string>
+    <string name="set_uni_default">Felsőoktatási Intézmény</string>
+    <string name="set_program_default">BSc Hallgató</string>
+    <string name="set_never_synced">Még nincs szinkronizálva</string>
+    <string name="set_last_sync">Utolsó sikeres szinkronizálás: %1$s</string>
+
+    <!-- Settings: appearance -->
+    <string name="set_appearance">Megjelenés és Téma</string>
+    <string name="set_appearance_desc">Szabd személyre az alkalmazás arculatát</string>
+    <string name="set_palette_desc">Téma</string>
+    <string name="set_theme_mode">Téma mód</string>
+    <string name="set_dynamic">Dinamikus színek</string>
+    <string name="set_dynamic_desc">A telefon háttérképéhez illeszkedő Material You paletta használata</string>
+    <string name="set_dynamic_unavail">Csak Android 12 vagy újabb rendszeren érhető el</string>
+    <string name="set_dynamic_hint">A dinamikus szín aktív. Ha egyéni hangsúlyszínt választasz, a dinamikus szín automatikusan kikapcsol.</string>
+    <string name="set_accent">Hangsúlyszín kiválasztása</string>
+    <string name="set_accent_selected">Kiválasztva: %1$s</string>
+    <string name="set_custom_theme">Egyéni téma</string>
+    <string name="set_preview">Élő arculati előnézet</string>
+    <string name="set_active_theme">Aktív téma: %1$s</string>
+    <string name="set_dynamic_name">Material You Dinamikus</string>
+    <string name="set_btn_primary">Fő gomb</string>
+    <string name="set_btn_tonal">Tonális</string>
+    <string name="set_btn_outline">Keretes</string>
+
+    <!-- Settings: notifications -->
+    <string name="set_notif">Értesítések és Emlékeztetők</string>
+    <string name="set_notif_desc">Kategóriák és háttérbeli értesítések</string>
+    <string name="set_notif_icon">Értesítések</string>
+    <string name="set_perm_granted">Értesítések engedélyezve</string>
+    <string name="set_perm_needed">Értesítési engedély szükséges</string>
+    <string name="set_perm_granted_desc">Az alkalmazás küldhet órarendi és tanulmányi értesítéseket.</string>
+    <string name="set_perm_needed_desc">Kattints az engedély megadásához.</string>
+    <string name="set_perm_request">Engedély kérése</string>
+    <string name="set_cat_classes">Órarendi értesítések</string>
+    <string name="set_test_class">Óra teszt</string>
+    <string name="set_cat_grades">Jegyek és értékelések</string>
+    <string name="set_cat_grades_desc">Azonnali figyelmeztetés új érdemjegy vagy bejegyzés rögzítésekor</string>
+    <string name="set_test_grade">Jegy teszt</string>
+    <string name="set_cat_messages">Neptun üzenetek</string>
+    <string name="set_cat_messages_desc">Értesítés oktatói és tanulmányi rendszerüzenetek érkezésekor</string>
+    <string name="set_test_message">Üzenet teszt</string>
+    <string name="set_cat_finances">Pénzügyi tételek</string>
+    <string name="set_cat_finances_desc">Emlékeztetők kiírásokról, díjakról és fizetési határidőkről</string>
+    <string name="set_test_finance">Pénzügy teszt</string>
+
+    <!-- Settings: personalization -->
+    <string name="set_personal">Személyreszabás</string>
+    <string name="set_personal_desc">Kezdőképernyő, órarend és tanulmányi beállítások</string>
+    <string name="set_start">Kezdőképernyő</string>
+    <string name="set_start_desc">Az alkalmazás megnyitásakor megjelenő alapértelmezett oldal.</string>
+    <string name="set_start_label">Kezdőlap kiválasztása</string>
+    <string name="set_page_hidden">Jelenleg rejtett oldal</string>
+    <string name="set_weekend">Hétvége megjelenítése</string>
+    <string name="set_weekend_desc">Szombat és vasárnap oszlopai</string>
+    <string name="set_visible">Látható oldalak</string>
+    <string name="set_visible_desc">A számodra nem hasznos oldalakat elrejtheted – eltűnnek az alsó sávból. A %1$s mindig látható marad.</string>
+    <string name="set_credits">Cél kreditek (diploma)</string>
+    <string name="set_credits_desc">A kredithaladás sávja ezt a célt mutatja a Jegyek fülön.</string>
+    <string name="set_quiet">Halk órák</string>
+    <string name="set_quiet_desc">Ebben az időszakban nem küldünk üzenet-, jegy- és pénzügyi értesítést (az óra-emlékeztetők maradnak).</string>
+    <string name="set_quiet_window">Aktív időablak</string>
+
+    <!-- Settings: security -->
+    <string name="set_security">Biztonság és Titkosítás</string>
+    <string name="set_security_desc">Helyi és hardveres adatvédelem</string>
+    <string name="set_security_text">A Neptun bejelentkezési adatok hardveresen védett Android Keystore (AES-256) titkosítással vannak tárolva. Az órarend, jegyek és üzenetek helyi Room adatbázisban tárolódnak, így internetkapcsolat nélkül is azonnal elérhetők.</string>
+    <string name="set_biometric">Biometrikus zár</string>
+    <string name="set_biometric_desc">Az app felnyitásához ujjlenyomat vagy arcfelismerés szükséges</string>
+    <string name="set_security_icon">Biztonság</string>
+
+    <!-- Settings: app & updates -->
+    <string name="set_app">Alkalmazás és Frissítések</string>
+    <string name="set_app_desc">Verziókezelés és GitHub Releases</string>
+    <string name="set_channel">Frissítési csatorna</string>
+    <string name="set_installed">Telepített verzió</string>
+    <string name="set_package">Csomagnév</string>
+    <string name="set_download">Új verzió letöltése (%1$s)</string>
+    <string name="set_checking">Keresés…</string>
+    <string name="set_check">Frissítés keresése</string>
+    <string name="set_github">GitHub Releases</string>
+    <string name="set_update_available">Új verzió (%1$s) érhető el a %2$s csatornán!</string>
+    <string name="set_update_current">A legfrissebb verziót használod (v%1$s).</string>
+    <string name="set_update_open_github">Nyisd meg a GitHub Releases oldalt a letöltéshez.</string>
+
+    <!-- Settings: account actions -->
+    <string name="set_syncing">Szinkronizálás folyamatban…</string>
+    <string name="set_sync_now">Azonnali szinkronizálás</string>
+    <string name="set_export">Órarend exportálása (.ics)</string>
+    <string name="set_clearing">Törlés folyamatban…</string>
+    <string name="set_clear">Helyi gyorsítótár törlése</string>
+    <string name="set_logout">Kijelentkezés</string>
+    <string name="set_logout_text">Biztosan ki szeretnél jelentkezni? A helyileg tárolt hitelesítő adatok és az offline cache törlődnek.</string>
+    <string name="set_sync_ok">Sikeres szinkronizálás! Minden adat naprakész.</string>
+    <string name="set_sync_done">Szinkronizálás befejeződött.</string>
+    <string name="set_cache_ok">A helyi gyorsítótár törölve. A következő szinkronizáláskor friss adatok töltődnek le.</string>
+    <string name="set_cache_fail">A törlés nem sikerült.</string>
+
+    <!-- Demo payloads for the test notifications -->
+    <string name="demo_class_subject">Mesterséges intelligencia</string>
+    <string name="demo_msg_sender">Dr. Kovács István (Oktató)</string>
+    <string name="demo_msg_subject">Vizsgakurzus tájékoztató és konzultáció</string>
+    <string name="demo_msg_preview">Kedves Hallgatók! A jövő heti konzultáció időpontja módosult…</string>
+    <string name="demo_grade_subject">Algoritmuselmélet</string>
+    <string name="demo_fin_title">Kollégiumi térítési díj (2026/27/1)</string>
+
+    <!-- Grade names -->
+    <string name="grade_5">Jeles (5)</string>
+    <string name="grade_4">Jó (4)</string>
+    <string name="grade_3">Közepes (3)</string>
+    <string name="grade_2">Elégséges (2)</string>
+    <string name="grade_1">Elégtelen (1)</string>
+
+    <!-- Notifications -->
+    <string name="notif_channel_classes">Órarendi Értesítések</string>
+    <string name="notif_channel_classes_desc">Értesítés az órák megkezdése előtt a terem megjelölésével</string>
+    <string name="notif_channel_messages">Neptun Üzenetek</string>
+    <string name="notif_channel_messages_desc">Értesítés az új oktatói és tanulmányi üzenetekről</string>
+    <string name="notif_channel_grades">Jegyek és Értékelések</string>
+    <string name="notif_channel_grades_desc">Értesítés az új érdemjegyekről és félévközi eredményekről</string>
+    <string name="notif_channel_finances">Pénzügyi Értesítések</string>
+    <string name="notif_channel_finances_desc">Értesítés a pénzügyi kiírásokról és határidőkről</string>
+    <string name="notif_class_title">Hamarosan kezdődik: %1$s</string>
+    <string name="notif_class_text">%1$s %2$s-kor | Terem: %3$s</string>
+    <string name="notif_class_default">Óra</string>
+    <string name="notif_message_title">Új üzenet: %1$s</string>
+    <string name="notif_grade_title">Új érdemjegy: %1$s</string>
+    <string name="notif_grade_big">Új értékelés érkezett a(z) %1$s tantárgyból!\nÉrdemjegy: %2$s | Kreditérték: %3$d</string>
+    <string name="notif_grade_new">Új bejegyzés</string>
+    <string name="notif_finance_title">Pénzügyi tétel: %1$s</string>
+    <string name="notif_finance_text">Összeg: %1$s | Határidő: %2$s</string>
+    <string name="notif_finance_big">Figyelem! Befizetendő pénzügyi tétel: %1$s\nÖsszeg: %2$s HUF\nFizetési határidő: %3$s</string>
+    <string name="sync_finance_line">• %1$s – %2$d Ft (határidő: %3$s)</string>
+
+    <!-- Widget -->
+    <string name="widget_today">· Mai órák</string>
+    <string name="widget_empty">Ma nincs több órád!</string>
+
+    <!-- Biometric lock -->
+    <string name="bio_title">Neptun Mobile feloldása</string>
+    <string name="bio_subtitle">Erősítsd meg az azonosságod a folytatáshoz</string>
+    <string name="lock_locked_desc">Zárolva</string>
+    <string name="lock_title">Az alkalmazás zárolva van</string>
+    <string name="lock_unavailable">A biometrikus hitelesítés nem elérhető ezen az eszközön.</string>
+    <string name="lock_prompt">Erősítsd meg az azonosságod az ujjlenyomatoddal vagy arcoddal.</string>
+    <string name="lock_unlock">Feloldás</string>
+
+    <!-- In-app update -->
+    <string name="update_title">Új verzió érhető el! 🎉</string>
+    <string name="update_notes">Újdonságok és változtatások:</string>
+    <string name="update_notes_empty">Új, javított verzió érhető el a Neptun Mobile alkalmazáshoz.</string>
+    <string name="update_now">Frissítés most</string>
+    <string name="update_downloading">Frissítés letöltése… (%1$d%%)</string>
+    <string name="update_version">Verzió: %1$s</string>
+    <string name="update_progress">%1$.1f MB / %2$.1f MB</string>
+    <string name="update_background">Háttérbe</string>
+    <string name="update_ready">Letöltés kész!</string>
+    <string name="update_ready_text">A frissítés (v%1$s) sikeresen letöltődött. Érintsd meg a gombot a telepítéshez.</string>
+    <string name="update_install">Telepítés megnyitása</string>
+    <string name="update_error_title">Frissítési hiba</string>
+    <string name="update_github">GitHub letöltés</string>
+    <string name="update_download_failed">Hiba történt a letöltés során.</string>
+    <string name="update_http_failed">A letöltés meghiúsult: HTTP %1$d</string>
+    <string name="update_empty_body">Üres letöltési válasz érkezett</string>
+
+    <!-- ICS export -->
+    <string name="ics_teacher">Oktató:\u0020</string>
+    <string name="ics_reminder">Emlékeztető</string>
+
+    <!-- Network / login errors -->
+    <string name="api_no_connection">Nem sikerült kapcsolódni a Neptun szerverhez!</string>
+    <string name="api_login_page">Nem sikerült elérni a Neptun bejelentkezési oldalt (%1$s)</string>
+    <string name="api_send_creds">Hiba a hitelesítési adatok elküldésekor: %1$s</string>
+    <string name="api_2fa_load">Hiba a 2FA oldal betöltésekor: %1$s</string>
+    <string name="api_bad_credentials">Sikertelen bejelentkezés: hibás Neptun kód vagy jelszó!</string>
+    <string name="api_bad_2fa">A megadott biztonsági kód érvénytelen vagy lejárt!</string>
+    <string name="api_verify_2fa">Hiba a biztonsági kód ellenőrzésekor: %1$s</string>
+    <string name="api_no_guid">Nem sikerült GUID-ot kinyerni az outerlogin URL-ből: %1$s</string>
+    <string name="api_no_cookies">Nincsenek mentett munkamenet-sütik</string>
+    <string name="api_session_expired">ASP.NET munkamenet lejárt – újra be kell lépni.</string>
+    <string name="api_no_form">Nem található FormToNeptun az oldalon</string>
+    <string name="api_outerlogin_fail">Nem sikerült elérni az outerlogin végpontot</string>
+    <string name="api_renew_net">Hálózati hiba a munkamenet-megújításnál: %1$s</string>
+    <string name="api_login_failed_server">Nem sikerült a bejelentkezés a Neptun kiszolgálóra!</string>
+    <string name="api_invalid_response">Érvénytelen válasz a szervertől.</string>
+    <string name="api_bad_user_pass">Hibás felhasználónév vagy jelszó!</string>
+    <string name="api_connect_net">Hálózati hiba a Neptunhoz kapcsolódáskor: %1$s</string>
+    <string name="api_student">Hallgató (%1$s)</string>
+    <string name="api_program">Egyetemi képzés</string>
+    <string name="api_program_elte1">ELTE Egyetemi Képzés</string>
+    <string name="api_program_elte2">ELTE Felsőoktatási Képzés</string>
+    <string name="api_program_eng">Mérnökinformatikus képzés</string>
+    <string name="api_subject_default">Tantárgy</string>
+    <string name="api_term_current">Aktuális félév</string>
+    <string name="api_term_grades">Félévi jegyek</string>
+    <string name="api_offered">Megajánlott (%1$s)</string>
+    <string name="api_finance_payable">Befizetendő tétel</string>
+    <string name="api_finance_assessed">Kiírt tétel</string>
+    <string name="api_finance_transaction">Tranzakció</string>
+    <string name="api_finance_payment">Befizetés</string>
+    <string name="api_term_current_short">Aktuális</string>
+    <string name="api_term_short">Félév</string>
+
+    <!-- Plurals -->
+    <plurals name="tt_reminder_scheduled">
+        <item quantity="one">Értesítés beállítva %d perccel az óra előtt!</item>
+        <item quantity="other">Értesítés beállítva %d perccel az óra előtt!</item>
+    </plurals>
+    <plurals name="grades_ghost_active">
+        <item quantity="one">%d szellemjegy aktív</item>
+        <item quantity="other">%d szellemjegy aktív</item>
+    </plurals>
+    <plurals name="grades_credit_unit">
+        <item quantity="one">%d kredit</item>
+        <item quantity="other">%d kredit</item>
+    </plurals>
+    <plurals name="grades_progress_label">
+        <item quantity="one">%1$d / %2$d kredit</item>
+        <item quantity="other">%1$d / %2$d kredit</item>
+    </plurals>
+    <plurals name="msg_unread">
+        <item quantity="one">%d olvasatlan üzenet</item>
+        <item quantity="other">%d olvasatlan üzenet</item>
+    </plurals>
+    <plurals name="set_cat_classes_desc">
+        <item quantity="one">%d perccel az órák előtt emlékeztető a pontos teremszámmal</item>
+        <item quantity="other">%d perccel az órák előtt emlékeztető a pontos teremszámmal</item>
+    </plurals>
+    <plurals name="notif_class_big">
+        <item quantity="one">Az órád (%1$s - %2$s) %3$d perc múlva (%4$s) kezdődik a(z) %5$s teremben.</item>
+        <item quantity="other">Az órád (%1$s - %2$s) %3$d perc múlva (%4$s) kezdődik a(z) %5$s teremben.</item>
+    </plurals>
+    <plurals name="notif_grade_text">
+        <item quantity="one">Eredmény: %1$s (%2$d kredit)</item>
+        <item quantity="other">Eredmény: %1$s (%2$d kredit)</item>
+    </plurals>
+    <plurals name="sync_new_messages">
+        <item quantity="one">%d új üzenet</item>
+        <item quantity="other">%d új üzenet</item>
+    </plurals>
+    <plurals name="sync_new_grades">
+        <item quantity="one">%d új érdemjegy</item>
+        <item quantity="other">%d új érdemjegy</item>
+    </plurals>
+    <plurals name="sync_new_finances">
+        <item quantity="one">%d befizetendő tétel</item>
+        <item quantity="other">%d befizetendő tétel</item>
+    </plurals>
+    <plurals name="widget_more">
+        <item quantity="one">…és még %d óra</item>
+        <item quantity="other">…és még %d óra</item>
+    </plurals>
+    <string name="set_applang">Alkalmazás nyelve</string>
+    <string name="set_applang_desc">A felület nyelve (a Neptun-szerver nyelvétől független).</string>
+    <string name="set_applang_system">Rendszer alapértelmezett</string>
+    <string name="set_applang_hu">Magyar</string>
+    <string name="set_applang_en">English</string>
+    <string name="set_applang_de">Deutsch</string>
+    <string name="set_applang_note">A váltás azonnal életbe lép.</string>
+    <string name="auth_custom_city">Magyarország</string>
+</resources>

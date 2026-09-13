@@ -47,6 +47,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -55,6 +57,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.example.R
 import com.example.domain.model.ExamItem
 import com.example.domain.model.SubjectGrade
 import com.example.presentation.ui.components.GradeBadge
@@ -87,8 +90,8 @@ fun GradesScreen(
             .background(MaterialTheme.colorScheme.background)
     ) {
         NeptunTopBar(
-            title = "Jegyek & Átlagszámítás",
-            subtitle = "Kreditindex és Szellemjegy kalkulátor",
+            title = stringResource(R.string.grades_title),
+            subtitle = stringResource(R.string.grades_subtitle),
             isRefreshing = if (uiState.selectedTab == 0) uiState.isRefreshing else uiState.isRefreshingExams,
             onRefresh = if (uiState.selectedTab == 0) onRefresh else onRefreshExams
         )
@@ -104,14 +107,14 @@ fun GradesScreen(
                 onClick = { onTabSelect(0) },
                 shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
             ) {
-                Text("Jegyek")
+                Text(stringResource(R.string.nav_grades))
             }
             SegmentedButton(
                 selected = uiState.selectedTab == 1,
                 onClick = { onTabSelect(1) },
                 shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
             ) {
-                Text("Vizsgák")
+                Text(stringResource(R.string.grades_tab_exams))
             }
         }
 
@@ -184,7 +187,7 @@ fun GradesScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Felvett tárgyak (${uiState.termGrades.size} db)",
+                        text = stringResource(R.string.grades_enrolled, uiState.termGrades.size),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -202,13 +205,13 @@ fun GradesScreen(
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Clear,
-                                    contentDescription = "Törlés",
+                                    contentDescription = stringResource(R.string.common_delete_desc),
                                     tint = NeptunPurple,
                                     modifier = Modifier.size(14.dp)
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    text = "Szellemjegyek törlése",
+                                    text = stringResource(R.string.grades_clear_ghosts),
                                     color = NeptunPurple,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold
@@ -283,7 +286,7 @@ private fun AcademicSummaryCard(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Calculate,
-                            contentDescription = "Átlagszámítás",
+                            contentDescription = stringResource(R.string.grades_calc_desc),
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(20.dp)
                         )
@@ -291,12 +294,12 @@ private fun AcademicSummaryCard(
                     Spacer(modifier = Modifier.width(10.dp))
                     Column {
                         Text(
-                            text = "Tanulmányi Eredmények",
+                            text = stringResource(R.string.grades_calc_title),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "Formula: (Σ Jegy * Kredit) / Σ Teljesített Kredit",
+                            text = stringResource(R.string.grades_formula),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 11.sp
@@ -310,7 +313,11 @@ private fun AcademicSummaryCard(
                         shape = RoundedCornerShape(6.dp)
                     ) {
                         Text(
-                            text = "${calc?.ghostCount} szellemjegy aktív",
+                            text = pluralStringResource(
+                                R.plurals.grades_ghost_active,
+                                calc?.ghostCount ?: 0,
+                                calc?.ghostCount ?: 0
+                            ),
                             color = NeptunPurple,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.ExtraBold,
@@ -330,7 +337,7 @@ private fun AcademicSummaryCard(
                 // Súlyozott Átlag (KGI)
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Súlyozott Átlag",
+                        text = stringResource(R.string.grades_avg),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 12.sp
@@ -346,7 +353,7 @@ private fun AcademicSummaryCard(
                 // Kreditindex
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Kreditindex",
+                        text = stringResource(R.string.grades_ci),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 12.sp
@@ -362,7 +369,7 @@ private fun AcademicSummaryCard(
                 // Teljesített Kreditek
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Teljesített / Felvett",
+                        text = stringResource(R.string.grades_credits_done),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 12.sp
@@ -410,20 +417,20 @@ private fun AcademicSummaryCard(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
                                 imageVector = Icons.Default.AutoAwesome,
-                                contentDescription = "Szellemjegy hatás",
+                                contentDescription = stringResource(R.string.grades_ghost_effect),
                                 tint = NeptunPurple,
                                 modifier = Modifier.size(20.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Column {
                                 Text(
-                                    text = "Várható átlag szellemjegyekkel",
+                                    text = stringResource(R.string.grades_ghost_title),
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = NeptunPurple
                                 )
                                 Text(
-                                    text = "Szimulált kreditindex: ${calc?.ghostCreditIndex ?: 0.0}",
+                                    text = stringResource(R.string.grades_ghost_ci, calc?.ghostCreditIndex ?: 0.0),
                                     fontSize = 11.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -489,7 +496,7 @@ private fun SubjectGradeCard(
                     shape = RoundedCornerShape(6.dp)
                 ) {
                     Text(
-                        text = "${subject.credit} kredit",
+                        text = pluralStringResource(R.plurals.grades_credit_unit, subject.credit, subject.credit),
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary,
@@ -505,7 +512,7 @@ private fun SubjectGradeCard(
                             modifier = Modifier.padding(end = 6.dp)
                         ) {
                             Text(
-                                text = "Aláírva",
+                                text = stringResource(R.string.grades_signed),
                                 color = NeptunGreen,
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
@@ -519,7 +526,7 @@ private fun SubjectGradeCard(
                     } else if (subject.ghostGrade != null) {
                         GradeBadge(grade = subject.ghostGrade, gradeText = "", isGhost = true)
                     } else {
-                        GradeBadge(grade = null, gradeText = "Még nincs jegy", isGhost = false)
+                        GradeBadge(grade = null, gradeText = stringResource(R.string.grades_no_grade), isGhost = false)
                     }
                 }
             }
@@ -558,13 +565,13 @@ private fun SubjectGradeCard(
                 ) {
                     Icon(
                         imageVector = Icons.Default.AutoAwesome,
-                        contentDescription = "Szellemjegy",
+                        contentDescription = stringResource(R.string.grades_ghost_icon),
                         tint = if (subject.ghostGrade != null) NeptunPurple else MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(16.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = if (subject.ghostGrade != null) "Szellemjegy módosítása (${subject.ghostGrade})" else "Szellemjegy hozzáadása",
+                        text = if (subject.ghostGrade != null) stringResource(R.string.grades_ghost_modify, subject.ghostGrade ?: 0) else stringResource(R.string.grades_ghost_add),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = if (subject.ghostGrade != null) NeptunPurple else MaterialTheme.colorScheme.primary
@@ -601,7 +608,7 @@ private fun GhostMarkPickerModal(
                 ) {
                     Icon(
                         imageVector = Icons.Default.AutoAwesome,
-                        contentDescription = "Szellemjegy",
+                        contentDescription = stringResource(R.string.grades_ghost_icon),
                         tint = NeptunPurple,
                         modifier = Modifier.size(24.dp)
                     )
@@ -610,7 +617,7 @@ private fun GhostMarkPickerModal(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Text(
-                    text = "Szellemjegy beállítása",
+                    text = stringResource(R.string.grades_ghost_dialog_title),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
@@ -625,7 +632,7 @@ private fun GhostMarkPickerModal(
                 )
 
                 Text(
-                    text = "Adj meg egy virtuális jegyet a várható féléves átlag és kreditindex azonnali szimulálásához.",
+                    text = stringResource(R.string.grades_ghost_desc),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
@@ -670,7 +677,7 @@ private fun GhostMarkPickerModal(
                             .fillMaxWidth()
                             .padding(bottom = 8.dp)
                     ) {
-                        Text("Szellemjegy eltávolítása", color = MaterialTheme.colorScheme.error)
+                        Text(stringResource(R.string.grades_ghost_remove), color = MaterialTheme.colorScheme.error)
                     }
                 }
 
@@ -683,7 +690,7 @@ private fun GhostMarkPickerModal(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text = "Mégse",
+                        text = stringResource(R.string.common_cancel),
                         color = MaterialTheme.colorScheme.onSecondaryContainer
                     )
                 }
@@ -711,7 +718,7 @@ private fun TermStatisticsCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Féléves statisztika",
+                    text = stringResource(R.string.grades_stats),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
@@ -728,7 +735,7 @@ private fun TermStatisticsCard(
 
             if (termStats.isEmpty()) {
                 Text(
-                    text = "Még nincs elég adat a statisztikához.",
+                    text = stringResource(R.string.grades_stats_empty),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -794,13 +801,13 @@ private fun TermStatisticsCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Kredithaladás",
+                    text = stringResource(R.string.grades_progress),
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = "$totalCompletedCredits / $targetCredits kredit",
+                    text = pluralStringResource(R.plurals.grades_progress_label, totalCompletedCredits, totalCompletedCredits, targetCredits),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -816,7 +823,7 @@ private fun TermStatisticsCard(
                 trackColor = MaterialTheme.colorScheme.surfaceVariant
             )
             Text(
-                text = "A célt a Beállítások → Tanulmányok menüben módosíthatod.",
+                text = stringResource(R.string.grades_target_hint),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 10.sp,
@@ -854,12 +861,12 @@ private fun ExamsTabContent(
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        text = "Nem található vizsgaadat.",
+                        text = stringResource(R.string.grades_no_exams),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = "A vizsgalista ezen az egyetemi szerveren nem elérhető, vagy nincs felvett vizsgád. (Kísérleti funkció)",
+                        text = stringResource(R.string.grades_no_exams_desc),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center,
@@ -918,7 +925,7 @@ private fun ExamCard(exam: ExamItem) {
                         shape = RoundedCornerShape(6.dp)
                     ) {
                         Text(
-                            text = "Nincs jelentkezve",
+                            text = stringResource(R.string.grades_not_signed_up),
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onErrorContainer,
@@ -947,7 +954,7 @@ private fun ExamCard(exam: ExamItem) {
             ).joinToString(" · ")
 
             Text(
-                text = details.ifEmpty { "Nincs részletinformáció" },
+                text = details.ifEmpty { stringResource(R.string.grades_no_details) },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

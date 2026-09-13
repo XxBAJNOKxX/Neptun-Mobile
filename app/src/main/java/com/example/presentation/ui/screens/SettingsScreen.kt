@@ -57,6 +57,7 @@ import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.SystemUpdate
+import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -92,6 +93,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
@@ -106,6 +109,8 @@ import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.example.BuildConfig
+import com.example.R
+import com.example.core.locale.AppLocale
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.example.core.notification.NotificationHelper
@@ -125,7 +130,6 @@ import com.example.ui.theme.NeptunGold
 import com.example.ui.theme.NeptunGreen
 import com.example.ui.theme.ThemeMode
 import com.example.ui.theme.ThemeSettings
-import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
@@ -164,6 +168,8 @@ fun SettingsScreen(
     loginLcid: Int = 0,
     onSelectServerLanguage: (Int) -> Unit = {},
     onRefreshServerLanguages: () -> Unit = {},
+    appLocale: AppLocale = AppLocale.SYSTEM,
+    onAppLocaleChange: (AppLocale) -> Unit = {},
     onExportIcs: () -> Unit = {},
     onClearCache: () -> Unit = {},
     onSimulateClassNotification: () -> Unit,
@@ -230,10 +236,13 @@ fun SettingsScreen(
 
     val lastSyncFormatted = remember(credentials?.lastSyncTime) {
         if (credentials != null && credentials.lastSyncTime > 0) {
-            val sdf = SimpleDateFormat("yyyy. MM. dd. HH:mm:ss", Locale("hu", "HU"))
-            sdf.format(Date(credentials.lastSyncTime))
+            java.text.DateFormat.getDateTimeInstance(
+                java.text.DateFormat.MEDIUM,
+                java.text.DateFormat.SHORT,
+                Locale.getDefault()
+            ).format(Date(credentials.lastSyncTime))
         } else {
-            "Még nincs szinkronizálva"
+            null
         }
     }
 
@@ -245,8 +254,8 @@ fun SettingsScreen(
             .background(MaterialTheme.colorScheme.background)
     ) {
         NeptunTopBar(
-            title = "Beállítások",
-            subtitle = credentials?.studentName ?: "Profil & Testreszabás",
+            title = stringResource(R.string.set_title),
+            subtitle = credentials?.studentName.takeUnless { it.isNullOrBlank() } ?: stringResource(R.string.set_subtitle_default),
             isRefreshing = isSyncing,
             onRefresh = onManualSync
         )
@@ -288,29 +297,151 @@ fun SettingsScreen(
 
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = credentials?.studentName ?: "Egyetemi Hallgató",
+                            text = credentials?.studentName.takeUnless { it.isNullOrBlank() } ?: stringResource(R.string.set_student_default),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = "Neptun kód: ${credentials?.neptunCode ?: "-"}",
+                            text = stringResource(R.string.set_neptun_code, credentials?.neptunCode ?: "-"),
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.primary
                         )
                         Text(
-                            text = credentials?.universityName ?: "Felsőoktatási Intézmény",
+                            text = credentials?.universityName.takeUnless { it.isNullOrBlank() } ?: stringResource(R.string.set_uni_default),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
-                            text = credentials?.trainingProgram ?: "BSc Hallgató",
+                            text = credentials?.trainingProgram.takeUnless { it.isNullOrBlank() } ?: stringResource(R.string.set_program_default),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 11.sp
                         )
                     }
+                }
+            }
+
+            // ==========================================
+            // ALKALMAZÁS NYELVE (UI LOCALE)
+            // ==========================================
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("app_language_card")
+            ) {
+                Column(
+                    modifier = Modifier.padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(MaterialTheme.colorScheme.primaryContainer),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Translate,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = stringResource(R.string.set_applang),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = stringResource(R.string.set_applang_desc),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+                    var appLocaleDropdownOpen by remember { mutableStateOf(false) }
+                    ExposedDropdownMenuBox(
+                        expanded = appLocaleDropdownOpen,
+                        onExpandedChange = { appLocaleDropdownOpen = it },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        OutlinedTextField(
+                            value = appLocaleLabel(appLocale),
+                            onValueChange = {},
+                            readOnly = true,
+                            singleLine = true,
+                            label = { Text(stringResource(R.string.set_applang)) },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.Translate,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            },
+                            trailingIcon = {
+                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = appLocaleDropdownOpen)
+                            },
+                            colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier
+                                .menuAnchor(MenuAnchorType.PrimaryNotEditable)
+                                .fillMaxWidth()
+                        )
+                        ExposedDropdownMenu(
+                            expanded = appLocaleDropdownOpen,
+                            onDismissRequest = { appLocaleDropdownOpen = false }
+                        ) {
+                            AppLocale.entries.forEach { locale ->
+                                val isSelected = locale == appLocale
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            text = appLocaleLabel(locale),
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                        )
+                                    },
+                                    trailingIcon = if (isSelected) {
+                                        {
+                                            Icon(
+                                                imageVector = Icons.Default.Check,
+                                                contentDescription = stringResource(R.string.common_selected),
+                                                tint = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                    } else null,
+                                    onClick = {
+                                        appLocaleDropdownOpen = false
+                                        if (locale != appLocale) {
+                                            onAppLocaleChange(locale)
+                                            // Az új nyelv az Activity újralétrehozásával lép életbe
+                                            // (az attachBaseContext ilyenkor csomagolja újra a contextet).
+                                            (context as? Activity)?.recreate()
+                                        }
+                                    },
+                                    contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
+                                )
+                            }
+                        }
+                    }
+
+                    Text(
+                        text = stringResource(R.string.set_applang_note),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 11.5.sp
+                    )
                 }
             }
 
@@ -339,7 +470,7 @@ fun SettingsScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Language,
-                                contentDescription = "Nyelv",
+                                contentDescription = stringResource(R.string.srvlang_icon_desc),
                                 tint = MaterialTheme.colorScheme.onPrimaryContainer,
                                 modifier = Modifier.size(20.dp)
                             )
@@ -347,12 +478,12 @@ fun SettingsScreen(
                         Spacer(modifier = Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Neptun szerver nyelve",
+                                text = stringResource(R.string.srvlang_title),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "Az intézmény által támogatott nyelvek",
+                                text = stringResource(R.string.srvlang_subtitle),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -366,7 +497,7 @@ fun SettingsScreen(
                             IconButton(onClick = onRefreshServerLanguages) {
                                 Icon(
                                     imageVector = Icons.Default.Refresh,
-                                    contentDescription = "Nyelvek frissítése",
+                                    contentDescription = stringResource(R.string.srvlang_refresh_desc),
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
@@ -376,7 +507,7 @@ fun SettingsScreen(
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
                     Text(
-                        text = "A Neptun szerver felől érkező szövegek (státuszok, jegy-megnevezések, hibaüzenetek) nyelvét állítja be. Intézményenként eltérhet, hogy mely nyelvek érhetők el – a lista automatikusan a szerverről töltődik be.",
+                        text = stringResource(R.string.srvlang_desc),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         lineHeight = 17.sp
@@ -393,7 +524,7 @@ fun SettingsScreen(
 
                     if (serverLanguage.isFallback) {
                         Text(
-                            text = "Az intézmény nyelvi listája most nem érhető el (offline állapot vagy régebbi szerver), ezért az alapértelmezett lista látszik.",
+                            text = stringResource(R.string.srvlang_fallback),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 11.5.sp
@@ -428,9 +559,9 @@ fun SettingsScreen(
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = if (needsRelogin) {
-                                    "Másik nyelvet választottál, mint amivel be vagy jelentkezve. A váltás életbe léptetéséhez jelentkezz ki, majd be újra (a Profil oldal alján)."
+                                    stringResource(R.string.srvlang_relogin)
                                 } else {
-                                    "A kiválasztott nyelv a következő bejelentkezéskor lép életbe."
+                                    stringResource(R.string.srvlang_next_login)
                                 },
                                 style = MaterialTheme.typography.bodySmall,
                                 color = if (needsRelogin) {
@@ -471,7 +602,7 @@ fun SettingsScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Palette,
-                                contentDescription = "Téma",
+                                contentDescription = stringResource(R.string.set_palette_desc),
                                 tint = MaterialTheme.colorScheme.onPrimaryContainer,
                                 modifier = Modifier.size(20.dp)
                             )
@@ -479,12 +610,12 @@ fun SettingsScreen(
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {
                             Text(
-                                text = "Megjelenés és Téma",
+                                text = stringResource(R.string.set_appearance),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "Szabd személyre az alkalmazás arculatát",
+                                text = stringResource(R.string.set_appearance_desc),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -496,7 +627,7 @@ fun SettingsScreen(
                     // 1. Theme Mode Selector
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
-                            text = "Téma mód",
+                            text = stringResource(R.string.set_theme_mode),
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface
@@ -526,14 +657,14 @@ fun SettingsScreen(
                                             }
                                             Icon(
                                                 imageVector = icon,
-                                                contentDescription = mode.title,
+                                                contentDescription = stringResource(mode.labelRes),
                                                 modifier = Modifier.size(18.dp)
                                             )
                                         }
                                     },
                                     label = {
                                         Text(
-                                            text = mode.title,
+                                            text = stringResource(mode.labelRes),
                                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                                             fontSize = 13.sp
                                         )
@@ -543,7 +674,7 @@ fun SettingsScreen(
                         }
 
                         Text(
-                            text = themeSettings.themeMode.description,
+                            text = stringResource(themeSettings.themeMode.descriptionRes),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 12.sp,
@@ -585,7 +716,7 @@ fun SettingsScreen(
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.AutoAwesome,
-                                    contentDescription = "Dinamikus színek",
+                                    contentDescription = stringResource(R.string.set_dynamic),
                                     tint = if (themeSettings.useDynamicColor && isDynamicColorSupported) {
                                         MaterialTheme.colorScheme.onPrimaryContainer
                                     } else {
@@ -603,7 +734,7 @@ fun SettingsScreen(
                                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
                                     Text(
-                                        text = "Dinamikus színek",
+                                        text = stringResource(R.string.set_dynamic),
                                         style = MaterialTheme.typography.bodyMedium,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.onSurface
@@ -625,9 +756,9 @@ fun SettingsScreen(
                                 }
                                 Text(
                                     text = if (isDynamicColorSupported) {
-                                        "A telefon háttérképéhez illeszkedő Material You paletta használata"
+                                        stringResource(R.string.set_dynamic_desc)
                                     } else {
-                                        "Csak Android 12 vagy újabb rendszeren érhető el"
+                                        stringResource(R.string.set_dynamic_unavail)
                                     },
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -674,7 +805,7 @@ fun SettingsScreen(
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = "A dinamikus szín aktív. Ha egyéni hangsúlyszínt választasz, a dinamikus szín automatikusan kikapcsol.",
+                                    text = stringResource(R.string.set_dynamic_hint),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSecondaryContainer,
                                     fontSize = 11.5.sp
@@ -694,13 +825,13 @@ fun SettingsScreen(
                         ) {
                             Column {
                                 Text(
-                                    text = "Hangsúlyszín kiválasztása",
+                                    text = stringResource(R.string.set_accent),
                                     style = MaterialTheme.typography.labelLarge,
                                     fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
-                                    text = "Kiválasztva: ${themeSettings.accentColor.title}",
+                                    text = stringResource(R.string.set_accent_selected, stringResource(themeSettings.accentColor.labelRes)),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.primary,
                                     fontWeight = FontWeight.Medium
@@ -713,7 +844,7 @@ fun SettingsScreen(
                                     color = MaterialTheme.colorScheme.primaryContainer
                                 ) {
                                     Text(
-                                        text = "Egyéni téma",
+                                        text = stringResource(R.string.set_custom_theme),
                                         style = MaterialTheme.typography.labelSmall,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -759,7 +890,7 @@ fun SettingsScreen(
                     // 4. Live Theme Preview Card
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
-                            text = "Élő arculati előnézet",
+                            text = stringResource(R.string.set_preview),
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface
@@ -789,7 +920,11 @@ fun SettingsScreen(
                                         )
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Text(
-                                            text = "Aktív téma: ${if (themeSettings.useDynamicColor && isDynamicColorSupported) "Material You Dinamikus" else themeSettings.accentColor.title}",
+                                            text = stringResource(
+                                            R.string.set_active_theme,
+                                            if (themeSettings.useDynamicColor && isDynamicColorSupported) stringResource(R.string.set_dynamic_name)
+                                            else stringResource(themeSettings.accentColor.labelRes)
+                                        ),
                                             style = MaterialTheme.typography.bodySmall,
                                             fontWeight = FontWeight.Bold,
                                             color = MaterialTheme.colorScheme.onSurface
@@ -801,7 +936,7 @@ fun SettingsScreen(
                                         color = MaterialTheme.colorScheme.primaryContainer
                                     ) {
                                         Text(
-                                            text = themeSettings.themeMode.title,
+                                            text = stringResource(themeSettings.themeMode.labelRes),
                                             style = MaterialTheme.typography.labelSmall,
                                             color = MaterialTheme.colorScheme.onPrimaryContainer,
                                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
@@ -820,7 +955,7 @@ fun SettingsScreen(
                                         modifier = Modifier.weight(1f),
                                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
                                     ) {
-                                        Text("Fő gomb", fontSize = 12.sp)
+                                        Text(stringResource(R.string.set_btn_primary), fontSize = 12.sp)
                                     }
 
                                     FilledTonalButton(
@@ -829,7 +964,7 @@ fun SettingsScreen(
                                         modifier = Modifier.weight(1f),
                                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
                                     ) {
-                                        Text("Tonális", fontSize = 12.sp)
+                                        Text(stringResource(R.string.set_btn_tonal), fontSize = 12.sp)
                                     }
 
                                     OutlinedButton(
@@ -838,7 +973,7 @@ fun SettingsScreen(
                                         modifier = Modifier.weight(1f),
                                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
                                     ) {
-                                        Text("Keretes", fontSize = 12.sp)
+                                        Text(stringResource(R.string.set_btn_outline), fontSize = 12.sp)
                                     }
                                 }
                             }
@@ -872,7 +1007,7 @@ fun SettingsScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.NotificationsActive,
-                                contentDescription = "Értesítések",
+                                contentDescription = stringResource(R.string.set_notif_icon),
                                 tint = MaterialTheme.colorScheme.onPrimaryContainer,
                                 modifier = Modifier.size(20.dp)
                             )
@@ -880,12 +1015,12 @@ fun SettingsScreen(
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {
                             Text(
-                                text = "Értesítések és Emlékeztetők",
+                                text = stringResource(R.string.set_notif),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "Kategóriák és háttérbeli értesítések",
+                                text = stringResource(R.string.set_notif_desc),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -923,13 +1058,13 @@ fun SettingsScreen(
                             Spacer(modifier = Modifier.width(10.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = if (isNotificationPermissionGranted) "Értesítések engedélyezve" else "Értesítési engedély szükséges",
+                                    text = if (isNotificationPermissionGranted) stringResource(R.string.set_perm_granted) else stringResource(R.string.set_perm_needed),
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Bold,
                                     color = if (isNotificationPermissionGranted) NeptunGreen else MaterialTheme.colorScheme.onErrorContainer
                                 )
                                 Text(
-                                    text = if (isNotificationPermissionGranted) "Az alkalmazás küldhet órarendi és tanulmányi értesítéseket." else "Kattints az engedély megadásához.",
+                                    text = if (isNotificationPermissionGranted) stringResource(R.string.set_perm_granted_desc) else stringResource(R.string.set_perm_needed_desc),
                                     style = MaterialTheme.typography.bodySmall,
                                     fontSize = 11.5.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -942,7 +1077,7 @@ fun SettingsScreen(
                                     shape = RoundedCornerShape(8.dp),
                                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
                                 ) {
-                                    Text("Engedély kérése", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    Text(stringResource(R.string.set_perm_request), fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
@@ -952,11 +1087,15 @@ fun SettingsScreen(
                     NotificationCategoryItem(
                         icon = Icons.Default.Alarm,
                         iconTint = NeptunCyan40,
-                        title = "Órarendi értesítések",
-                        description = "15 perccel az órák előtt emlékeztető a pontos teremszámmal",
+                        title = stringResource(R.string.set_cat_classes),
+                        description = pluralStringResource(
+                        R.plurals.set_cat_classes_desc,
+                        notificationPreferences.reminderMinutesBefore,
+                        notificationPreferences.reminderMinutesBefore
+                    ),
                         checked = notificationPreferences.notifyClasses,
                         onCheckedChange = onNotifyClassesChange,
-                        testButtonLabel = "Óra teszt",
+                        testButtonLabel = stringResource(R.string.set_test_class),
                         onTestClick = onSimulateClassNotification
                     )
 
@@ -966,11 +1105,11 @@ fun SettingsScreen(
                     NotificationCategoryItem(
                         icon = Icons.Default.School,
                         iconTint = NeptunGreen,
-                        title = "Jegyek és értékelések",
-                        description = "Azonnali figyelmeztetés új érdemjegy vagy bejegyzés rögzítésekor",
+                        title = stringResource(R.string.set_cat_grades),
+                        description = stringResource(R.string.set_cat_grades_desc),
                         checked = notificationPreferences.notifyGrades,
                         onCheckedChange = onNotifyGradesChange,
-                        testButtonLabel = "Jegy teszt",
+                        testButtonLabel = stringResource(R.string.set_test_grade),
                         onTestClick = onSimulateGradeNotification
                     )
 
@@ -980,11 +1119,11 @@ fun SettingsScreen(
                     NotificationCategoryItem(
                         icon = Icons.Default.Email,
                         iconTint = MaterialTheme.colorScheme.primary,
-                        title = "Neptun üzenetek",
-                        description = "Értesítés oktatói és tanulmányi rendszerüzenetek érkezésekor",
+                        title = stringResource(R.string.set_cat_messages),
+                        description = stringResource(R.string.set_cat_messages_desc),
                         checked = notificationPreferences.notifyMessages,
                         onCheckedChange = onNotifyMessagesChange,
-                        testButtonLabel = "Üzenet teszt",
+                        testButtonLabel = stringResource(R.string.set_test_message),
                         onTestClick = onSimulateMessageNotification
                     )
 
@@ -994,11 +1133,11 @@ fun SettingsScreen(
                     NotificationCategoryItem(
                         icon = Icons.Default.AccountBalanceWallet,
                         iconTint = NeptunGold,
-                        title = "Pénzügyi tételek",
-                        description = "Emlékeztetők kiírásokról, díjakról és fizetési határidőkről",
+                        title = stringResource(R.string.set_cat_finances),
+                        description = stringResource(R.string.set_cat_finances_desc),
                         checked = notificationPreferences.notifyFinances,
                         onCheckedChange = onNotifyFinancesChange,
-                        testButtonLabel = "Pénzügy teszt",
+                        testButtonLabel = stringResource(R.string.set_test_finance),
                         onTestClick = onSimulateFinanceNotification
                     )
                 }
@@ -1030,7 +1169,7 @@ fun SettingsScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.AutoAwesome,
-                                contentDescription = "Személyreszabás",
+                                contentDescription = stringResource(R.string.set_personal),
                                 tint = MaterialTheme.colorScheme.onPrimaryContainer,
                                 modifier = Modifier.size(20.dp)
                             )
@@ -1038,12 +1177,12 @@ fun SettingsScreen(
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {
                             Text(
-                                text = "Személyreszabás",
+                                text = stringResource(R.string.set_personal),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "Kezdőképernyő, órarend és tanulmányi beállítások",
+                                text = stringResource(R.string.set_personal_desc),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -1055,12 +1194,12 @@ fun SettingsScreen(
                     // 1. Kezdőképernyő (dropdown)
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
-                            text = "Kezdőképernyő",
+                            text = stringResource(R.string.set_start),
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "Az alkalmazás megnyitásakor megjelenő alapértelmezett oldal.",
+                            text = stringResource(R.string.set_start_desc),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -1075,11 +1214,11 @@ fun SettingsScreen(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             OutlinedTextField(
-                                value = selectedStartItem.title,
+                                value = stringResource(selectedStartItem.labelRes),
                                 onValueChange = {},
                                 readOnly = true,
                                 singleLine = true,
-                                label = { Text("Kezdőlap kiválasztása") },
+                                label = { Text(stringResource(R.string.set_start_label)) },
                                 leadingIcon = {
                                     Icon(
                                         imageVector = selectedStartItem.selectedIcon,
@@ -1107,13 +1246,13 @@ fun SettingsScreen(
                                         text = {
                                             Column {
                                                 Text(
-                                                    text = item.title,
+                                                    text = stringResource(item.labelRes),
                                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                                     color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                                                 )
                                                 if (isHidden) {
                                                     Text(
-                                                        text = "Jelenleg rejtett oldal",
+                                                        text = stringResource(R.string.set_page_hidden),
                                                         style = MaterialTheme.typography.bodySmall,
                                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                                     )
@@ -1131,7 +1270,7 @@ fun SettingsScreen(
                                             {
                                                 Icon(
                                                     imageVector = Icons.Default.Check,
-                                                    contentDescription = "Kiválasztva",
+                                                    contentDescription = stringResource(R.string.common_selected),
                                                     tint = MaterialTheme.colorScheme.primary
                                                 )
                                             }
@@ -1152,7 +1291,7 @@ fun SettingsScreen(
                     // 2. Órarend: hétvége megjelenítése
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
-                            text = "Órarend",
+                            text = stringResource(R.string.nav_timetable),
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Bold
                         )
@@ -1163,9 +1302,9 @@ fun SettingsScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
-                                Text("Hétvége megjelenítése", style = MaterialTheme.typography.bodyMedium)
+                                Text(stringResource(R.string.set_weekend), style = MaterialTheme.typography.bodyMedium)
                                 Text(
-                                    text = "Szombat és vasárnap oszlopai",
+                                    text = stringResource(R.string.set_weekend_desc),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -1182,12 +1321,12 @@ fun SettingsScreen(
                     // 3. Látható oldalak: tetszőleges fül kikapcsolása
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
-                            text = "Látható oldalak",
+                            text = stringResource(R.string.set_visible),
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "A számodra nem hasznos oldalakat elrejtheted – eltűnnek az alsó sávból. A Profil mindig látható marad.",
+                            text = stringResource(R.string.set_visible_desc),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -1201,7 +1340,7 @@ fun SettingsScreen(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
-                                        text = item.title,
+                                        text = stringResource(item.labelRes),
                                         style = MaterialTheme.typography.bodyMedium
                                     )
                                     Switch(
@@ -1232,13 +1371,13 @@ fun SettingsScreen(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "Cél kreditek (diploma)",
+                                text = stringResource(R.string.set_credits),
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Bold
                             )
                         }
                         Text(
-                            text = "A kredithaladás sávja ezt a célt mutatja a Jegyek fülön.",
+                            text = stringResource(R.string.set_credits_desc),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -1251,7 +1390,7 @@ fun SettingsScreen(
                                 enabled = personalization.targetCredits > 30
                             ) { Text("−10") }
                             Text(
-                                text = "${personalization.targetCredits} kredit",
+                                text = pluralStringResource(R.plurals.grades_credit_unit, personalization.targetCredits, personalization.targetCredits),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.primary
@@ -1281,10 +1420,10 @@ fun SettingsScreen(
                                         modifier = Modifier.size(18.dp)
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Text("Halk órák", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                                    Text(stringResource(R.string.set_quiet), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
                                 }
                                 Text(
-                                    text = "Ebben az időszakban nem küldünk üzenet-, jegy- és pénzügyi értesítést (az óra-emlékeztetők maradnak).",
+                                    text = stringResource(R.string.set_quiet_desc),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -1297,7 +1436,7 @@ fun SettingsScreen(
 
                         if (notificationPreferences.quietHoursEnabled) {
                             Text(
-                                text = "Aktív időablak",
+                                text = stringResource(R.string.set_quiet_window),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -1342,7 +1481,7 @@ fun SettingsScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Security,
-                                contentDescription = "Biztonság",
+                                contentDescription = stringResource(R.string.set_security_icon),
                                 tint = NeptunGreen,
                                 modifier = Modifier.size(20.dp)
                             )
@@ -1350,12 +1489,12 @@ fun SettingsScreen(
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {
                             Text(
-                                text = "Biztonság és Titkosítás",
+                                text = stringResource(R.string.set_security),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "Helyi és hardveres adatvédelem",
+                                text = stringResource(R.string.set_security_desc),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -1365,7 +1504,7 @@ fun SettingsScreen(
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
                     Text(
-                        text = "A Neptun bejelentkezési adatok hardveresen védett Android Keystore (AES-256) titkosítással vannak tárolva. Az órarend, jegyek és üzenetek helyi Room adatbázisban tárolódnak, így internetkapcsolat nélkül is azonnal elérhetők.",
+                        text = stringResource(R.string.set_security_text),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         lineHeight = 18.sp
@@ -1379,12 +1518,12 @@ fun SettingsScreen(
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Biometrikus zár",
+                                text = stringResource(R.string.set_biometric),
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "Az app felnyitásához ujjlenyomat vagy arcfelismerés szükséges",
+                                text = stringResource(R.string.set_biometric_desc),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -1416,7 +1555,7 @@ fun SettingsScreen(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "Utolsó sikeres szinkronizálás: $lastSyncFormatted",
+                                text = lastSyncFormatted?.let { stringResource(R.string.set_last_sync, it) } ?: stringResource(R.string.set_never_synced),
                                 style = MaterialTheme.typography.bodySmall,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.primary
@@ -1449,7 +1588,7 @@ fun SettingsScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.SystemUpdate,
-                                contentDescription = "Frissítés",
+                                contentDescription = stringResource(R.string.common_refresh_desc),
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(20.dp)
                             )
@@ -1457,12 +1596,12 @@ fun SettingsScreen(
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {
                             Text(
-                                text = "Alkalmazás és Frissítések",
+                                text = stringResource(R.string.set_app),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "Verziókezelés és GitHub Releases",
+                                text = stringResource(R.string.set_app_desc),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -1477,7 +1616,7 @@ fun SettingsScreen(
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Text(
-                            text = "Frissítési csatorna",
+                            text = stringResource(R.string.set_channel),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -1494,7 +1633,7 @@ fun SettingsScreen(
                                     )
                                 ) {
                                     Text(
-                                        text = channel.displayName,
+                                        text = stringResource(channel.labelRes),
                                         fontSize = 12.sp,
                                         fontWeight = if (updateChannel == channel) FontWeight.Bold else FontWeight.Normal
                                     )
@@ -1502,7 +1641,7 @@ fun SettingsScreen(
                             }
                         }
                         Text(
-                            text = updateChannel.description,
+                            text = stringResource(updateChannel.descriptionRes),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 11.sp
@@ -1518,7 +1657,7 @@ fun SettingsScreen(
                     ) {
                         Column {
                             Text(
-                                text = "Telepített verzió",
+                                text = stringResource(R.string.set_installed),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -1532,7 +1671,7 @@ fun SettingsScreen(
 
                         Column(horizontalAlignment = Alignment.End) {
                             Text(
-                                text = "Csomagnév",
+                                text = stringResource(R.string.set_package),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -1587,7 +1726,7 @@ fun SettingsScreen(
                         ) {
                             Icon(imageVector = Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Új verzió letöltése (${updateCheckState.latestVersionName ?: "APK"})", fontWeight = FontWeight.Bold)
+                            Text(stringResource(R.string.set_download, updateCheckState.latestVersionName ?: "APK"), fontWeight = FontWeight.Bold)
                         }
                     }
 
@@ -1606,11 +1745,11 @@ fun SettingsScreen(
                             if (updateCheckState.isChecking) {
                                 CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("Keresés...", fontSize = 12.sp)
+                                Text(stringResource(R.string.set_checking), fontSize = 12.sp)
                             } else {
                                 Icon(imageVector = Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("Frissítés keresése", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                Text(stringResource(R.string.set_check), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                             }
                         }
 
@@ -1627,7 +1766,7 @@ fun SettingsScreen(
                         ) {
                             Icon(imageVector = Icons.Default.OpenInBrowser, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("GitHub Releases", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                            Text(stringResource(R.string.set_github), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
@@ -1695,11 +1834,11 @@ fun SettingsScreen(
                                 color = MaterialTheme.colorScheme.primary
                             )
                             Spacer(modifier = Modifier.width(10.dp))
-                            Text("Szinkronizálás folyamatban...", fontWeight = FontWeight.Bold)
+                            Text(stringResource(R.string.set_syncing), fontWeight = FontWeight.Bold)
                         } else {
                             Icon(imageVector = Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(10.dp))
-                            Text("Azonnali szinkronizálás", fontWeight = FontWeight.Bold)
+                            Text(stringResource(R.string.set_sync_now), fontWeight = FontWeight.Bold)
                         }
                     }
 
@@ -1712,7 +1851,7 @@ fun SettingsScreen(
                     ) {
                         Icon(imageVector = Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(10.dp))
-                        Text("Órarend exportálása (.ics)", fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.set_export), fontWeight = FontWeight.Bold)
                     }
 
                     OutlinedButton(
@@ -1730,11 +1869,11 @@ fun SettingsScreen(
                                 color = MaterialTheme.colorScheme.primary
                             )
                             Spacer(modifier = Modifier.width(10.dp))
-                            Text("Törlés folyamatban...", fontWeight = FontWeight.Bold)
+                            Text(stringResource(R.string.set_clearing), fontWeight = FontWeight.Bold)
                         } else {
                             Icon(imageVector = Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(10.dp))
-                            Text("Helyi gyorsítótár törlése", fontWeight = FontWeight.Bold)
+                            Text(stringResource(R.string.set_clear), fontWeight = FontWeight.Bold)
                         }
                     }
 
@@ -1771,7 +1910,7 @@ fun SettingsScreen(
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(10.dp))
-                        Text("Kijelentkezés", fontWeight = FontWeight.Bold, color = Color.White, fontSize = 15.sp)
+                        Text(stringResource(R.string.set_logout), fontWeight = FontWeight.Bold, color = Color.White, fontSize = 15.sp)
                     }
                 }
             }
@@ -1783,8 +1922,8 @@ fun SettingsScreen(
     if (showLogoutDialog) {
         AlertDialog(
             onDismissRequest = { showLogoutDialog = false },
-            title = { Text("Kijelentkezés") },
-            text = { Text("Biztosan ki szeretnél jelentkezni? A helyileg tárolt hitelesítő adatok és az offline cache törlődnek.") },
+            title = { Text(stringResource(R.string.set_logout)) },
+            text = { Text(stringResource(R.string.set_logout_text)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -1792,16 +1931,24 @@ fun SettingsScreen(
                         onLogoutClick()
                     }
                 ) {
-                    Text("Kijelentkezés", color = Color(0xFF991B1B), fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.set_logout), color = Color(0xFF991B1B), fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showLogoutDialog = false }) {
-                    Text("Mégse")
+                    Text(stringResource(R.string.common_cancel))
                 }
             }
         )
     }
+}
+
+@Composable
+private fun appLocaleLabel(locale: AppLocale): String = when (locale) {
+    AppLocale.SYSTEM -> stringResource(R.string.set_applang_system)
+    AppLocale.HUNGARIAN -> stringResource(R.string.set_applang_hu)
+    AppLocale.ENGLISH -> stringResource(R.string.set_applang_en)
+    AppLocale.GERMAN -> stringResource(R.string.set_applang_de)
 }
 
 @Composable
@@ -1946,7 +2093,7 @@ private fun AccentColorTile(
                 if (isSelected) {
                     Icon(
                         imageVector = Icons.Default.Check,
-                        contentDescription = "Kiválasztva",
+                        contentDescription = stringResource(R.string.common_selected),
                         tint = Color.White,
                         modifier = Modifier.size(20.dp)
                     )
@@ -1956,7 +2103,7 @@ private fun AccentColorTile(
             Spacer(modifier = Modifier.height(4.dp))
 
             Text(
-                text = accent.title,
+                text = stringResource(accent.labelRes),
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                 color = if (isSelected) accent.primary else MaterialTheme.colorScheme.onSurface,

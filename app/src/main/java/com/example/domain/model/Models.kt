@@ -1,5 +1,7 @@
 package com.example.domain.model
 
+import androidx.annotation.StringRes
+import com.example.R
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -17,17 +19,17 @@ data class StudentCredentials(
     val universityName: String,
     val neptunUrl: String,
     val studentName: String = "",
-    val trainingProgram: String = "Mérnökinformatikus BSc",
+    val trainingProgram: String = "",
     val isLoggedIn: Boolean = false,
     val lastSyncTime: Long = 0L
 )
 
-enum class CourseType(val displayName: String) {
-    LECTURE("Előadás"),
-    PRACTICE("Gyakorlat"),
-    LAB("Labor"),
-    SEMINAR("Szeminárium"),
-    EXAM("Vizsga")
+enum class CourseType(@StringRes val labelRes: Int) {
+    LECTURE(R.string.course_lecture),
+    PRACTICE(R.string.course_practice),
+    LAB(R.string.course_lab),
+    SEMINAR(R.string.course_seminar),
+    EXAM(R.string.course_exam)
 }
 
 data class CalendarEvent(
@@ -52,20 +54,39 @@ data class CalendarEvent(
 
     val isHolidayOrBreak: Boolean
         get() {
-            val nameLower = subjectName.lowercase()
-            return nameLower.contains("szünnap") ||
-                   nameLower.contains("szünet") ||
-                   nameLower.contains("munkaszünet") ||
-                   nameLower.contains("ünnep") ||
-                   nameLower.contains("tanítás nélküli") ||
-                   nameLower.contains("oktatási szünet") ||
-                   nameLower.contains("rektori") ||
-                   nameLower.contains("dékáni") ||
+            return isBreakOrHolidayName(subjectName) ||
                    (startHour == 0 && startMinute == 0 && (endHour == 0 || endHour == 23 || endHour == 24))
         }
 
     val isActualAttendedClass: Boolean
         get() = !isHolidayOrBreak && !(startHour == 0 && startMinute == 0 && endHour == 0 && endMinute == 0)
+}
+
+/**
+ * Szünetre / tanítási szünetre utaló óracímek felismerése. A szerver a
+ * bejelentkezési LCID nyelvén küldi a neveket, ezért a minta többnyelvű
+ * (magyar / angol / német) – független az app felületi nyelvétől.
+ */
+fun isBreakOrHolidayName(subjectName: String): Boolean {
+    val nameLower = subjectName.lowercase()
+    return nameLower.contains("szünnap") ||
+        nameLower.contains("szünet") ||
+        nameLower.contains("munkaszünet") ||
+        nameLower.contains("ünnep") ||
+        nameLower.contains("tanítás nélküli") ||
+        nameLower.contains("oktatási szünet") ||
+        nameLower.contains("rektori") ||
+        nameLower.contains("dékáni") ||
+        nameLower.contains("holiday") ||
+        nameLower.contains("vacation") ||
+        nameLower.contains("no lecture") ||
+        nameLower.contains("christmas") ||
+        nameLower.contains("easter") ||
+        nameLower.contains("feiertag") ||
+        nameLower.contains("weihnacht") ||
+        nameLower.contains("ostern") ||
+        nameLower.contains("unterrichtsfrei") ||
+        nameLower.contains("vorlesungsfrei")
 }
 
 data class SubjectGrade(
@@ -109,10 +130,10 @@ data class NeptunMessage(
     val isOfficial: Boolean = false
 )
 
-enum class FinanceStatus(val displayName: String) {
-    COMPLETED("Teljesítve"),
-    PENDING("Kiírva"),
-    OVERDUE("Késedelmes")
+enum class FinanceStatus(@StringRes val labelRes: Int) {
+    COMPLETED(R.string.finance_completed),
+    PENDING(R.string.finance_pending),
+    OVERDUE(R.string.finance_overdue)
 }
 
 data class Neptun2FASession(
@@ -128,9 +149,9 @@ data class Neptun2FASession(
     val baseUrl: String = "https://neptun.elte.hu"
 )
 
-enum class TwoFactorMethod(val displayName: String) {
-    EMAIL("E-mail kód"),
-    TOTP("Hitelesítő App (TOTP)")
+enum class TwoFactorMethod(@StringRes val labelRes: Int) {
+    EMAIL(R.string.tfa_email),
+    TOTP(R.string.tfa_totp)
 }
 
 /** Vizsgaelem a Neptun vizsgalista oldaláról (kísérleti támogatás). */

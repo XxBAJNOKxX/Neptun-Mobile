@@ -1,3 +1,532 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Default (English) UI strings. Hungarian: values-hu, German: values-de.
+         Every key must exist in all three files (see StringsParityTest). -->
     <string name="app_name">Neptun Mobile</string>
+
+    <!-- Bottom navigation -->
+    <string name="nav_home">Home</string>
+    <string name="nav_timetable">Timetable</string>
+    <string name="nav_grades">Grades</string>
+    <string name="nav_messages">Messages</string>
+    <string name="nav_finances">Finances</string>
+    <string name="nav_profile">Profile</string>
+
+    <!-- Theme -->
+    <string name="theme_system">System</string>
+    <string name="theme_system_desc">Follows your phone settings</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_light_desc">Always light appearance</string>
+    <string name="theme_dark">Dark</string>
+    <string name="theme_dark_desc">Easy on the eyes in the dark</string>
+
+    <!-- Accent colors -->
+    <string name="accent_blue">Neptune Blue</string>
+    <string name="accent_indigo">Sapphire Indigo</string>
+    <string name="accent_cyan">Ocean Cyan</string>
+    <string name="accent_emerald">Emerald Green</string>
+    <string name="accent_gold">Amber Gold</string>
+    <string name="accent_purple">Royal Purple</string>
+    <string name="accent_crimson">Ruby Red</string>
+    <string name="accent_rose">Rose Coral</string>
+
+    <!-- Course types -->
+    <string name="course_lecture">Lecture</string>
+    <string name="course_practice">Practice</string>
+    <string name="course_lab">Lab</string>
+    <string name="course_seminar">Seminar</string>
+    <string name="course_exam">Exam</string>
+
+    <!-- Finance status -->
+    <string name="finance_completed">Completed</string>
+    <string name="finance_pending">Pending</string>
+    <string name="finance_overdue">Overdue</string>
+
+    <!-- 2FA methods -->
+    <string name="tfa_email">Email code</string>
+    <string name="tfa_totp">Authenticator app (TOTP)</string>
+
+    <!-- Update channels -->
+    <string name="channel_stable">Stable releases</string>
+    <string name="channel_stable_desc">Only officially tested, reliable versions</string>
+    <string name="channel_dev">Developer (Dev)</string>
+    <string name="channel_dev_desc">The latest developer builds and preview features</string>
+
+    <!-- App UI language (native names stay the same in every locale) -->
+
+    <!-- Common -->
+    <string name="common_cancel">Cancel</string>
+    <string name="common_close">Close</string>
+    <string name="common_later">Later</string>
+    <string name="common_refresh_desc">Refresh</string>
+    <string name="common_selected">Selected</string>
+    <string name="common_delete_desc">Delete</string>
+
+    <!-- Crash dialog -->
+    <string name="crash_title">The app has stopped unexpectedly</string>
+    <string name="crash_body">Log of the previous run (copy it for bug reports):</string>
+    <string name="crash_copy">Copy</string>
+    <string name="crash_time">Time</string>
+    <string name="crash_thread">Thread</string>
+
+    <!-- Session expiry -->
+    <string name="session_title">Session expired</string>
+    <string name="session_text">The Neptun server rejected the session and it could not be renewed automatically. Please log in again to get fresh data.</string>
+
+    <!-- Data mode banner -->
+    <string name="demo_banner_demo">Demo mode – the displayed data is not real</string>
+    <string name="demo_banner_mock">Sample data shown (synchronization failed)</string>
+    <string name="student_fallback">Student</string>
+    <string name="share_timetable">Share timetable</string>
+
+    <!-- Login -->
+    <string name="login_subtitle">Modern alternative Neptun client with 2FA support</string>
+    <string name="login_title">Log in</string>
+    <string name="login_university_label">Institution / University</string>
+    <string name="login_university_none">Choose a university…</string>
+    <string name="login_code_label">Neptun code (6 characters)</string>
+    <string name="login_code_desc">Neptun code</string>
+    <string name="login_password">Password</string>
+    <string name="login_password_hide">Hide password</string>
+    <string name="login_password_show">Show password</string>
+    <string name="login_demo">Load offline demo data</string>
+    <string name="login_demo_desc">Demo data</string>
+    <string name="login_keystore_note">Your credentials are stored securely encrypted on your device via Android Keystore (EncryptedSharedPreferences).</string>
+    <string name="login_pick_uni">Choose an institution</string>
+    <string name="login_search_hint">Search by name, code or city…</string>
+    <string name="login_search_desc">Search</string>
+    <string name="login_university_desc">University</string>
+    <string name="login_expand_desc">Expand</string>
+    <string name="login_logo_desc">Neptun logo</string>
+
+    <!-- 2FA dialog -->
+    <string name="tfa_title">Two-factor authentication (2FA)</string>
+    <string name="tfa_subtitle">Neptun requires two-factor authentication for account %1$s.</string>
+    <string name="tfa_email_hint">Request a login code to your university email address:</string>
+    <string name="tfa_requesting">Requesting code…</string>
+    <string name="tfa_request">Request email code</string>
+    <string name="tfa_sent">Code sent to your university account!</string>
+    <string name="tfa_prefix">Prefix generated by Neptun: %1$s</string>
+    <string name="tfa_code_label">6-digit code from the email</string>
+    <string name="tfa_new_code">Request a new code</string>
+    <string name="tfa_test">Test: 999999</string>
+    <string name="tfa_totp_hint">Enter the 6-digit code shown in your Google / Microsoft Authenticator app:</string>
+    <string name="tfa_totp_nokey">Note: according to Neptun, no TOTP key has been paired with this account yet. Use the Email code option!</string>
+    <string name="tfa_totp_label">TOTP code (e.g. 482910)</string>
+    <string name="tfa_submit">Log in</string>
+
+    <!-- Auth validation / 2FA status -->
+    <string name="auth_err_no_uni">Please choose a university!</string>
+    <string name="auth_err_code_len">The Neptun code must be 6 characters long!</string>
+    <string name="auth_err_no_pass">Please enter your password!</string>
+    <string name="auth_err_login_failed">Login failed!</string>
+    <string name="auth_err_2fa_code_empty">Please enter the 6-digit code!</string>
+    <string name="auth_err_2fa_failed">Incorrect 2FA code!</string>
+    <string name="auth_err_email_send">Failed to send the email code.</string>
+    <string name="auth_2fa_sent_prefix">Neptun has sent the 6-digit code to your university email address! Prefix: %1$s</string>
+    <string name="auth_2fa_sent">Neptun has sent the verification code to your email address!</string>
+    <string name="auth_2fa_prefix_only">Prefix: %1$s</string>
+    <string name="auth_err_code_len2">The Neptun code must consist of exactly 6 characters!</string>
+    <string name="auth_err_pass_empty">The password field cannot be empty!</string>
+    <string name="auth_err_2fa_incomplete">Failed to complete two-factor authentication!</string>
+    <string name="auth_uni_fallback">University</string>
+
+    <!-- Neptun server language -->
+    <string name="srvlang_title">Neptun server language</string>
+    <string name="srvlang_subtitle">Languages supported by the institution</string>
+    <string name="srvlang_icon_desc">Language</string>
+    <string name="srvlang_login_label">Neptun language</string>
+    <string name="srvlang_loading">Loading…</string>
+    <string name="srvlang_refresh_desc">Refresh languages</string>
+    <string name="srvlang_desc">Sets the language of texts coming from the Neptun server (statuses, grade names, error messages). Available languages may differ per institution – the list loads automatically from the server.</string>
+    <string name="srvlang_login_hint">The server language used at login and when fetching data.</string>
+    <string name="srvlang_fallback_login">The institution\'s language list is unavailable, showing the default list.</string>
+    <string name="srvlang_fallback">The institution\'s language list is currently unavailable (offline state or older server), so the default list is shown.</string>
+    <string name="srvlang_loading_row">Loading the institution\'s language list…</string>
+    <string name="srvlang_relogin">You have selected a different language than the one you are logged in with. To apply the change, log out and back in (at the bottom of the Profile page).</string>
+    <string name="srvlang_next_login">The selected language will take effect at the next login.</string>
+
+    <!-- Dashboard -->
+    <string name="dash_demo">You are seeing demo data – your real data will sync after logging in.</string>
+    <string name="dash_stat_messages">Unread\nmessages</string>
+    <string name="dash_stat_grade">Latest\ngrade</string>
+    <string name="dash_stat_pending">Payable\n(Ft)</string>
+    <string name="dash_today">Today\'s classes (%1$d)</string>
+    <string name="dash_no_more">No more classes today 🎉</string>
+    <string name="dash_no_more_plain">No more classes today</string>
+    <string name="dash_rest">Take a break, or check your finances!</string>
+    <string name="dash_ongoing">Happening now</string>
+    <string name="dash_next">Next class</string>
+    <string name="dash_finance_title">Payable: %1$s</string>
+    <string name="dash_finance_line">%1$s Ft · Due: %2$s</string>
+    <string name="dash_greet_night">Good night</string>
+    <string name="dash_greet_morning">Good morning</string>
+    <string name="dash_greet_day">Hi</string>
+    <string name="dash_greet_evening">Good evening</string>
+    <string name="dash_greeting">%1$s, %2$s!</string>
+    <string name="dash_compact_million">M</string>
+    <string name="dash_compact_thousand">K</string>
+    <string name="dash_date_pattern">EEEE, MMMM d, yyyy</string>
+
+    <!-- Timetable -->
+    <string name="tt_title">Weekly timetable</string>
+    <string name="tt_sub_week">Weekly overview</string>
+    <string name="tt_sub_day">Daily breakdown</string>
+    <string name="tt_fallback_title">Timetable</string>
+    <string name="tt_prev_desc">Previous week</string>
+    <string name="tt_next_desc">Next week</string>
+    <string name="tt_this_week">This week</string>
+    <string name="tt_full_week">Full week view</string>
+    <string name="tt_day_classes">%1$s classes (%2$s)</string>
+    <string name="tt_to_day">Daily view</string>
+    <string name="tt_to_week">Week overview</string>
+    <string name="tt_toggle_desc">Switch view</string>
+    <string name="tt_live_ongoing">Class in progress</string>
+    <string name="tt_live_next">Next class today</string>
+    <string name="tt_empty_day_week">No classes on this day this week.</string>
+    <string name="tt_empty_day">You have no classes scheduled for this day this week.</string>
+    <string name="tt_badge_live">LIVE NOW</string>
+    <string name="tt_badge_next">UP NEXT</string>
+    <string name="tt_alarm_desc_card">Notification reminder</string>
+    <string name="tt_alarm_desc_banner">Set notification</string>
+    <string name="tt_time_desc">Time slot</string>
+    <string name="tt_room_desc">Room</string>
+    <string name="tt_teacher_desc">Teacher</string>
+    <string name="tt_no_room">No room specified</string>
+
+    <!-- Grades -->
+    <string name="grades_title">Grades &amp; Average Calculator</string>
+    <string name="grades_subtitle">Credit index and ghost-grade calculator</string>
+    <string name="grades_tab_exams">Exams</string>
+    <string name="grades_enrolled">Enrolled subjects (%1$d)</string>
+    <string name="grades_clear_ghosts">Clear ghost grades</string>
+    <string name="grades_calc_title">Academic Results</string>
+    <string name="grades_calc_desc">Average calculation</string>
+    <string name="grades_formula">Formula: (Σ Grade × Credits) / Σ Completed Credits</string>
+    <string name="grades_avg">Weighted Average</string>
+    <string name="grades_ci">Credit Index</string>
+    <string name="grades_credits_done">Completed / Enrolled</string>
+    <string name="grades_ghost_title">Projected average with ghost grades</string>
+    <string name="grades_ghost_effect">Ghost grade effect</string>
+    <string name="grades_ghost_ci">Simulated credit index: %1$s</string>
+    <string name="grades_ghost_icon">Ghost grade</string>
+    <string name="grades_signed">Signed</string>
+    <string name="grades_no_grade">No grade yet</string>
+    <string name="grades_ghost_modify">Edit ghost grade (%1$d)</string>
+    <string name="grades_ghost_add">Add ghost grade</string>
+    <string name="grades_ghost_dialog_title">Set ghost grade</string>
+    <string name="grades_ghost_desc">Enter a virtual grade to instantly simulate the expected term average and credit index.</string>
+    <string name="grades_ghost_prefix">" Ghost: "</string>
+    <string name="grades_ghost_remove">Remove ghost grade</string>
+    <string name="grades_stats">Term statistics</string>
+    <string name="grades_stats_empty">Not enough data for statistics yet.</string>
+    <string name="grades_progress">Credit progress</string>
+    <string name="grades_target_hint">You can change the target in the Settings → Studies menu.</string>
+    <string name="grades_no_exams">No exam data found.</string>
+    <string name="grades_no_exams_desc">The exam list is unavailable on this university server, or you have no registered exams. (Experimental feature)</string>
+    <string name="grades_not_signed_up">Not registered</string>
+    <string name="grades_no_details">No details available</string>
+
+    <!-- Messages -->
+    <string name="msg_title">Neptun Messages</string>
+    <string name="msg_all_read">All messages read</string>
+    <string name="msg_unread_only_title">Unread messages</string>
+    <string name="msg_all_title">All messages (%1$d)</string>
+    <string name="msg_filter">Unread only</string>
+    <string name="msg_filter_desc">Filter</string>
+    <string name="msg_search_hint">Search by sender or subject…</string>
+    <string name="msg_empty_unread">You have no unread messages!</string>
+    <string name="msg_empty">No messages in your inbox.</string>
+    <string name="msg_empty_desc">Empty</string>
+    <string name="msg_system_sender">System message</string>
+    <string name="msg_badge_official">Official Notice</string>
+    <string name="msg_badge_teacher">Instructor Message</string>
+    <string name="msg_sender">Sender: %1$s</string>
+    <string name="msg_date">Date: %1$s</string>
+    <string name="msg_loading">Downloading message content from Neptun…</string>
+    <string name="msg_empty_body">The message body is empty or could not be loaded directly from Neptun.</string>
+    <string name="msg_retry">Retry loading content</string>
+    <string name="msg_no_subject">No subject</string>
+    <string name="msg_unavailable">The message content is unavailable or empty.</string>
+    <string name="repo_msg_fallback">Dear Student!\n\nWe are informing you regarding the official message titled \"%1$s\".\n\nSender: %2$s\nDate: %3$s\n\nBest regards,\n%2$s</string>
+
+    <!-- Finances -->
+    <string name="fin_title">Finances</string>
+    <string name="fin_subtitle">Items, payments and obligations</string>
+    <string name="fin_summary">Financial Balance</string>
+    <string name="fin_pending">Payable obligation</string>
+    <string name="fin_completed">Settled items</string>
+    <string name="fin_filter_all">All (%1$d)</string>
+    <string name="fin_filter_pending">Assessed / Payable</string>
+    <string name="fin_empty">No finance items with this status!</string>
+    <string name="fin_amount">%1$s Ft</string>
+    <string name="fin_meta">Term: %1$s • Receipt no.: %2$s</string>
+    <string name="fin_due">Due: %1$s</string>
+    <string name="fin_due_desc">Due date</string>
+    <string name="fin_paid">Paid: %1$s</string>
+
+    <!-- Settings: profile -->
+    <string name="set_title">Settings</string>
+    <string name="set_subtitle_default">Profile &amp; Customization</string>
+    <string name="set_student_default">University student</string>
+    <string name="set_neptun_code">Neptun code: %1$s</string>
+    <string name="set_uni_default">Higher Education Institution</string>
+    <string name="set_program_default">BSc student</string>
+    <string name="set_never_synced">Not synced yet</string>
+    <string name="set_last_sync">Last successful sync: %1$s</string>
+
+    <!-- Settings: appearance -->
+    <string name="set_appearance">Appearance &amp; Theme</string>
+    <string name="set_appearance_desc">Personalize the look of the app</string>
+    <string name="set_palette_desc">Theme</string>
+    <string name="set_theme_mode">Theme mode</string>
+    <string name="set_dynamic">Dynamic colors</string>
+    <string name="set_dynamic_desc">Use the Material You palette matched to your phone wallpaper</string>
+    <string name="set_dynamic_unavail">Only available on Android 12 or newer</string>
+    <string name="set_dynamic_hint">Dynamic color is active. If you choose a custom accent color, dynamic color turns off automatically.</string>
+    <string name="set_accent">Choose accent color</string>
+    <string name="set_accent_selected">Selected: %1$s</string>
+    <string name="set_custom_theme">Custom theme</string>
+    <string name="set_preview">Live theme preview</string>
+    <string name="set_active_theme">Active theme: %1$s</string>
+    <string name="set_dynamic_name">Material You Dynamic</string>
+    <string name="set_btn_primary">Primary</string>
+    <string name="set_btn_tonal">Tonal</string>
+    <string name="set_btn_outline">Outlined</string>
+
+    <!-- Settings: notifications -->
+    <string name="set_notif">Notifications &amp; Reminders</string>
+    <string name="set_notif_desc">Categories and background notifications</string>
+    <string name="set_notif_icon">Notifications</string>
+    <string name="set_perm_granted">Notifications enabled</string>
+    <string name="set_perm_needed">Notification permission required</string>
+    <string name="set_perm_granted_desc">The app can send timetable and study notifications.</string>
+    <string name="set_perm_needed_desc">Tap to grant the permission.</string>
+    <string name="set_perm_request">Request permission</string>
+    <string name="set_cat_classes">Timetable notifications</string>
+    <string name="set_test_class">Class test</string>
+    <string name="set_cat_grades">Grades and evaluations</string>
+    <string name="set_cat_grades_desc">Instant alert when a new grade or entry is recorded</string>
+    <string name="set_test_grade">Grade test</string>
+    <string name="set_cat_messages">Neptun messages</string>
+    <string name="set_cat_messages_desc">Notification when instructor and study system messages arrive</string>
+    <string name="set_test_message">Message test</string>
+    <string name="set_cat_finances">Finance items</string>
+    <string name="set_cat_finances_desc">Reminders about assessments, fees and payment deadlines</string>
+    <string name="set_test_finance">Finance test</string>
+
+    <!-- Settings: personalization -->
+    <string name="set_personal">Personalization</string>
+    <string name="set_personal_desc">Start screen, timetable and study settings</string>
+    <string name="set_start">Start screen</string>
+    <string name="set_start_desc">The default page shown when opening the app.</string>
+    <string name="set_start_label">Select home page</string>
+    <string name="set_page_hidden">Currently hidden page</string>
+    <string name="set_weekend">Show weekend</string>
+    <string name="set_weekend_desc">Saturday and Sunday columns</string>
+    <string name="set_visible">Visible pages</string>
+    <string name="set_visible_desc">You can hide pages you don\'t find useful – they disappear from the bottom bar. %1$s always stays visible.</string>
+    <string name="set_credits">Target credits (diploma)</string>
+    <string name="set_credits_desc">The credit progress bar shows this target on the Grades tab.</string>
+    <string name="set_quiet">Quiet hours</string>
+    <string name="set_quiet_desc">During this period we don\'t send message, grade or finance notifications (class reminders remain).</string>
+    <string name="set_quiet_window">Active time window</string>
+
+    <!-- Settings: security -->
+    <string name="set_security">Security &amp; Encryption</string>
+    <string name="set_security_desc">Local and hardware data protection</string>
+    <string name="set_security_text">Neptun login data is stored with hardware-backed Android Keystore (AES-256) encryption. Timetable, grades and messages are stored in a local Room database, so they are instantly available without an internet connection.</string>
+    <string name="set_biometric">Biometric lock</string>
+    <string name="set_biometric_desc">Fingerprint or face recognition is required to open the app</string>
+    <string name="set_security_icon">Security</string>
+
+    <!-- Settings: app & updates -->
+    <string name="set_app">App &amp; Updates</string>
+    <string name="set_app_desc">Version management and GitHub Releases</string>
+    <string name="set_channel">Update channel</string>
+    <string name="set_installed">Installed version</string>
+    <string name="set_package">Package name</string>
+    <string name="set_download">Download new version (%1$s)</string>
+    <string name="set_checking">Checking…</string>
+    <string name="set_check">Check for updates</string>
+    <string name="set_github">GitHub Releases</string>
+    <string name="set_update_available">A new version (%1$s) is available on the %2$s channel!</string>
+    <string name="set_update_current">You are using the latest version (v%1$s).</string>
+    <string name="set_update_open_github">Open the GitHub Releases page to download.</string>
+
+    <!-- Settings: account actions -->
+    <string name="set_syncing">Syncing…</string>
+    <string name="set_sync_now">Sync now</string>
+    <string name="set_export">Export timetable (.ics)</string>
+    <string name="set_clearing">Clearing…</string>
+    <string name="set_clear">Clear local cache</string>
+    <string name="set_logout">Log out</string>
+    <string name="set_logout_text">Are you sure you want to log out? Locally stored credentials and the offline cache will be deleted.</string>
+    <string name="set_sync_ok">Sync successful! All data is up to date.</string>
+    <string name="set_sync_done">Synchronization finished.</string>
+    <string name="set_cache_ok">Local cache cleared. Fresh data will be downloaded at the next sync.</string>
+    <string name="set_cache_fail">Clearing failed.</string>
+
+    <!-- Demo payloads for the test notifications -->
+    <string name="demo_class_subject">Artificial Intelligence</string>
+    <string name="demo_msg_sender">Dr. John Smith (Instructor)</string>
+    <string name="demo_msg_subject">Exam course information and consultation</string>
+    <string name="demo_msg_preview">Dear Students! Next week\'s consultation has been rescheduled…</string>
+    <string name="demo_grade_subject">Theory of Algorithms</string>
+    <string name="demo_fin_title">Dormitory fee (2026/27/1)</string>
+
+    <!-- Grade names -->
+    <string name="grade_5">Excellent (5)</string>
+    <string name="grade_4">Good (4)</string>
+    <string name="grade_3">Satisfactory (3)</string>
+    <string name="grade_2">Sufficient (2)</string>
+    <string name="grade_1">Failed (1)</string>
+
+    <!-- Notifications -->
+    <string name="notif_channel_classes">Timetable Notifications</string>
+    <string name="notif_channel_classes_desc">Notification before classes start, indicating the room</string>
+    <string name="notif_channel_messages">Neptun Messages</string>
+    <string name="notif_channel_messages_desc">Notifications about new instructor and study messages</string>
+    <string name="notif_channel_grades">Grades &amp; Evaluations</string>
+    <string name="notif_channel_grades_desc">Notifications about new grades and mid-term results</string>
+    <string name="notif_channel_finances">Finance Notifications</string>
+    <string name="notif_channel_finances_desc">Notifications about finance assessments and deadlines</string>
+    <string name="notif_class_title">Starting soon: %1$s</string>
+    <string name="notif_class_text">%1$s at %2$s | Room: %3$s</string>
+    <string name="notif_class_default">Class</string>
+    <string name="notif_message_title">New message: %1$s</string>
+    <string name="notif_grade_title">New grade: %1$s</string>
+    <string name="notif_grade_big">New evaluation arrived for %1$s!\nGrade: %2$s | Credit value: %3$d</string>
+    <string name="notif_grade_new">New entry</string>
+    <string name="notif_finance_title">Finance item: %1$s</string>
+    <string name="notif_finance_text">Amount: %1$s | Due: %2$s</string>
+    <string name="notif_finance_big">Attention! Payable finance item: %1$s\nAmount: %2$s HUF\nPayment deadline: %3$s</string>
+    <string name="sync_finance_line">• %1$s – %2$d Ft (due: %3$s)</string>
+
+    <!-- Widget -->
+    <string name="widget_today">· Today\'s classes</string>
+    <string name="widget_empty">No more classes today!</string>
+
+    <!-- Biometric lock -->
+    <string name="bio_title">Unlock Neptun Mobile</string>
+    <string name="bio_subtitle">Confirm your identity to continue</string>
+    <string name="lock_locked_desc">Locked</string>
+    <string name="lock_title">The app is locked</string>
+    <string name="lock_unavailable">Biometric authentication is not available on this device.</string>
+    <string name="lock_prompt">Confirm your identity with your fingerprint or face.</string>
+    <string name="lock_unlock">Unlock</string>
+
+    <!-- In-app update -->
+    <string name="update_title">New version available! 🎉</string>
+    <string name="update_notes">What\'s new and changed:</string>
+    <string name="update_notes_empty">A new, improved version of Neptun Mobile is available.</string>
+    <string name="update_now">Update now</string>
+    <string name="update_downloading">Downloading update… (%1$d%%)</string>
+    <string name="update_version">Version: %1$s</string>
+    <string name="update_progress">%1$.1f MB / %2$.1f MB</string>
+    <string name="update_background">To background</string>
+    <string name="update_ready">Download complete!</string>
+    <string name="update_ready_text">The update (v%1$s) downloaded successfully. Tap the button to install it.</string>
+    <string name="update_install">Open installer</string>
+    <string name="update_error_title">Update error</string>
+    <string name="update_github">GitHub download</string>
+    <string name="update_download_failed">An error occurred during the download.</string>
+    <string name="update_http_failed">Download failed: HTTP %1$d</string>
+    <string name="update_empty_body">Empty download response received</string>
+
+    <!-- ICS export -->
+    <string name="ics_teacher">Teacher:\u0020</string>
+    <string name="ics_reminder">Reminder</string>
+
+    <!-- Network / login errors -->
+    <string name="api_no_connection">Failed to connect to the Neptun server!</string>
+    <string name="api_login_page">Failed to reach the Neptun login page (%1$s)</string>
+    <string name="api_send_creds">Error sending the credentials: %1$s</string>
+    <string name="api_2fa_load">Error loading the 2FA page: %1$s</string>
+    <string name="api_bad_credentials">Login failed: incorrect Neptun code or password!</string>
+    <string name="api_bad_2fa">The security code entered is invalid or expired!</string>
+    <string name="api_verify_2fa">Error verifying the security code: %1$s</string>
+    <string name="api_no_guid">Failed to extract a GUID from the outerlogin URL: %1$s</string>
+    <string name="api_no_cookies">No saved session cookies</string>
+    <string name="api_session_expired">ASP.NET session expired – please log in again.</string>
+    <string name="api_no_form">FormToNeptun not found on the page</string>
+    <string name="api_outerlogin_fail">Failed to reach the outerlogin endpoint</string>
+    <string name="api_renew_net">Network error while renewing the session: %1$s</string>
+    <string name="api_login_failed_server">Failed to log in to the Neptun server!</string>
+    <string name="api_invalid_response">Invalid response from the server.</string>
+    <string name="api_bad_user_pass">Incorrect username or password!</string>
+    <string name="api_connect_net">Network error while connecting to Neptun: %1$s</string>
+    <string name="api_student">Student (%1$s)</string>
+    <string name="api_program">University program</string>
+    <string name="api_program_elte1">ELTE University Program</string>
+    <string name="api_program_elte2">ELTE Higher Education Program</string>
+    <string name="api_program_eng">Computer Engineering program</string>
+    <string name="api_subject_default">Subject</string>
+    <string name="api_term_current">Current term</string>
+    <string name="api_term_grades">Term grades</string>
+    <string name="api_offered">Offered (%1$s)</string>
+    <string name="api_finance_payable">Payable item</string>
+    <string name="api_finance_assessed">Assessed item</string>
+    <string name="api_finance_transaction">Transaction</string>
+    <string name="api_finance_payment">Payment</string>
+    <string name="api_term_current_short">Current</string>
+    <string name="api_term_short">Term</string>
+
+    <!-- Plurals -->
+    <plurals name="tt_reminder_scheduled">
+        <item quantity="one">Notification set for %d minute before the class!</item>
+        <item quantity="other">Notification set for %d minutes before the class!</item>
+    </plurals>
+    <plurals name="grades_ghost_active">
+        <item quantity="one">%d ghost grade active</item>
+        <item quantity="other">%d ghost grades active</item>
+    </plurals>
+    <plurals name="grades_credit_unit">
+        <item quantity="one">%d credit</item>
+        <item quantity="other">%d credits</item>
+    </plurals>
+    <plurals name="grades_progress_label">
+        <item quantity="one">%1$d / %2$d credit</item>
+        <item quantity="other">%1$d / %2$d credits</item>
+    </plurals>
+    <plurals name="msg_unread">
+        <item quantity="one">%d unread message</item>
+        <item quantity="other">%d unread messages</item>
+    </plurals>
+    <plurals name="set_cat_classes_desc">
+        <item quantity="one">Reminder %d minute before classes with the exact room number</item>
+        <item quantity="other">Reminder %d minutes before classes with the exact room number</item>
+    </plurals>
+    <plurals name="notif_class_big">
+        <item quantity="one">Your class (%1$s - %2$s) starts in %3$d minute (%4$s) in room %5$s.</item>
+        <item quantity="other">Your class (%1$s - %2$s) starts in %3$d minutes (%4$s) in room %5$s.</item>
+    </plurals>
+    <plurals name="notif_grade_text">
+        <item quantity="one">Result: %1$s (%2$d credit)</item>
+        <item quantity="other">Result: %1$s (%2$d credits)</item>
+    </plurals>
+    <plurals name="sync_new_messages">
+        <item quantity="one">%d new message</item>
+        <item quantity="other">%d new messages</item>
+    </plurals>
+    <plurals name="sync_new_grades">
+        <item quantity="one">%d new grade</item>
+        <item quantity="other">%d new grades</item>
+    </plurals>
+    <plurals name="sync_new_finances">
+        <item quantity="one">%d payable item</item>
+        <item quantity="other">%d payable items</item>
+    </plurals>
+    <plurals name="widget_more">
+        <item quantity="one">…and %d more class</item>
+        <item quantity="other">…and %d more classes</item>
+    </plurals>
+    <string name="set_applang">App language</string>
+    <string name="set_applang_desc">Interface language (independent of the Neptun server language).</string>
+    <string name="set_applang_system">System default</string>
+    <string name="set_applang_hu">Magyar</string>
+    <string name="set_applang_en">English</string>
+    <string name="set_applang_de">Deutsch</string>
+    <string name="set_applang_note">The change applies immediately.</string>
+    <string name="auth_custom_city">Hungary</string>
 </resources>
