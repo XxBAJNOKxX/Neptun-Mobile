@@ -43,6 +43,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Notifications
@@ -72,6 +73,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SegmentedButton
@@ -112,7 +114,10 @@ import com.example.core.security.NotificationPreferences
 import com.example.core.security.UpdateChannel
 import com.example.domain.model.StudentCredentials
 import com.example.presentation.navigation.NavigationItem
+import com.example.presentation.ui.components.LanguageLoadingRow
+import com.example.presentation.ui.components.LanguageRadioList
 import com.example.presentation.ui.components.NeptunTopBar
+import com.example.presentation.viewmodel.ServerLanguageUiState
 import com.example.presentation.viewmodel.UpdateCheckState
 import com.example.ui.theme.AppAccentColor
 import com.example.ui.theme.NeptunCyan40
@@ -155,6 +160,10 @@ fun SettingsScreen(
     onTargetCreditsChange: (Int) -> Unit = {},
     onBiometricLockChange: (Boolean) -> Unit = {},
     onUpdateChannelChange: (UpdateChannel) -> Unit = {},
+    serverLanguage: ServerLanguageUiState = ServerLanguageUiState(),
+    loginLcid: Int = 0,
+    onSelectServerLanguage: (Int) -> Unit = {},
+    onRefreshServerLanguages: () -> Unit = {},
     onExportIcs: () -> Unit = {},
     onClearCache: () -> Unit = {},
     onSimulateClassNotification: () -> Unit,
@@ -301,6 +310,137 @@ fun SettingsScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 11.sp
                         )
+                    }
+                }
+            }
+
+            // ==========================================
+            // NEPTUN SZERVERNYELV (LCID)
+            // ==========================================
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("server_language_card")
+            ) {
+                Column(
+                    modifier = Modifier.padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(MaterialTheme.colorScheme.primaryContainer),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Language,
+                                contentDescription = "Nyelv",
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Neptun szerver nyelve",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Az intézmény által támogatott nyelvek",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        if (serverLanguage.isLoading) {
+                            CircularProgressIndicator(
+                                strokeWidth = 2.dp,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        } else {
+                            IconButton(onClick = onRefreshServerLanguages) {
+                                Icon(
+                                    imageVector = Icons.Default.Refresh,
+                                    contentDescription = "Nyelvek frissítése",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+                    Text(
+                        text = "A Neptun szerver felől érkező szövegek (státuszok, jegy-megnevezések, hibaüzenetek) nyelvét állítja be. Intézményenként eltérhet, hogy mely nyelvek érhetők el – a lista automatikusan a szerverről töltődik be.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        lineHeight = 17.sp
+                    )
+
+                    if (serverLanguage.isLoading && serverLanguage.isFallback) {
+                        LanguageLoadingRow()
+                    }
+
+                    LanguageRadioList(
+                        state = serverLanguage,
+                        onSelect = onSelectServerLanguage
+                    )
+
+                    if (serverLanguage.isFallback) {
+                        Text(
+                            text = "Az intézmény nyelvi listája most nem érhető el (offline állapot vagy régebbi szerver), ezért az alapértelmezett lista látszik.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 11.5.sp
+                        )
+                    }
+
+                    val needsRelogin = (credentials?.isLoggedIn == true) &&
+                        loginLcid > 0 && loginLcid != serverLanguage.selectedLcid
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (needsRelogin) {
+                            MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.6f)
+                        } else {
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = null,
+                                tint = if (needsRelogin) {
+                                    MaterialTheme.colorScheme.onTertiaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = if (needsRelogin) {
+                                    "Másik nyelvet választottál, mint amivel be vagy jelentkezve. A váltás életbe léptetéséhez jelentkezz ki, majd be újra (a Profil oldal alján)."
+                                } else {
+                                    "A kiválasztott nyelv a következő bejelentkezéskor lép életbe."
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (needsRelogin) {
+                                    MaterialTheme.colorScheme.onTertiaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                                fontSize = 11.5.sp
+                            )
+                        }
                     }
                 }
             }

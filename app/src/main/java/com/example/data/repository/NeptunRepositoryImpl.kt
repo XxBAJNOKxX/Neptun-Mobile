@@ -168,7 +168,7 @@ class NeptunRepositoryImpl(
         if (isElte && deviceCookie.isNotBlank()) {
             try {
                 val aspBaseUrl = normalizeAspBaseUrl(loginUrl.ifEmpty { creds.neptunUrl })
-                val renewResult = neptunApiClient.renewSessionWithCookies(aspBaseUrl, deviceCookie, creds.neptunCode)
+                val renewResult = neptunApiClient.renewSessionWithCookies(aspBaseUrl, deviceCookie, creds.neptunCode, prefsManager.getServerLanguageLcid())
                 when (renewResult) {
                     is NeptunAuthResult.Success -> {
                         prefsManager.setAccessToken(renewResult.accessToken)
@@ -195,7 +195,15 @@ class NeptunRepositoryImpl(
         val password = prefsManager.getPassword()
         if (creds.neptunCode.isNotEmpty() && password.isNotEmpty() && password != "******") {
             try {
-                val authRes = neptunApiClient.authenticate(loginUrl, creds.neptunCode, password, deviceCookie)
+                // Megjegyzés: a deviceCookie-t névvel ellátott argumentumként adjuk át,
+                // különben a twoFactorCode paraméterbe kerülne (korábbi pozíciós hiba).
+                val authRes = neptunApiClient.authenticate(
+                    rawUrl = loginUrl,
+                    neptunCode = creds.neptunCode,
+                    password = password,
+                    savedDeviceCookie = deviceCookie,
+                    lcid = prefsManager.getServerLanguageLcid()
+                )
                 when {
                     authRes is NeptunAuthResult.Success && authRes.accessToken.isNotBlank() -> {
                         prefsManager.setAccessToken(authRes.accessToken)

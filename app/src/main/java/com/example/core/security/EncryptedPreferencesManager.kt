@@ -6,6 +6,8 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import com.example.domain.model.NeptunLanguage
+import com.example.domain.model.NeptunLanguages
 import com.example.domain.model.StudentCredentials
 import com.example.ui.theme.AppAccentColor
 import com.example.ui.theme.ThemeMode
@@ -13,6 +15,8 @@ import com.example.ui.theme.ThemeSettings
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import org.json.JSONArray
+import org.json.JSONObject
 
 /**
  * Adataink forrása (UI visszajelzéshez): valódi szerveradat, demo bejelentkezés vagy mock adat.
@@ -88,6 +92,9 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
 
     private val _sessionExpiredFlow = MutableStateFlow(prefs.getBoolean(KEY_SESSION_EXPIRED, false))
     val sessionExpiredFlow: StateFlow<Boolean> = _sessionExpiredFlow.asStateFlow()
+
+    private val _serverLanguageFlow = MutableStateFlow(getServerLanguageLcid())
+    val serverLanguageFlow: StateFlow<Int> = _serverLanguageFlow.asStateFlow()
 
     fun updateLastSyncTime(timestamp: Long = System.currentTimeMillis()) {
         prefs.edit().putLong(KEY_LAST_SYNC, timestamp).apply()
@@ -186,6 +193,116 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
     fun setBiometricLockEnabled(enabled: Boolean) {
         prefs.edit().putBoolean(KEY_BIOMETRIC_LOCK, enabled).apply()
         _personalizationFlow.value = loadPersonalization()
+    }
+
+    // ------------------------------------------------------------------ //
+    // Neptun szervernyelv (LCID) és támogatott nyelvek gyorsítótára
+    // ------------------------------------------------------------------ //
+
+    /**
+     * A kiválasztott szervernyelv LCID-je (pl. 1038 = magyar). A bejelentkezéskor
+     * küldött `LCID` mező és az `Accept-Language` fejlécek ebből származnak.
+     */
+    fun getServerLanguageLcid(): Int {
+        val stored = prefs.getInt(KEY_SERVER_LANGUAGE_LCID, NeptunLanguages.DEFAULT_LCID)
+        return if (stored > 0) stored else NeptunLanguages.DEFAULT_LCID
+    }
+
+    fun setServerLanguageLcid(lcid: Int) {
+        if (lcid <= 0) return
+        prefs.edit().putInt(KEY_SERVER_LANGUAGE_LCID, lcid).apply()
+        _serverLanguageFlow.value = lcid
+    }
+
+    /**
+     * A bejelentkezéskor ténylegesen használt LCID. Ha eltér a kiválasztottól,
+     * a nyelvváltoztatáshoz újra be kell jelentkezni. 0 = ismeretlen (pl. régi
+     * verzióval történt belépés).
+     */
+    fun getLoginLcid(): Int = prefs.getInt(KEY_LOGIN_LCID, 0)
+
+    fun setLoginLcid(lcid: Int) {
+        prefs.edit().putInt(KEY_LOGIN_LCID, lcid).apply()
+    }
+
+    /**
+     * Az `EnvironmentData` végpontról érkezett nyelvi lista gyorsítótárazása
+     * intézményenként (normalizált base URL kulccsal).
+     */
+    fun cacheSupportedLanguages(baseUrl: String, languages: List<NeptunLanguage>) {
+        if (baseUrl.isBlank() || languages.isEmpty()) return
+        try {
+            val root = try {
+                JSONObject(prefs.getString(KEY_SUPPORTED_LANGUAGES_CACHE, "{}") ?: "{}")
+            } catch (_: Exception) {
+                JSONObject()
+            }
+            val entry = JSONObject()
+            entry.put("fetchedAt", System.currentTimeMillis())
+            val array = JSONArray()
+            for (lang in languages) {
+                val obj = JSONObject()
+                obj.put("code", lang.code)
+                obj.put("name", lang.name)
+                obj.put("lcid", lang.lcid)
+                obj.put("selected", lang.selected)
+                array.put(obj)
+            }
+            entry.put("languages", array)
+            root.put(cacheKeyForBaseUrl(baseUrl), entry)
+            // Biztonsági korlát: legfeljebb 10 intézmény listáját őrizzük meg.
+            val keys = root.keys().asSequence().toList()
+            if (keys.size > 10) {
+                var oldestKey: String? = null
+                var oldestTime = Long.MAX_VALUE
+                for (key in keys) {
+                    val fetchedAt = try {
+                        root.getJSONObject(key).optLong("fetchedAt", 0L)
+                    } catch (_: Exception) {
+                        0L
+                    }
+                    if (fetchedAt < oldestTime) {
+                        oldestTime = fetchedAt
+                        oldestKey = key
+                    }
+                }
+                if (oldestKey != null) root.remove(oldestKey)
+            }
+            prefs.edit().putString(KEY_SUPPORTED_LANGUAGES_CACHE, root.toString()).apply()
+        } catch (_: Exception) {
+            // A gyorsítótár hibája nem törheti meg a bejelentkezést.
+        }
+    }
+
+    /** A gyorsítótárazott nyelvi lista, vagy `null`, ha még nincs ilyen. */
+    fun getCachedSupportedLanguages(baseUrl: String): List<NeptunLanguage>? {
+        if (baseUrl.isBlank()) return null
+        return try {
+            val root = JSONObject(prefs.getString(KEY_SUPPORTED_LANGUAGES_CACHE, "{}") ?: "{}")
+            val entry = root.optJSONObject(cacheKeyForBaseUrl(baseUrl)) ?: return null
+            val array = entry.optJSONArray("languages") ?: return null
+            val result = mutableListOf<NeptunLanguage>()
+            for (i in 0 until array.length()) {
+                val obj = array.optJSONObject(i) ?: continue
+                val lcid = obj.optInt("lcid", 0)
+                if (lcid <= 0) continue
+                result.add(
+                    NeptunLanguage(
+                        code = obj.optString("code", ""),
+                        name = obj.optString("name", ""),
+                        lcid = lcid,
+                        selected = obj.optBoolean("selected", false)
+                    )
+                )
+            }
+            result.ifEmpty { null }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun cacheKeyForBaseUrl(baseUrl: String): String {
+        return baseUrl.trim().trimEnd('/').lowercase()
     }
 
     // ------------------------------------------------------------------ //
@@ -496,9 +613,12 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
         val reminderMins = prefs.getInt(KEY_CLASS_REMINDER_MINUTES, 15)
         val savedPersonalization = loadPersonalization()
         val savedNotifQuiet = loadNotificationPreferences()
+        val savedServerLanguage = getServerLanguageLcid()
+        val savedLanguageCache = prefs.getString(KEY_SUPPORTED_LANGUAGES_CACHE, null)
 
         prefs.edit()
             .clear()
+            .putInt(KEY_SERVER_LANGUAGE_LCID, savedServerLanguage)
             .putString(KEY_SELECTED_UNIVERSITY_ID, savedUniId)
             .putString(KEY_SELECTED_UNIVERSITY_NAME, savedUniName)
             .putString(KEY_SELECTED_UNIVERSITY_URL, savedUniUrl)
@@ -523,6 +643,12 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
             .putInt(KEY_QUIET_END_MINUTE, savedNotifQuiet.quietEndMinute)
             .putBoolean(KEY_IS_LOGGED_IN, false)
             .apply()
+
+        // A nyelvi gyorsítótár kijelentkezéskor is megmarad (intézményfüggő,
+        // nem személyes adat), hogy a login-képernyő offline is listázni tudjon.
+        if (!savedLanguageCache.isNullOrEmpty()) {
+            prefs.edit().putString(KEY_SUPPORTED_LANGUAGES_CACHE, savedLanguageCache).apply()
+        }
 
         _credentialsFlow.value = null
         _sessionExpiredFlow.value = false
@@ -568,6 +694,9 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
         private const val KEY_HIDDEN_PAGES = "key_hidden_pages"
         private const val KEY_DATA_MODE = "key_data_mode"
         private const val KEY_SESSION_EXPIRED = "key_session_expired"
+        private const val KEY_SERVER_LANGUAGE_LCID = "key_server_language_lcid"
+        private const val KEY_LOGIN_LCID = "key_login_lcid"
+        private const val KEY_SUPPORTED_LANGUAGES_CACHE = "key_supported_languages_cache"
         private const val KEY_NOTIFIED_PREFIX = "key_notified_"
         private const val KEY_NOTIFIED_BASELINE_PREFIX = "key_notified_baseline_"
     }

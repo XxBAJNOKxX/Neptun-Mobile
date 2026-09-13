@@ -8,6 +8,7 @@ import com.example.domain.model.StudentCredentials
 import com.example.domain.model.TwoFactorMethod
 import com.example.domain.model.University
 import com.example.domain.repository.AuthRepository
+import com.example.domain.repository.LanguageRepository
 import com.example.domain.repository.NeptunRepository
 import com.example.domain.repository.TwoFactorRequiredException
 import com.example.domain.repository.TwoFactorSessionRequiredException
@@ -38,12 +39,15 @@ data class AuthUiState(
     val twoFactorCode: String = "",
     val twoFactorSuccessMessage: String? = null,
     val twoFactorErrorMessage: String? = null,
-    val isTwoFactorLoading: Boolean = false
+    val isTwoFactorLoading: Boolean = false,
+    // Neptun szervernyelv-választó
+    val serverLanguage: ServerLanguageUiState = ServerLanguageUiState()
 )
 
 class AuthViewModel(
     private val authRepository: AuthRepository,
-    private val neptunRepository: NeptunRepository
+    private val neptunRepository: NeptunRepository,
+    private val languageRepository: LanguageRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AuthUiState())
@@ -79,6 +83,7 @@ class AuthViewModel(
                     isOfflineModeAvailable = offlineAvailable
                 )
             }
+            loadServerLanguages(matchedUni)
         }
 
         viewModelScope.launch {
@@ -125,6 +130,57 @@ class AuthViewModel(
                 isUniversityDropdownOpen = false,
                 errorMessage = null
             )
+        }
+        loadServerLanguages(university)
+    }
+
+    /**
+     * Az intézmény támogatott nyelveinek betöltése: először a gyorsítótárból
+     * (azonnal), majd háttérben a szerverről frissítve. A bejelentkezés sosem
+     * blokkolódik emiatt – hiba esetén a beépített hu/en/de lista látszik.
+     */
+    fun loadServerLanguages(university: University?) {
+        if (university == null) return
+        val cached = languageRepository.getCachedLanguages(university.neptunUrl)
+        _uiState.update {
+            it.copy(
+                serverLanguage = ServerLanguageUiState(
+                    languages = cached.languages,
+                    selectedLcid = languageRepository.getSelectedLcid(),
+                    isLoading = true,
+                    isFallback = cached.isFallback
+                )
+            )
+        }
+        viewModelScope.launch {
+            val fresh = languageRepository.refreshLanguages(university.neptunUrl)
+            _uiState.update {
+                it.copy(
+                    serverLanguage = ServerLanguageUiState(
+                        languages = fresh.languages,
+                        selectedLcid = languageRepository.getSelectedLcid(),
+                        isLoading = false,
+                        isFallback = fresh.isFallback
+                    )
+                )
+            }
+        }
+    }
+
+    fun refreshServerLanguages() {
+        loadServerLanguages(_uiState.value.selectedUniversity)
+    }
+
+    fun selectServerLanguage(lcid: Int) {
+        viewModelScope.launch {
+            languageRepository.setSelectedLcid(lcid)
+            _uiState.update {
+                it.copy(
+                    serverLanguage = it.serverLanguage.copy(
+                        selectedLcid = languageRepository.getSelectedLcid()
+                    )
+                )
+            }
         }
     }
 
@@ -374,11 +430,12 @@ class AuthViewModel(
     companion object {
         fun provideFactory(
             authRepository: AuthRepository,
-            neptunRepository: NeptunRepository
+            neptunRepository: NeptunRepository,
+            languageRepository: LanguageRepository
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                return AuthViewModel(authRepository, neptunRepository) as T
+                return AuthViewModel(authRepository, neptunRepository, languageRepository) as T
             }
         }
     }

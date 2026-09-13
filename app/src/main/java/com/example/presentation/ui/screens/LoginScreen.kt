@@ -80,7 +80,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.domain.model.TwoFactorMethod
 import com.example.domain.model.University
+import com.example.presentation.ui.components.LanguageDropdownField
 import com.example.presentation.viewmodel.AuthUiState
+import com.example.presentation.viewmodel.ServerLanguageUiState
 import com.example.ui.theme.NeptunBlue40
 import com.example.ui.theme.NeptunCyan40
 
@@ -98,6 +100,9 @@ fun LoginScreen(
     onRequestEmailCode: () -> Unit = {},
     onSubmitTwoFactor: () -> Unit = {},
     onCancelTwoFactor: () -> Unit = {},
+    serverLanguage: ServerLanguageUiState = ServerLanguageUiState(),
+    onSelectServerLanguage: (Int) -> Unit = {},
+    onRefreshServerLanguages: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var showUniversityDialog by remember { mutableStateOf(false) }
@@ -233,6 +238,15 @@ fun LoginScreen(
                             )
                         }
                     }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Neptun szervernyelv-választó (az intézmény támogatott nyelvei)
+                    LanguageDropdownField(
+                        state = serverLanguage,
+                        onSelect = onSelectServerLanguage,
+                        onRefresh = onRefreshServerLanguages
+                    )
 
                     Spacer(modifier = Modifier.height(14.dp))
 
