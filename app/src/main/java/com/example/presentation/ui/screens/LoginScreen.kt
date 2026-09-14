@@ -98,9 +98,11 @@ fun LoginScreen(
     onRequestEmailCode: () -> Unit = {},
     onSubmitTwoFactor: () -> Unit = {},
     onCancelTwoFactor: () -> Unit = {},
+    onSelectLanguage: (com.example.domain.model.NeptunLanguage) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var showUniversityDialog by remember { mutableStateOf(false) }
+    var showLanguageDialog by remember { mutableStateOf(false) }
     var passwordVisible by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
 
@@ -113,10 +115,50 @@ fun LoginScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp, vertical = 32.dp),
+                .padding(horizontal = 24.dp, vertical = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(modifier = Modifier.height(16.dp))
+            // Top Bar with Language Switcher
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp),
+                horizontalArrangement = Arrangement.End
+            ) {
+                Surface(
+                    onClick = { showLanguageDialog = true },
+                    shape = RoundedCornerShape(20.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                    modifier = Modifier.testTag("login_language_selector")
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = uiState.currentLanguage.flagEmoji,
+                            fontSize = 16.sp
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = uiState.currentLanguage.code.uppercase(),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            imageVector = Icons.Default.ArrowDropDown,
+                            contentDescription = "Nyelvválasztó",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
 
             // Branding Crest & Header
             Box(
@@ -471,6 +513,98 @@ fun LoginScreen(
                             }
                             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                         }
+                    }
+                }
+            }
+        }
+    }
+
+    // Language Selection Dialog
+    if (showLanguageDialog) {
+        Dialog(onDismissRequest = { showLanguageDialog = false }) {
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 6.dp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 480.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(20.dp)
+                ) {
+                    Text(
+                        text = "Nyelv kiválasztása",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "Válassz nyelvet a felülethez és a Neptunhoz",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 4.dp, bottom = 12.dp)
+                    )
+
+                    HorizontalDivider()
+
+                    LazyColumn(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                        items(uiState.supportedLanguages) { lang ->
+                            val isSelected = lang.lcid == uiState.currentLanguage.lcid || lang.code.equals(uiState.currentLanguage.code, ignoreCase = true)
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .clickable {
+                                        onSelectLanguage(lang)
+                                        showLanguageDialog = false
+                                    }
+                                    .background(
+                                        if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                                        else Color.Transparent
+                                    )
+                                    .padding(vertical = 12.dp, horizontal = 12.dp)
+                            ) {
+                                Text(
+                                    text = lang.flagEmoji,
+                                    fontSize = 24.sp
+                                )
+                                Spacer(modifier = Modifier.width(14.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = lang.displayLabel,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = "${lang.name} • LCID: ${lang.lcid}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        fontSize = 11.sp
+                                    )
+                                }
+                                if (isSelected) {
+                                    Icon(
+                                        imageVector = Icons.Default.CheckCircle,
+                                        contentDescription = "Kiválasztva",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedButton(
+                        onClick = { showLanguageDialog = false },
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Bezárás")
                     }
                 }
             }

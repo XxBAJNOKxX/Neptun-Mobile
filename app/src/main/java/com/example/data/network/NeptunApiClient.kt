@@ -166,6 +166,115 @@ class NeptunApiClient {
         return safeParseJson(raw) as? JsonObject
     }
 
+    /**
+     * Lekéri az adott intézmény Neptun szervere által támogatott nyelveket (EnvironmentData végpont).
+     * Ha a szerver nem érhető el vagy nem modern API, az alapértelmezett (HU, EN, DE) listát adja vissza.
+     */
+    suspend fun getSupportedLanguages(rawUrl: String): List<com.example.domain.model.NeptunLanguage> = withContext(Dispatchers.IO) {
+        if (rawUrl.isBlank()) return@withContext com.example.domain.model.NeptunLanguage.DEFAULT_LANGUAGES
+
+        val cleanBase = normalizeBaseUrl(rawUrl)
+        val endpoints = listOf(
+            "$cleanBase/api/General/EnvironmentData",
+            "$cleanBase/General/EnvironmentData",
+            "$cleanBase/api/EnvironmentData"
+        )
+
+        for (endpoint in endpoints) {
+            try {
+                val req = Request.Builder()
+                    .url(endpoint)
+                    .get()
+                    .header("Accept", "application/json, text/plain, */*")
+                    .header("User-Agent", DEFAULT_USER_AGENT)
+                    .build()
+
+                okHttpClient.newCall(req).execute().use { response ->
+                    if (response.isSuccessful) {
+                        val body = response.body?.string() ?: ""
+                        val rootObj = safeParseJsonObject(body)
+                        val dataObj = rootObj?.get("data")?.jsonObject
+                        val langsArray = dataObj?.get("supportedLanguages")?.jsonArray
+
+                        if (langsArray != null && langsArray.isNotEmpty()) {
+                            val parsedLangs = mutableListOf<com.example.domain.model.NeptunLanguage>()
+                            for (item in langsArray) {
+                                val obj = item.jsonObject
+                                val code = obj["code"]?.jsonPrimitive?.contentOrNull ?: ""
+                                val name = obj["name"]?.jsonPrimitive?.contentOrNull ?: ""
+                                val lcid = obj["lcid"]?.jsonPrimitive?.intOrNull ?: 1038
+                                val selected = obj["selected"]?.jsonPrimitive?.booleanOrNull ?: false
+
+                                if (code.isNotEmpty()) {
+                                    parsedLangs.add(
+                                        com.example.domain.model.NeptunLanguage(
+                                            code = code,
+                                            name = name.ifEmpty { code.uppercase() },
+                                            lcid = lcid,
+                                            isSelected = selected
+                                        )
+                                    )
+                                }
+                            }
+                            if (parsedLangs.isNotEmpty()) {
+                                Log.d(tag, "Fetched ${parsedLangs.size} supported languages from $endpoint: ${parsedLangs.map { it.code }}")
+                                return@withContext parsedLangs
+                            }
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.d(tag, "EnvironmentData query failed on $endpoint: ${e.message}")
+            }
+        }
+        com.example.domain.model.NeptunLanguage.DEFAULT_LANGUAGES
+    }
+
+    /**
+     * Beállítja az aktív nyelvet a Neptun szerveren (SetLanguage végpont).
+     */
+    suspend fun setLanguage(
+        rawUrl: String,
+        sessionToken: String?,
+        lcid: Int
+    ): Boolean = withContext(Dispatchers.IO) {
+        if (rawUrl.isBlank()) return@withContext false
+
+        val cleanBase = normalizeBaseUrl(rawUrl)
+        val endpoints = listOf(
+            "$cleanBase/api/General/SetLanguage",
+            "$cleanBase/General/SetLanguage",
+            "$cleanBase/api/SetLanguage",
+            "$cleanBase/SetLanguage"
+        )
+
+        val jsonBody = """{"lcid":$lcid}""".toRequestBody("application/json; charset=utf-8".toMediaType())
+
+        for (endpoint in endpoints) {
+            try {
+                val reqBuilder = Request.Builder()
+                    .url(endpoint)
+                    .post(jsonBody)
+                    .header("Accept", "application/json, text/plain, */*")
+                    .header("User-Agent", DEFAULT_USER_AGENT)
+
+                if (!sessionToken.isNullOrBlank()) {
+                    reqBuilder.header("Authorization", "Bearer $sessionToken")
+                }
+
+                okHttpClient.newCall(reqBuilder.build()).execute().use { response ->
+                    if (response.isSuccessful || response.code in 200..299) {
+                        Log.d(tag, "Successfully updated language on Neptun server (lcid: $lcid) via $endpoint")
+                        return@withContext true
+                    }
+                }
+            } catch (e: Exception) {
+                Log.d(tag, "SetLanguage failed on $endpoint: ${e.message}")
+            }
+        }
+        false
+    }
+
     suspend fun authenticate(
         rawUrl: String,
         neptunCode: String,

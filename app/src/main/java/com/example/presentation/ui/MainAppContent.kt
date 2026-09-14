@@ -166,7 +166,8 @@ fun MainAppContent() {
             onTwoFactorMethodChange = authViewModel::onTwoFactorMethodChange,
             onRequestEmailCode = authViewModel::requestEmailCode,
             onSubmitTwoFactor = authViewModel::submitTwoFactor,
-            onCancelTwoFactor = authViewModel::cancelTwoFactor
+            onCancelTwoFactor = authViewModel::cancelTwoFactor,
+            onSelectLanguage = authViewModel::selectLanguage
         )
     } else {
         // Biometrikus zár (ha be van kapcsolva)
@@ -430,6 +431,11 @@ private fun MainDashboard(
                             updateChannel = settingsState.updateChannel,
                             isClearingCache = settingsState.isClearingCache,
                             cacheClearedMessage = settingsState.cacheClearedMessage,
+                            currentLanguage = settingsState.currentLanguage,
+                            supportedLanguages = settingsState.supportedLanguages,
+                            isChangingLanguage = settingsState.isChangingLanguage,
+                            languageMessage = settingsState.languageMessage,
+                            onLanguageSelect = settingsViewModel::selectLanguage,
                             onThemeModeChange = settingsViewModel::setThemeMode,
                             onDynamicColorToggle = settingsViewModel::setDynamicColor,
                             onAccentColorSelect = settingsViewModel::setAccentColor,

@@ -3,9 +3,12 @@ package com.example
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.core.i18n.AppStringsProvider
+import com.example.core.i18n.LocalAppStrings
 import com.example.presentation.ui.MainAppContent
 import com.example.ui.theme.MyApplicationTheme
 
@@ -19,12 +22,17 @@ class MainActivity : FragmentActivity() {
 
         setContent {
             val themeSettings by prefsManager.themeSettingsFlow.collectAsStateWithLifecycle()
-            MyApplicationTheme(
-                themeMode = themeSettings.themeMode,
-                dynamicColor = themeSettings.useDynamicColor,
-                accentColor = themeSettings.accentColor
-            ) {
-                MainAppContent()
+            val currentLanguage by prefsManager.languageFlow.collectAsStateWithLifecycle()
+            val appStrings = AppStringsProvider.getForCode(currentLanguage.code)
+
+            CompositionLocalProvider(LocalAppStrings provides appStrings) {
+                MyApplicationTheme(
+                    themeMode = themeSettings.themeMode,
+                    dynamicColor = themeSettings.useDynamicColor,
+                    accentColor = themeSettings.accentColor
+                ) {
+                    MainAppContent()
+                }
             }
         }
     }

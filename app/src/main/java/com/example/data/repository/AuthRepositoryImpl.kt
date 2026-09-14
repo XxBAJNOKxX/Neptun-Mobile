@@ -255,4 +255,45 @@ class AuthRepositoryImpl(
     override fun saveNeptunCode(code: String) {
         prefsManager.saveLastNeptunCode(code)
     }
+
+    override suspend fun getSupportedLanguages(universityUrl: String?): List<com.example.domain.model.NeptunLanguage> = withContext(Dispatchers.IO) {
+        val targetUrl = universityUrl?.ifBlank { null }
+            ?: prefsManager.getSelectedUniversityUrl().ifBlank { null }
+            ?: prefsManager.getBaseUrl().ifBlank { null }
+            ?: "https://neptun2.ppke.hu/hallgato_uj"
+
+        val serverLangs = neptunApiClient.getSupportedLanguages(targetUrl)
+        if (serverLangs.isNotEmpty()) {
+            prefsManager.saveCachedSupportedLanguages(serverLangs)
+            serverLangs
+        } else {
+            prefsManager.loadCachedSupportedLanguages()
+        }
+    }
+
+    override suspend fun setLanguage(language: com.example.domain.model.NeptunLanguage): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            prefsManager.setLanguage(language)
+
+            val sessionToken = prefsManager.getAccessToken() ?: prefsManager.getSessionToken()
+            val baseUrl = prefsManager.getBaseUrl().ifBlank { prefsManager.getSelectedUniversityUrl() }
+
+            if (baseUrl.isNotBlank()) {
+                neptunApiClient.setLanguage(baseUrl, sessionToken, language.lcid)
+            }
+            Result.success(Unit)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            // Még ha a hálózati hívás sikertelen is, a helyi beállítás frissült
+            Result.success(Unit)
+        }
+    }
+
+    override fun getSelectedLanguage(): Flow<com.example.domain.model.NeptunLanguage> {
+        return prefsManager.languageFlow
+    }
+
+    override fun getCachedSupportedLanguages(): Flow<List<com.example.domain.model.NeptunLanguage>> {
+        return prefsManager.supportedLanguagesFlow
+    }
 }

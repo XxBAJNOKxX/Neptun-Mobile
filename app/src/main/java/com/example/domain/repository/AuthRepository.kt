@@ -31,5 +31,9 @@ interface AuthRepository {
     fun saveSelectedUniversity(university: University)
     fun getSavedNeptunCode(): String
     fun saveNeptunCode(code: String)
+    suspend fun getSupportedLanguages(universityUrl: String? = null): List<com.example.domain.model.NeptunLanguage>
+    suspend fun setLanguage(language: com.example.domain.model.NeptunLanguage): Result<Unit>
+    fun getSelectedLanguage(): Flow<com.example.domain.model.NeptunLanguage>
+    fun getCachedSupportedLanguages(): Flow<List<com.example.domain.model.NeptunLanguage>>
 }
 

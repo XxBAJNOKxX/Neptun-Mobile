@@ -43,6 +43,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Notifications
@@ -106,10 +107,12 @@ import androidx.core.content.ContextCompat
 import com.example.BuildConfig
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.example.core.i18n.currentStrings
 import com.example.core.notification.NotificationHelper
 import com.example.core.security.AppPersonalization
 import com.example.core.security.NotificationPreferences
 import com.example.core.security.UpdateChannel
+import com.example.domain.model.NeptunLanguage
 import com.example.domain.model.StudentCredentials
 import com.example.presentation.navigation.NavigationItem
 import com.example.presentation.ui.components.NeptunTopBar
@@ -140,6 +143,11 @@ fun SettingsScreen(
     updateChannel: UpdateChannel = UpdateChannel.STABLE,
     isClearingCache: Boolean = false,
     cacheClearedMessage: String? = null,
+    currentLanguage: NeptunLanguage = NeptunLanguage.HUNGARIAN,
+    supportedLanguages: List<NeptunLanguage> = NeptunLanguage.DEFAULT_LANGUAGES,
+    isChangingLanguage: Boolean = false,
+    languageMessage: String? = null,
+    onLanguageSelect: (NeptunLanguage) -> Unit = {},
     onThemeModeChange: (ThemeMode) -> Unit,
     onDynamicColorToggle: (Boolean) -> Unit,
     onAccentColorSelect: (AppAccentColor) -> Unit,
@@ -301,6 +309,145 @@ fun SettingsScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 11.sp
                         )
+                    }
+                }
+            }
+
+            // ==========================================
+            // LANGUAGE SELECTION SECTION
+            // ==========================================
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("language_settings_card")
+            ) {
+                Column(
+                    modifier = Modifier.padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    // Section Title
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(MaterialTheme.colorScheme.tertiaryContainer),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Language,
+                                contentDescription = "Nyelv",
+                                tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Nyelv / Language",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Alkalmazás és Neptun kiszolgáló nyelve",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        if (isChangingLanguage) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+                    Text(
+                        text = "Intézmény által támogatott nyelvek (${supportedLanguages.size}):",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        supportedLanguages.forEach { lang ->
+                            val isSelected = lang.lcid == currentLanguage.lcid || lang.code.equals(currentLanguage.code, ignoreCase = true)
+                            Surface(
+                                onClick = { onLanguageSelect(lang) },
+                                shape = RoundedCornerShape(14.dp),
+                                color = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
+                                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                                border = if (isSelected) BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else null,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("language_option_${lang.code}")
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = lang.flagEmoji,
+                                        fontSize = 24.sp
+                                    )
+                                    Spacer(modifier = Modifier.width(14.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = lang.displayLabel,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
+                                            color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Text(
+                                            text = "${lang.name} • LCID: ${lang.lcid}",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                            fontSize = 11.sp
+                                        )
+                                    }
+                                    if (isSelected) {
+                                        Icon(
+                                            imageVector = Icons.Default.CheckCircle,
+                                            contentDescription = "Kiválasztva",
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(22.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if (languageMessage != null) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.secondaryContainer,
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = languageMessage,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                            }
+                        }
                     }
                 }
             }
