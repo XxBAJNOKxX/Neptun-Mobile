@@ -172,6 +172,118 @@ interface AppStrings {
     val checkUpdates: String
     val appVersion: String
     val serverConnectionMode: String
+
+    // Extended Settings Strings
+    val profileSubtitle: String
+    val studentDefaultName: String
+    val studentDefaultUni: String
+    val studentDefaultProgram: String
+    val neptunCodeLabel: String
+    val languageSubtitle: String
+    val supportedLanguagesHeader: String
+    val appearanceTitle: String
+    val appearanceSubtitle: String
+    val themeModeLabel: String
+    val dynamicColorLabel: String
+    val dynamicColorDesc: String
+    val dynamicColorOnlyAndroid12: String
+    val dynamicColorActiveBanner: String
+    val accentColorTitle: String
+    val accentColorSelected: String
+    val customThemeBadge: String
+    val livePreviewTitle: String
+    val activeThemeLabel: String
+    val btnPrimary: String
+    val btnTonal: String
+    val btnOutlined: String
+    val notificationsTitle: String
+    val notificationsSubtitle: String
+    val notifPermissionGranted: String
+    val notifPermissionRequired: String
+    val notifPermissionGrantedDesc: String
+    val notifPermissionRequiredDesc: String
+    val grantPermissionBtn: String
+    val notifClassesTitle: String
+    val notifClassesDesc: String
+    val notifGradesTitle: String
+    val notifGradesDesc: String
+    val notifMessagesTitle: String
+    val notifMessagesDesc: String
+    val notifFinancesTitle: String
+    val notifFinancesDesc: String
+    val testClassBtn: String
+    val testGradeBtn: String
+    val testMsgBtn: String
+    val testFinanceBtn: String
+    val personalizationTitle: String
+    val personalizationSubtitle: String
+    val startScreenLabel: String
+    val startScreenDesc: String
+    val selectStartScreenPlaceholder: String
+    val currentlyHiddenPage: String
+    val timetableSectionLabel: String
+    val showWeekendLabel: String
+    val showWeekendDesc: String
+    val visiblePagesLabel: String
+    val visiblePagesDesc: String
+    val targetCreditsLabel: String
+    val targetCreditsDesc: String
+    val creditsUnit: String
+    val quietHoursLabel: String
+    val quietHoursDesc: String
+    val activeWindowLabel: String
+    val securityTitle: String
+    val securitySubtitle: String
+    val securityDescription: String
+    val biometricLockTitle: String
+    val biometricLockDesc: String
+    val lastSyncLabel: String
+    val notSyncedYet: String
+    val appUpdatesTitle: String
+    val appUpdatesSubtitle: String
+    val updateChannelLabel: String
+    val installedVersionLabel: String
+    val packageNameLabel: String
+    val downloadNewVersionBtn: String
+    val checkingUpdates: String
+    val checkUpdatesBtn: String
+    val githubReleasesBtn: String
+    val syncInProgress: String
+    val manualSyncBtn: String
+    val exportIcsBtn: String
+    val clearCacheBtn: String
+    val clearingCacheInProgress: String
+    val logoutBtn: String
+    val logoutDialogTitle: String
+    val logoutDialogMessage: String
+
+    // Extended Login Strings
+    val loginBrandingSubtitle: String
+    val institutionLabel: String
+    val selectUniversityPlaceholder: String
+    val neptunCodeInputLabel: String
+    val passwordInputLabel: String
+    val quickDemoCredentials: String
+    val keystoreSecurityNote: String
+    val selectInstitutionTitle: String
+    val searchUniversityPlaceholder: String
+    val selectLanguageSubtitle: String
+    val twoFactorHeader: String
+    val twoFactorAccountPrompt: (String) -> String
+    val twoFactorEmailTab: String
+    val twoFactorTotpTab: String
+    val twoFactorEmailPrompt: String
+    val twoFactorRequestingCode: String
+    val twoFactorRequestEmailBtn: String
+    val twoFactorCodeSent: String
+    val twoFactorCodePrefix: String
+    val twoFactorEmailCodeInputLabel: String
+    val twoFactorResendBtn: String
+    val twoFactorTestCodeBtn: String
+    val twoFactorTotpPrompt: String
+    val twoFactorNoTotpNote: String
+    val twoFactorTotpInputLabel: String
+    val twoFactorVerifyBtn: String
 }
 
 class HungarianStrings : AppStrings {
@@ -332,6 +444,118 @@ class HungarianStrings : AppStrings {
     override val checkUpdates = "Frissítések keresése"
     override val appVersion = "Alkalmazás verzió"
     override val serverConnectionMode = "Kapcsolati mód"
+
+    // Extended Settings Strings
+    override val profileSubtitle = "Profil & Testreszabás"
+    override val studentDefaultName = "Egyetemi Hallgató"
+    override val studentDefaultUni = "Felsőoktatási Intézmény"
+    override val studentDefaultProgram = "BSc Hallgató"
+    override val neptunCodeLabel = "Neptun kód:"
+    override val languageSubtitle = "Alkalmazás és Neptun kiszolgáló nyelve"
+    override val supportedLanguagesHeader = "Intézmény által támogatott nyelvek"
+    override val appearanceTitle = "Megjelenés és Téma"
+    override val appearanceSubtitle = "Szabd személyre az alkalmazás arculatát"
+    override val themeModeLabel = "Téma mód"
+    override val dynamicColorLabel = "Dinamikus színek"
+    override val dynamicColorDesc = "A telefon háttérképéhez illeszkedő Material You paletta használata"
+    override val dynamicColorOnlyAndroid12 = "Csak Android 12 vagy újabb rendszeren érhető el"
+    override val dynamicColorActiveBanner = "A dinamikus szín aktív. Ha egyéni hangsúlyszínt választasz, a dinamikus szín automatikusan kikapcsol."
+    override val accentColorTitle = "Hangsúlyszín kiválasztása"
+    override val accentColorSelected = "Kiválasztva:"
+    override val customThemeBadge = "Egyéni téma"
+    override val livePreviewTitle = "Élő arculati előnézet"
+    override val activeThemeLabel = "Aktív téma:"
+    override val btnPrimary = "Fő gomb"
+    override val btnTonal = "Tonális"
+    override val btnOutlined = "Keretes"
+    override val notificationsTitle = "Értesítések és Emlékeztetők"
+    override val notificationsSubtitle = "Kategóriák és háttérbeli értesítések"
+    override val notifPermissionGranted = "Értesítések engedélyezve"
+    override val notifPermissionRequired = "Értesítési engedély szükséges"
+    override val notifPermissionGrantedDesc = "Az alkalmazás küldhet órarendi és tanulmányi értesítéseket."
+    override val notifPermissionRequiredDesc = "Kattints az engedély megadásához."
+    override val grantPermissionBtn = "Engedély kérése"
+    override val notifClassesTitle = "Órarendi értesítések"
+    override val notifClassesDesc = "15 perccel az órák előtt emlékeztető a pontos teremszámmal"
+    override val notifGradesTitle = "Jegyek és értékelések"
+    override val notifGradesDesc = "Azonnali figyelmeztetés új érdemjegy vagy bejegyzés rögzítésekor"
+    override val notifMessagesTitle = "Neptun üzenetek"
+    override val notifMessagesDesc = "Értesítés oktatói és tanulmányi rendszerüzenetek érkezésekor"
+    override val notifFinancesTitle = "Pénzügyi tételek"
+    override val notifFinancesDesc = "Emlékeztetők kiírásokról, díjakról és fizetési határidőkről"
+    override val testClassBtn = "Óra teszt"
+    override val testGradeBtn = "Jegy teszt"
+    override val testMsgBtn = "Üzenet teszt"
+    override val testFinanceBtn = "Pénzügy teszt"
+    override val personalizationTitle = "Személyreszabás"
+    override val personalizationSubtitle = "Kezdőképernyő, órarend és tanulmányi beállítások"
+    override val startScreenLabel = "Kezdőképernyő"
+    override val startScreenDesc = "Az alkalmazás megnyitásakor megjelenő alapértelmezett oldal."
+    override val selectStartScreenPlaceholder = "Kezdőlap kiválasztása"
+    override val currentlyHiddenPage = "Jelenleg rejtett oldal"
+    override val timetableSectionLabel = "Órarend"
+    override val showWeekendLabel = "Hétvége megjelenítése"
+    override val showWeekendDesc = "Szombat és vasárnap oszlopai"
+    override val visiblePagesLabel = "Látható oldalak"
+    override val visiblePagesDesc = "A számodra nem hasznos oldalakat elrejtheted – eltűnnek az alsó sávból. A Profil mindig látható marad."
+    override val targetCreditsLabel = "Cél kreditek (diploma)"
+    override val targetCreditsDesc = "A kredithaladás sávja ezt a célt mutatja a Jegyek fülön."
+    override val creditsUnit = "kredit"
+    override val quietHoursLabel = "Halk órák"
+    override val quietHoursDesc = "Ebben az időszakban nem küldünk üzenet-, jegy- és pénzügyi értesítést (az óra-emlékeztetők maradnak)."
+    override val activeWindowLabel = "Aktív időablak"
+    override val securityTitle = "Biztonság és Titkosítás"
+    override val securitySubtitle = "Helyi és hardveres adatvédelem"
+    override val securityDescription = "A Neptun bejelentkezési adatok hardveresen védett Android Keystore (AES-256) titkosítással vannak tárolva. Az órarend, jegyek és üzenetek helyi Room adatbázisban tárolódnak, így internetkapcsolat nélkül is azonnal elérhetők."
+    override val biometricLockTitle = "Biometrikus zár"
+    override val biometricLockDesc = "Az app felnyitásához ujjlenyomat vagy arcfelismerés szükséges"
+    override val lastSyncLabel = "Utolsó sikeres szinkronizálás:"
+    override val notSyncedYet = "Még nincs szinkronizálva"
+    override val appUpdatesTitle = "Alkalmazás és Frissítések"
+    override val appUpdatesSubtitle = "Verziókezelés és GitHub Releases"
+    override val updateChannelLabel = "Frissítési csatorna"
+    override val installedVersionLabel = "Telepített verzió"
+    override val packageNameLabel = "Csomagnév"
+    override val downloadNewVersionBtn = "Új verzió letöltése"
+    override val checkingUpdates = "Keresés..."
+    override val checkUpdatesBtn = "Frissítés keresése"
+    override val githubReleasesBtn = "GitHub Releases"
+    override val syncInProgress = "Szinkronizálás folyamatban..."
+    override val manualSyncBtn = "Azonnali szinkronizálás"
+    override val exportIcsBtn = "Órarend exportálása (.ics)"
+    override val clearCacheBtn = "Helyi gyorsítótár törlése"
+    override val clearingCacheInProgress = "Törlés folyamatban..."
+    override val logoutBtn = "Kijelentkezés"
+    override val logoutDialogTitle = "Kijelentkezés"
+    override val logoutDialogMessage = "Biztosan ki szeretnél jelentkezni? A helyileg tárolt hitelesítő adatok és az offline cache törlődnek."
+
+    // Extended Login Strings
+    override val loginBrandingSubtitle = "Modern alternatív Neptun kliens 2FA támogatással"
+    override val institutionLabel = "Intézmény / Egyetem"
+    override val selectUniversityPlaceholder = "Válassz egyetemet..."
+    override val neptunCodeInputLabel = "Neptun kód (6 karakter)"
+    override val passwordInputLabel = "Jelszó"
+    override val quickDemoCredentials = "Offline Demo adatok betöltése"
+    override val keystoreSecurityNote = "Hitelesítő adataidat az Android Keystore (EncryptedSharedPreferences) biztonságosan, titkosítva tárolja az eszközödön."
+    override val selectInstitutionTitle = "Válassz intézményt"
+    override val searchUniversityPlaceholder = "Keresés név, kód vagy város alapján..."
+    override val selectLanguageSubtitle = "Válassz nyelvet a felülethez és a Neptunhoz"
+    override val twoFactorHeader = "Kétlépcsős Azonosítás (2FA)"
+    override val twoFactorAccountPrompt = { code: String -> "A Neptun kétlépcsős hitelesítést igényel a(z) $code fiókhoz." }
+    override val twoFactorEmailTab = "E-mail kód"
+    override val twoFactorTotpTab = "Hitelesítő App"
+    override val twoFactorEmailPrompt = "Kérj belépési kódot az egyetemi e-mail címedre:"
+    override val twoFactorRequestingCode = "Kód kérése folyamatban..."
+    override val twoFactorRequestEmailBtn = "E-mail kód kérése"
+    override val twoFactorCodeSent = "Kód elküldve az egyetemi fiókodra!"
+    override val twoFactorCodePrefix = "A Neptun által generált előtag:"
+    override val twoFactorEmailCodeInputLabel = "6 jegyű kód az e-mailből"
+    override val twoFactorResendBtn = "Új kód kérése"
+    override val twoFactorTestCodeBtn = "Teszt: 999999"
+    override val twoFactorTotpPrompt = "Add meg a Google / Microsoft Authenticator appban megjelenő 6 számjegyű kódot:"
+    override val twoFactorNoTotpNote = "Megjegyzés: A Neptun szerint még nincs TOTP kulcs párosítva ehhez a fiókhoz. Használd az E-mail kód opciót!"
+    override val twoFactorTotpInputLabel = "TOTP Kód (pl. 482910)"
+    override val twoFactorVerifyBtn = "Belépés"
 }
 
 class EnglishStrings : AppStrings {
@@ -492,6 +716,118 @@ class EnglishStrings : AppStrings {
     override val checkUpdates = "Check for Updates"
     override val appVersion = "App Version"
     override val serverConnectionMode = "Connection Mode"
+
+    // Extended Settings Strings
+    override val profileSubtitle = "Profile & Customization"
+    override val studentDefaultName = "University Student"
+    override val studentDefaultUni = "Higher Education Institution"
+    override val studentDefaultProgram = "BSc Student"
+    override val neptunCodeLabel = "Neptun code:"
+    override val languageSubtitle = "Application and Neptun server language"
+    override val supportedLanguagesHeader = "Languages supported by institution"
+    override val appearanceTitle = "Appearance & Theme"
+    override val appearanceSubtitle = "Customize the look and feel of the app"
+    override val themeModeLabel = "Theme mode"
+    override val dynamicColorLabel = "Dynamic colors"
+    override val dynamicColorDesc = "Use Material You palette matching phone wallpaper"
+    override val dynamicColorOnlyAndroid12 = "Available on Android 12 or newer only"
+    override val dynamicColorActiveBanner = "Dynamic color is active. Selecting a custom accent color will disable dynamic color."
+    override val accentColorTitle = "Select Accent Color"
+    override val accentColorSelected = "Selected:"
+    override val customThemeBadge = "Custom theme"
+    override val livePreviewTitle = "Live Theme Preview"
+    override val activeThemeLabel = "Active theme:"
+    override val btnPrimary = "Primary"
+    override val btnTonal = "Tonal"
+    override val btnOutlined = "Outlined"
+    override val notificationsTitle = "Notifications & Reminders"
+    override val notificationsSubtitle = "Categories and background notifications"
+    override val notifPermissionGranted = "Notifications enabled"
+    override val notifPermissionRequired = "Notification permission required"
+    override val notifPermissionGrantedDesc = "The app can send timetable and academic alerts."
+    override val notifPermissionRequiredDesc = "Tap to grant permission."
+    override val grantPermissionBtn = "Grant permission"
+    override val notifClassesTitle = "Timetable alerts"
+    override val notifClassesDesc = "Reminder 15 minutes before classes with exact room number"
+    override val notifGradesTitle = "Grades and assessments"
+    override val notifGradesDesc = "Instant alert when a new grade or entry is recorded"
+    override val notifMessagesTitle = "Neptun messages"
+    override val notifMessagesDesc = "Alert on instructor and academic system messages"
+    override val notifFinancesTitle = "Financial items"
+    override val notifFinancesDesc = "Reminders about fees, charges, and payment deadlines"
+    override val testClassBtn = "Class test"
+    override val testGradeBtn = "Grade test"
+    override val testMsgBtn = "Message test"
+    override val testFinanceBtn = "Finance test"
+    override val personalizationTitle = "Personalization"
+    override val personalizationSubtitle = "Home screen, timetable, and study settings"
+    override val startScreenLabel = "Default Start Screen"
+    override val startScreenDesc = "Default page displayed when launching the app."
+    override val selectStartScreenPlaceholder = "Select start screen"
+    override val currentlyHiddenPage = "Currently hidden page"
+    override val timetableSectionLabel = "Timetable"
+    override val showWeekendLabel = "Show weekend"
+    override val showWeekendDesc = "Saturday and Sunday columns"
+    override val visiblePagesLabel = "Visible Pages"
+    override val visiblePagesDesc = "Hide pages you don't need – they will disappear from the bottom bar. Settings remains visible."
+    override val targetCreditsLabel = "Target Credits (Degree)"
+    override val targetCreditsDesc = "Credit progress bar shows this target on the Grades tab."
+    override val creditsUnit = "credits"
+    override val quietHoursLabel = "Quiet Hours"
+    override val quietHoursDesc = "No message, grade, or finance alerts will be sent during this period (class reminders remain active)."
+    override val activeWindowLabel = "Active time window"
+    override val securityTitle = "Security & Encryption"
+    override val securitySubtitle = "Local and hardware data protection"
+    override val securityDescription = "Neptun credentials are stored with hardware-backed Android Keystore (AES-256) encryption. Timetable, grades, and messages are stored in a local Room database for instant offline access."
+    override val biometricLockTitle = "Biometric Lock"
+    override val biometricLockDesc = "Fingerprint or facial recognition required to open the app"
+    override val lastSyncLabel = "Last successful sync:"
+    override val notSyncedYet = "Not synced yet"
+    override val appUpdatesTitle = "App & Updates"
+    override val appUpdatesSubtitle = "Version management and GitHub Releases"
+    override val updateChannelLabel = "Update channel"
+    override val installedVersionLabel = "Installed version"
+    override val packageNameLabel = "Package name"
+    override val downloadNewVersionBtn = "Download New Version"
+    override val checkingUpdates = "Checking..."
+    override val checkUpdatesBtn = "Check for updates"
+    override val githubReleasesBtn = "GitHub Releases"
+    override val syncInProgress = "Syncing in progress..."
+    override val manualSyncBtn = "Sync Now"
+    override val exportIcsBtn = "Export timetable (.ics)"
+    override val clearCacheBtn = "Clear local cache"
+    override val clearingCacheInProgress = "Clearing cache..."
+    override val logoutBtn = "Log Out"
+    override val logoutDialogTitle = "Log Out"
+    override val logoutDialogMessage = "Are you sure you want to log out? Stored credentials and offline cache will be deleted."
+
+    // Extended Login Strings
+    override val loginBrandingSubtitle = "Modern alternative Neptun client with 2FA support"
+    override val institutionLabel = "Institution / University"
+    override val selectUniversityPlaceholder = "Select university..."
+    override val neptunCodeInputLabel = "Neptun code (6 characters)"
+    override val passwordInputLabel = "Password"
+    override val quickDemoCredentials = "Load Offline Demo Credentials"
+    override val keystoreSecurityNote = "Your credentials are encrypted and securely stored on your device using Android Keystore."
+    override val selectInstitutionTitle = "Select Institution"
+    override val searchUniversityPlaceholder = "Search by name, code or city..."
+    override val selectLanguageSubtitle = "Choose language for the interface and Neptun"
+    override val twoFactorHeader = "Two-Factor Authentication (2FA)"
+    override val twoFactorAccountPrompt = { code: String -> "Neptun requires two-factor authentication for account $code." }
+    override val twoFactorEmailTab = "Email Code"
+    override val twoFactorTotpTab = "Authenticator App"
+    override val twoFactorEmailPrompt = "Request a login code to your university email address:"
+    override val twoFactorRequestingCode = "Requesting code..."
+    override val twoFactorRequestEmailBtn = "Request Email Code"
+    override val twoFactorCodeSent = "Code sent to your university account!"
+    override val twoFactorCodePrefix = "Neptun generated prefix:"
+    override val twoFactorEmailCodeInputLabel = "6-digit code from email"
+    override val twoFactorResendBtn = "Request new code"
+    override val twoFactorTestCodeBtn = "Test: 999999"
+    override val twoFactorTotpPrompt = "Enter the 6-digit code from your Google / Microsoft Authenticator app:"
+    override val twoFactorNoTotpNote = "Note: No TOTP key is paired with this account in Neptun. Please use the Email code option!"
+    override val twoFactorTotpInputLabel = "TOTP Code (e.g. 482910)"
+    override val twoFactorVerifyBtn = "Log In"
 }
 
 class GermanStrings : AppStrings {
@@ -652,6 +988,118 @@ class GermanStrings : AppStrings {
     override val checkUpdates = "Nach Updates suchen"
     override val appVersion = "App-Version"
     override val serverConnectionMode = "Verbindungsmodus"
+
+    // Extended Settings Strings
+    override val profileSubtitle = "Profil & Anpassung"
+    override val studentDefaultName = "Student"
+    override val studentDefaultUni = "Hochschule"
+    override val studentDefaultProgram = "BSc Student"
+    override val neptunCodeLabel = "Neptun-Code:"
+    override val languageSubtitle = "Sprache der App und des Neptun-Servers"
+    override val supportedLanguagesHeader = "Von der Institution unterstützte Sprachen"
+    override val appearanceTitle = "Erscheinungsbild & Design"
+    override val appearanceSubtitle = "Passen Sie das Erscheinungsbild der App an"
+    override val themeModeLabel = "Designmodus"
+    override val dynamicColorLabel = "Dynamische Farben"
+    override val dynamicColorDesc = "Material You-Palette passend zum Hintergrundbild verwenden"
+    override val dynamicColorOnlyAndroid12 = "Nur ab Android 12 verfügbar"
+    override val dynamicColorActiveBanner = "Dynamische Farben sind aktiv. Die Auswahl einer Akzentfarbe deaktiviert dynamische Farben."
+    override val accentColorTitle = "Akzentfarbe auswählen"
+    override val accentColorSelected = "Ausgewählt:"
+    override val customThemeBadge = "Eigenes Design"
+    override val livePreviewTitle = "Live-Vorschau des Designs"
+    override val activeThemeLabel = "Aktives Design:"
+    override val btnPrimary = "Primär"
+    override val btnTonal = "Tonal"
+    override val btnOutlined = "Umrandet"
+    override val notificationsTitle = "Benachrichtigungen & Erinnerungen"
+    override val notificationsSubtitle = "Kategorien und Hintergrundbenachrichtigungen"
+    override val notifPermissionGranted = "Benachrichtigungen aktiviert"
+    override val notifPermissionRequired = "Benachrichtigungsberechtigung erforderlich"
+    override val notifPermissionGrantedDesc = "Die App kann Stundenplan- und Studienbenachrichtigungen senden."
+    override val notifPermissionRequiredDesc = "Tippen Sie hier, um die Berechtigung zu erteilen."
+    override val grantPermissionBtn = "Berechtigung erteilen"
+    override val notifClassesTitle = "Stundenplan-Erinnerungen"
+    override val notifClassesDesc = "Erinnerung 15 Minuten vor Vorlesungen mit genauer Raumnummer"
+    override val notifGradesTitle = "Noten und Bewertungen"
+    override val notifGradesDesc = "Sofortige Benachrichtigung bei Eintragung einer neuen Note"
+    override val notifMessagesTitle = "Neptun-Nachrichten"
+    override val notifMessagesDesc = "Benachrichtigung bei Dozenten- und Systemnachrichten"
+    override val notifFinancesTitle = "Finanzpositionen"
+    override val notifFinancesDesc = "Erinnerungen an Gebühren, Zahlungen und Fristen"
+    override val testClassBtn = "Vorlesung Test"
+    override val testGradeBtn = "Noten Test"
+    override val testMsgBtn = "Nachricht Test"
+    override val testFinanceBtn = "Finanz Test"
+    override val personalizationTitle = "Personalisierung"
+    override val personalizationSubtitle = "Startbildschirm, Stundenplan- und Studieneinstellungen"
+    override val startScreenLabel = "Startbildschirm"
+    override val startScreenDesc = "Standardseite beim Öffnen der App."
+    override val selectStartScreenPlaceholder = "Startbildschirm wählen"
+    override val currentlyHiddenPage = "Derzeit ausgeblendete Seite"
+    override val timetableSectionLabel = "Stundenplan"
+    override val showWeekendLabel = "Wochenende anzeigen"
+    override val showWeekendDesc = "Samstags- und Sonntagsspalten"
+    override val visiblePagesLabel = "Sichtbare Seiten"
+    override val visiblePagesDesc = "Blenden Sie nicht benötigte Seiten aus. Die Einstellungen bleiben immer sichtbar."
+    override val targetCreditsLabel = "Ziel-Credits (Abschluss)"
+    override val targetCreditsDesc = "Der Kreditfortschrittsbalken zeigt dieses Ziel im Noten-Tab."
+    override val creditsUnit = "Credits"
+    override val quietHoursLabel = "Ruhezeiten"
+    override val quietHoursDesc = "In diesem Zeitraum werden keine Nachrichten-, Noten- oder Finanzbenachrichtigungen gesendet."
+    override val activeWindowLabel = "Aktives Zeitfenster"
+    override val securityTitle = "Sicherheit & Verschlüsselung"
+    override val securitySubtitle = "Lokaler und hardwarebasierter Datenschutz"
+    override val securityDescription = "Neptun-Anmeldedaten werden mit hardwaregeschützter Android Keystore-Verschlüsselung (AES-256) gespeichert. Stundenplan, Noten und Nachrichten werden für den Offline-Zugriff in einer lokalen Room-Datenbank gespeichert."
+    override val biometricLockTitle = "Biometrische Sperre"
+    override val biometricLockDesc = "Fingerabdruck oder Gesichtserkennung zum Öffnen erforderlich"
+    override val lastSyncLabel = "Letzte erfolgreiche Synchronisierung:"
+    override val notSyncedYet = "Noch nicht synchronisiert"
+    override val appUpdatesTitle = "App & Updates"
+    override val appUpdatesSubtitle = "Versionsverwaltung und GitHub Releases"
+    override val updateChannelLabel = "Update-Kanal"
+    override val installedVersionLabel = "Installierte Version"
+    override val packageNameLabel = "Paketname"
+    override val downloadNewVersionBtn = "Neue Version herunterladen"
+    override val checkingUpdates = "Suche..."
+    override val checkUpdatesBtn = "Nach Updates suchen"
+    override val githubReleasesBtn = "GitHub Releases"
+    override val syncInProgress = "Synchronisierung läuft..."
+    override val manualSyncBtn = "Jetzt synchronisieren"
+    override val exportIcsBtn = "Stundenplan exportieren (.ics)"
+    override val clearCacheBtn = "Lokalen Cache leeren"
+    override val clearingCacheInProgress = "Cache wird geleert..."
+    override val logoutBtn = "Abmelden"
+    override val logoutDialogTitle = "Abmelden"
+    override val logoutDialogMessage = "Möchten Sie sich wirklich abmelden? Gespeicherte Anmeldedaten und Cache werden gelöscht."
+
+    // Extended Login Strings
+    override val loginBrandingSubtitle = "Moderner alternativer Neptun-Client mit 2FA-Unterstützung"
+    override val institutionLabel = "Institution / Universität"
+    override val selectUniversityPlaceholder = "Universität auswählen..."
+    override val neptunCodeInputLabel = "Neptun-Code (6 Zeichen)"
+    override val passwordInputLabel = "Passwort"
+    override val quickDemoCredentials = "Offline-Demo-Daten laden"
+    override val keystoreSecurityNote = "Ihre Anmeldedaten werden verschlüsselt und sicher auf Ihrem Gerät mit dem Android Keystore gespeichert."
+    override val selectInstitutionTitle = "Institution auswählen"
+    override val searchUniversityPlaceholder = "Suche nach Name, Code oder Stadt..."
+    override val selectLanguageSubtitle = "Wählen Sie die Sprache für die Benutzeroberfläche und Neptun"
+    override val twoFactorHeader = "Zwei-Faktor-Authentifizierung (2FA)"
+    override val twoFactorAccountPrompt = { code: String -> "Neptun erfordert eine Zwei-Faktor-Authentifizierung für Konto $code." }
+    override val twoFactorEmailTab = "E-Mail-Code"
+    override val twoFactorTotpTab = "Authenticator-App"
+    override val twoFactorEmailPrompt = "Fordern Sie einen Anmeldecode an Ihre Hochschul-E-Mail-Adresse an:"
+    override val twoFactorRequestingCode = "Code wird angefordert..."
+    override val twoFactorRequestEmailBtn = "E-Mail-Code anfordern"
+    override val twoFactorCodeSent = "Code an Ihr Hochschulkonto gesendet!"
+    override val twoFactorCodePrefix = "Vom Neptun generiertes Präfix:"
+    override val twoFactorEmailCodeInputLabel = "6-stelliger Code aus der E-Mail"
+    override val twoFactorResendBtn = "Neuen Code anfordern"
+    override val twoFactorTestCodeBtn = "Test: 999999"
+    override val twoFactorTotpPrompt = "Geben Sie den 6-stelligen Code aus der Authenticator-App ein:"
+    override val twoFactorNoTotpNote = "Hinweis: Für dieses Konto ist noch kein TOTP-Schlüssel im Neptun gekoppelt. Bitte verwenden Sie die E-Mail-Option!"
+    override val twoFactorTotpInputLabel = "TOTP-Code (z.B. 482910)"
+    override val twoFactorVerifyBtn = "Anmelden"
 }
 
 object AppStringsProvider {
