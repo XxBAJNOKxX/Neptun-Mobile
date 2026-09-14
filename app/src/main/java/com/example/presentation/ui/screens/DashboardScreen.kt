@@ -86,8 +86,15 @@ fun DashboardScreen(
             // Üdvözlés
             item {
                 Column {
+                    val hour = java.time.LocalTime.now().hour
+                    val greetingText = when {
+                        hour < 5 -> if (strings.languageCode == "hu") "Jó éjszakát" else if (strings.languageCode == "de") "Gute Nacht" else "Good night"
+                        hour < 9 -> if (strings.languageCode == "hu") "Jó reggelt" else if (strings.languageCode == "de") "Guten Morgen" else "Good morning"
+                        hour < 18 -> strings.dashboardGreeting
+                        else -> if (strings.languageCode == "hu") "Jó estét" else if (strings.languageCode == "de") "Guten Abend" else "Good evening"
+                    }
                     Text(
-                        text = "${uiState.greeting}, $studentName!",
+                        text = "$greetingText, $studentName!",
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -274,7 +281,7 @@ private fun NextClassCard(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = if (ongoing != null) (if (strings.languageCode == "hu") "Épp most zajlik" else if (strings.languageCode == "de") "Läuft gerade" else "In progress")
+                        text = if (ongoing != null) strings.inProgressClass
                                else strings.nextClass,
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Bold,
@@ -366,6 +373,7 @@ private fun QuickStatCard(
 
 @Composable
 private fun DashboardClassRow(event: CalendarEvent) {
+    val strings = currentStrings()
     Surface(
         color = MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(14.dp),
@@ -399,7 +407,7 @@ private fun DashboardClassRow(event: CalendarEvent) {
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = listOf(event.courseType.displayName, event.room.takeIf { it.isNotBlank() })
+                    text = listOf(event.courseType.getLocalizedName(strings), event.room.takeIf { it.isNotBlank() })
                         .filterNotNull()
                         .joinToString(" · "),
                     style = MaterialTheme.typography.bodySmall,

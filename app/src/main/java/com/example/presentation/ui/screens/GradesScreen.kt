@@ -188,8 +188,13 @@ fun GradesScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    val subjectsHeader = when (strings.languageCode) {
+                        "de" -> "Belegte Fächer (${uiState.termGrades.size})"
+                        "en" -> "Enrolled subjects (${uiState.termGrades.size})"
+                        else -> "Felvett tárgyak (${uiState.termGrades.size} db)"
+                    }
                     Text(
-                        text = "Felvett tárgyak (${uiState.termGrades.size} db)",
+                        text = subjectsHeader,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -207,13 +212,13 @@ fun GradesScreen(
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Clear,
-                                    contentDescription = "Törlés",
+                                    contentDescription = strings.delete,
                                     tint = NeptunPurple,
                                     modifier = Modifier.size(14.dp)
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    text = "Szellemjegyek törlése",
+                                    text = strings.resetGhostGrades,
                                     color = NeptunPurple,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold
@@ -260,6 +265,7 @@ private fun AcademicSummaryCard(
         Math.round((calc.ghostWeightedAverage - calc.weightedAverage) * 100.0) / 100.0
     } else 0.0
 
+    val strings = currentStrings()
     Card(
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
@@ -288,7 +294,7 @@ private fun AcademicSummaryCard(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Calculate,
-                            contentDescription = "Átlagszámítás",
+                            contentDescription = strings.weightedAverage,
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(20.dp)
                         )
@@ -296,12 +302,12 @@ private fun AcademicSummaryCard(
                     Spacer(modifier = Modifier.width(10.dp))
                     Column {
                         Text(
-                            text = "Tanulmányi Eredmények",
+                            text = if (strings.languageCode == "de") "Studienergebnisse" else if (strings.languageCode == "hu") "Tanulmányi Eredmények" else "Academic Results",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "Formula: (Σ Jegy * Kredit) / Σ Teljesített Kredit",
+                            text = if (strings.languageCode == "de") "Formel: (Σ Note * Credits) / Σ Erreichte Credits" else if (strings.languageCode == "hu") "Formula: (Σ Jegy * Kredit) / Σ Teljesített Kredit" else "Formula: (Σ Grade * Credits) / Σ Completed Credits",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 11.sp
@@ -314,8 +320,13 @@ private fun AcademicSummaryCard(
                         color = Color(0xFFEDE9FE),
                         shape = RoundedCornerShape(6.dp)
                     ) {
+                        val ghostActiveText = when (strings.languageCode) {
+                            "de" -> "${calc?.ghostCount} simulierte Noten aktiv"
+                            "en" -> "${calc?.ghostCount} simulated grade(s) active"
+                            else -> "${calc?.ghostCount} szellemjegy aktív"
+                        }
                         Text(
-                            text = "${calc?.ghostCount} szellemjegy aktív",
+                            text = ghostActiveText,
                             color = NeptunPurple,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.ExtraBold,
@@ -335,7 +346,7 @@ private fun AcademicSummaryCard(
                 // Súlyozott Átlag (KGI)
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Súlyozott Átlag",
+                        text = strings.weightedAverage,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 12.sp
@@ -351,7 +362,7 @@ private fun AcademicSummaryCard(
                 // Kreditindex
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Kreditindex",
+                        text = strings.creditIndex,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 12.sp
@@ -366,8 +377,13 @@ private fun AcademicSummaryCard(
 
                 // Teljesített Kreditek
                 Column(modifier = Modifier.weight(1f)) {
+                    val creditsRatioLabel = when (strings.languageCode) {
+                        "de" -> "Erreichte / Belegte"
+                        "en" -> "Completed / Enrolled"
+                        else -> "Teljesített / Felvett"
+                    }
                     Text(
-                        text = "Teljesített / Felvett",
+                        text = creditsRatioLabel,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 12.sp
@@ -415,20 +431,30 @@ private fun AcademicSummaryCard(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
                                 imageVector = Icons.Default.AutoAwesome,
-                                contentDescription = "Szellemjegy hatás",
+                                contentDescription = strings.ghostGrades,
                                 tint = NeptunPurple,
                                 modifier = Modifier.size(20.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Column {
+                                val expectedAvgLabel = when (strings.languageCode) {
+                                    "de" -> "Erwarteter Durchschnitt mit Notensimulation"
+                                    "en" -> "Expected average with simulated grades"
+                                    else -> "Várható átlag szellemjegyekkel"
+                                }
+                                val simCreditIndexLabel = when (strings.languageCode) {
+                                    "de" -> "Simulierter Kreditindex: ${calc?.ghostCreditIndex ?: 0.0}"
+                                    "en" -> "Simulated credit index: ${calc?.ghostCreditIndex ?: 0.0}"
+                                    else -> "Szimulált kreditindex: ${calc?.ghostCreditIndex ?: 0.0}"
+                                }
                                 Text(
-                                    text = "Várható átlag szellemjegyekkel",
+                                    text = expectedAvgLabel,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = NeptunPurple
                                 )
                                 Text(
-                                    text = "Szimulált kreditindex: ${calc?.ghostCreditIndex ?: 0.0}",
+                                    text = simCreditIndexLabel,
                                     fontSize = 11.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )

@@ -73,8 +73,10 @@ class TimetableViewModel(
 
     private fun buildInitialUiState(): TimetableUiState {
         val personalization = prefsManager?.loadPersonalization()
+        val language = prefsManager?.loadLanguage()
         val showWeekend = personalization?.showWeekend ?: false
-        val (weekDays, weekLabel) = calculateWeekInfo(0, showWeekend)
+        val langCode = language?.code ?: "hu"
+        val (weekDays, weekLabel) = calculateWeekInfo(0, showWeekend, langCode)
         return TimetableUiState(
             selectedDayOfWeek = currentOrNextSchoolDay(),
             selectedWeekOffset = 0,
@@ -87,8 +89,9 @@ class TimetableViewModel(
     private fun observePreferences() {
         viewModelScope.launch {
             prefsManager?.personalizationFlow?.collect { personalization ->
+                val langCode = prefsManager.loadLanguage().code
                 _uiState.update { state ->
-                    val (weekDays, weekLabel) = calculateWeekInfo(state.selectedWeekOffset, personalization.showWeekend)
+                    val (weekDays, weekLabel) = calculateWeekInfo(state.selectedWeekOffset, personalization.showWeekend, langCode)
                     state.copy(
                         showWeekend = personalization.showWeekend,
                         weekDays = weekDays,
@@ -97,9 +100,20 @@ class TimetableViewModel(
                 }
             }
         }
+        viewModelScope.launch {
+            prefsManager?.languageFlow?.collect { language ->
+                _uiState.update { state ->
+                    val (weekDays, weekLabel) = calculateWeekInfo(state.selectedWeekOffset, state.showWeekend, language.code)
+                    state.copy(
+                        weekDays = weekDays,
+                        weekLabel = weekLabel
+                    )
+                }
+            }
+        }
     }
 
-    private fun calculateWeekInfo(offset: Int, includeWeekend: Boolean): Pair<List<WeekDayInfo>, String> {
+    private fun calculateWeekInfo(offset: Int, includeWeekend: Boolean, langCode: String = "hu"): Pair<List<WeekDayInfo>, String> {
         val today = LocalDate.now()
         val isWeekend = today.dayOfWeek == DayOfWeek.SATURDAY || today.dayOfWeek == DayOfWeek.SUNDAY
         val baseMonday = if (isWeekend) {
@@ -108,7 +122,11 @@ class TimetableViewModel(
             today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
         }
         val monday = baseMonday.plusWeeks(offset.toLong())
-        val dayNames = listOf("Hétfő", "Kedd", "Szerda", "Csütörtök", "Péntek", "Szombat", "Vasárnap")
+        val dayNames = when (langCode.lowercase()) {
+            "en" -> listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+            "de" -> listOf("Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag")
+            else -> listOf("Hétfő", "Kedd", "Szerda", "Csütörtök", "Péntek", "Szombat", "Vasárnap")
+        }
 
         val dayCount = if (includeWeekend) 7 else 5
         val days = (0 until dayCount).map { i ->
@@ -126,12 +144,20 @@ class TimetableViewModel(
         }
 
         val lastDay = monday.plusDays((dayCount - 1).toLong())
-        val monthFormatter = DateTimeFormatter.ofPattern("yyyy. MMMM d.", Locale("hu"))
-        val endDayFormatter = DateTimeFormatter.ofPattern("d.", Locale("hu"))
+        val locale = when (langCode.lowercase()) {
+            "en" -> Locale.ENGLISH
+            "de" -> Locale.GERMAN
+            else -> Locale("hu")
+        }
+        val patternMonth = if (langCode == "hu") "yyyy. MMMM d." else "MMMM d, yyyy"
+        val patternEnd = "d."
+        val monthFormatter = DateTimeFormatter.ofPattern(patternMonth, locale)
+        val endDayFormatter = DateTimeFormatter.ofPattern(patternEnd, locale)
         val weekLabel = if (monday.month == lastDay.month) {
             "${monday.format(monthFormatter)} – ${lastDay.format(endDayFormatter)}"
         } else {
-            "${monday.format(DateTimeFormatter.ofPattern("yyyy. MMM d.", Locale("hu")))} – ${lastDay.format(DateTimeFormatter.ofPattern("MMM d.", Locale("hu")))}"
+            val patternShort = if (langCode == "hu") "yyyy. MMM d." else "MMM d"
+            "${monday.format(DateTimeFormatter.ofPattern(patternShort, locale))} – ${lastDay.format(DateTimeFormatter.ofPattern(patternShort, locale))}"
         }
 
         return days to weekLabel

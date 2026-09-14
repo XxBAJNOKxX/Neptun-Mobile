@@ -79,6 +79,16 @@ class NeptunRepositoryImpl(
             }
             val token = ensureValidToken(forceRefresh = false)
             val baseUrl = prefsManager.getBaseUrl().ifEmpty { creds?.neptunUrl ?: "" }
+
+            val currentLang = prefsManager.loadLanguage()
+            if (token.isNotBlank() && baseUrl.isNotBlank()) {
+                try {
+                    neptunApiClient.setLanguage(baseUrl, token, currentLang.lcid)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+
             if (token.isNotBlank() && baseUrl.isNotBlank() && prefsManager.isModernApi()) {
                 try {
                     val userInfo = neptunApiClient.getUserInfo(baseUrl, token)
