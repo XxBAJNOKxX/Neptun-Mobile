@@ -7,7 +7,7 @@ import org.junit.Test
 
 class NeptunApiClientTest {
 
-    private val client = NeptunApiClient()
+    private val client = NeptunApiClient(FakeStringProvider())
 
     @Test
     fun testNormalizeBaseUrl() {

@@ -29,8 +29,7 @@ data class DashboardUiState(
     val gradedCountThisTerm: Int = 0,
     val pendingFinanceHuf: Int = 0,
     val nextDueFinance: FinanceItem? = null,
-    val isRefreshing: Boolean = false,
-    val greeting: String = ""
+    val isRefreshing: Boolean = false
 )
 
 class DashboardViewModel(
@@ -40,7 +39,7 @@ class DashboardViewModel(
 
     private val getTodayClasses = GetTodayClassesUseCase()
 
-    private val _uiState = MutableStateFlow(DashboardUiState(greeting = buildGreeting()))
+    private val _uiState = MutableStateFlow(DashboardUiState())
     val uiState: StateFlow<DashboardUiState> = _uiState.asStateFlow()
 
     init {
@@ -101,15 +100,6 @@ class DashboardViewModel(
         }
     }
 
-    private fun buildGreeting(): String {
-        val hour = LocalTime.now().hour
-        return when {
-            hour < 5 -> "Jó éjszakát"
-            hour < 9 -> "Jó reggelt"
-            hour < 18 -> "Szia"
-            else -> "Jó estét"
-        }
-    }
 
     companion object {
         fun provideFactory(

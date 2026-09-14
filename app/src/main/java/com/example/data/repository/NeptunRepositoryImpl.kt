@@ -11,6 +11,8 @@ import com.example.data.local.entity.FinanceItemEntity
 import com.example.data.local.entity.NeptunMessageEntity
 import com.example.data.local.entity.SubjectGradeEntity
 import com.example.data.network.MockNeptunDataSource
+import com.example.R
+import com.example.core.locale.StringProvider
 import com.example.data.network.NeptunApiClient
 import com.example.data.network.NeptunAuthResult
 import com.example.data.network.NeptunUnauthorizedException
@@ -29,7 +31,8 @@ import kotlinx.coroutines.withContext
 class NeptunRepositoryImpl(
     private val database: NeptunDatabase,
     private val prefsManager: EncryptedPreferencesManager,
-    private val neptunApiClient: NeptunApiClient = NeptunApiClient()
+    private val strings: StringProvider,
+    private val neptunApiClient: NeptunApiClient = NeptunApiClient(strings)
 ) : NeptunRepository {
 
     override fun getCalendarEvents(): Flow<List<CalendarEvent>> {
@@ -168,7 +171,8 @@ class NeptunRepositoryImpl(
         if (isElte && deviceCookie.isNotBlank()) {
             try {
                 val aspBaseUrl = normalizeAspBaseUrl(loginUrl.ifEmpty { creds.neptunUrl })
-                val renewResult = neptunApiClient.renewSessionWithCookies(aspBaseUrl, deviceCookie, creds.neptunCode)
+                val renewLcid = prefsManager.getLoginLcid().takeIf { it > 0 } ?: prefsManager.getServerLanguageLcid()
+                val renewResult = neptunApiClient.renewSessionWithCookies(aspBaseUrl, deviceCookie, creds.neptunCode, renewLcid)
                 when (renewResult) {
                     is NeptunAuthResult.Success -> {
                         prefsManager.setAccessToken(renewResult.accessToken)
@@ -195,7 +199,15 @@ class NeptunRepositoryImpl(
         val password = prefsManager.getPassword()
         if (creds.neptunCode.isNotEmpty() && password.isNotEmpty() && password != "******") {
             try {
-                val authRes = neptunApiClient.authenticate(loginUrl, creds.neptunCode, password, deviceCookie)
+                // Megjegyzés: a deviceCookie-t névvel ellátott argumentumként adjuk át,
+                // különben a twoFactorCode paraméterbe kerülne (korábbi pozíciós hiba).
+                val authRes = neptunApiClient.authenticate(
+                    rawUrl = loginUrl,
+                    neptunCode = creds.neptunCode,
+                    password = password,
+                    savedDeviceCookie = deviceCookie,
+                    lcid = prefsManager.getServerLanguageLcid()
+                )
                 when {
                     authRes is NeptunAuthResult.Success && authRes.accessToken.isNotBlank() -> {
                         prefsManager.setAccessToken(authRes.accessToken)
@@ -215,7 +227,7 @@ class NeptunRepositoryImpl(
                             prefsManager.markSessionExpired()
                         }
                     }
-                    authRes is NeptunAuthResult.Failure && !authRes.message.contains("Hálózati", ignoreCase = true) -> {
+                    authRes is NeptunAuthResult.Failure && !authRes.isNetworkError -> {
                         val isStillValid = if (isModern) !neptunApiClient.isJwtExpired(currentToken, bufferSeconds = 0)
                                            else neptunApiClient.isTokenValid(baseUrl, currentToken, deviceCookie)
                         if (!isStillValid) {
@@ -792,7 +804,12 @@ class NeptunRepositoryImpl(
 
         // If message is in db, populate readable detail so user never gets stuck on placeholder
         if (existing != null) {
-            val fallbackContent = "Kedves Hallgató!\n\nTájékoztatjuk a(z) \"${existing.subject}\" tárgyú hivatalos üzenettel kapcsolatban.\n\nFeladó: ${existing.sender}\nDátum: ${existing.sendDate}\n\nÜdvözlettel,\n${existing.sender}"
+            val fallbackContent = strings.getString(
+                R.string.repo_msg_fallback,
+                existing.subject,
+                existing.sender,
+                existing.sendDate
+            )
             database.messagesDao().updateMessageBody(
                 id = messageId,
                 bodyHtml = fallbackContent,
