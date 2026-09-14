@@ -1,3 +1,23 @@
 <resources>
     <string name="app_name">Neptun Mobile</string>
+    <string name="nav_dashboard">Kezdőlap</string>
+    <string name="nav_timetable">Órarend</string>
+    <string name="nav_grades">Jegyek</string>
+    <string name="nav_messages">Üzenetek</string>
+    <string name="nav_finances">Pénzügyek</string>
+    <string name="nav_settings">Beállítások</string>
+
+    <string name="notification_channel_general">Általános értesítések</string>
+    <string name="notification_channel_classes">Órarendi emlékeztetők</string>
+    <string name="notification_channel_messages">Új üzenetek</string>
+    <string name="notification_channel_grades">Új jegyek</string>
+    <string name="notification_channel_finances">Pénzügyi határidők</string>
+
+    <string name="btn_login">Bejelentkezés</string>
+    <string name="btn_logout">Kijelentkezés</string>
+    <string name="btn_save">Mentés</string>
+    <string name="btn_cancel">Mégse</string>
+    <string name="btn_close">Bezárás</string>
+    <string name="btn_retry">Újrapróbálás</string>
+    <string name="btn_refresh">Frissítés</string>
 </resources>

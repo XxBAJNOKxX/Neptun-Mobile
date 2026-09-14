@@ -40,6 +40,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.core.i18n.currentStrings
 import com.example.domain.model.CalendarEvent
 import com.example.presentation.navigation.NavigationItem
 import com.example.presentation.ui.components.CourseTypeBadge
@@ -60,14 +61,16 @@ fun DashboardScreen(
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val strings = currentStrings()
+
     Column(
         modifier = modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
         NeptunTopBar(
-            title = "Kezdőlap",
-            subtitle = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy. MMMM d. EEEE", Locale("hu"))),
+            title = strings.navDashboard,
+            subtitle = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy. MMMM d. EEEE", Locale(strings.languageCode))),
             isRefreshing = uiState.isRefreshing,
             onRefresh = onRefresh
         )
@@ -92,7 +95,9 @@ fun DashboardScreen(
                     if (isDemoData) {
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Demo adatokat látsz – a valódi adataid bejelentkezés után szinkronizálódnak.",
+                            text = if (strings.languageCode == "hu") "Demo adatokat látsz – a valódi adataid bejelentkezés után szinkronizálódnak."
+                            else if (strings.languageCode == "de") "Sie sehen Demo-Daten – echte Daten werden nach der Anmeldung synchronisiert."
+                            else "Viewing demo data – your real data will synchronize after logging in.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -117,7 +122,7 @@ fun DashboardScreen(
                 ) {
                     QuickStatCard(
                         icon = Icons.Default.Mail,
-                        label = "Olvasatlan\nüzenet",
+                        label = if (strings.languageCode == "hu") "Olvasatlan\nüzenet" else if (strings.languageCode == "de") "Ungelesene\nNachrichten" else "Unread\nMessages",
                         value = "${uiState.unreadMessages}",
                         tint = MaterialTheme.colorScheme.primary,
                         onClick = { onNavigate(NavigationItem.MESSAGES) },
@@ -125,7 +130,7 @@ fun DashboardScreen(
                     )
                     QuickStatCard(
                         icon = Icons.Default.Grading,
-                        label = "Legutóbbi\njegy",
+                        label = if (strings.languageCode == "hu") "Legutóbbi\njegy" else if (strings.languageCode == "de") "Letzte\nNote" else "Latest\nGrade",
                         value = uiState.latestGrades.firstOrNull()?.grade?.toString() ?: "–",
                         tint = NeptunGreen,
                         onClick = { onNavigate(NavigationItem.GRADES) },
@@ -133,7 +138,7 @@ fun DashboardScreen(
                     )
                     QuickStatCard(
                         icon = Icons.Default.AccountBalanceWallet,
-                        label = "Fizetendő\n(Ft)",
+                        label = if (strings.languageCode == "hu") "Fizetendő\n(Ft)" else if (strings.languageCode == "de") "Zu zahlen\n(Ft)" else "Due\n(HUF)",
                         value = if (uiState.pendingFinanceHuf > 0) formatShort(uiState.pendingFinanceHuf) else "0",
                         tint = if (uiState.pendingFinanceHuf > 0) MaterialTheme.colorScheme.error else NeptunGreen,
                         onClick = { onNavigate(NavigationItem.FINANCES) },
@@ -145,7 +150,7 @@ fun DashboardScreen(
             // Mai órák listája
             item {
                 Text(
-                    text = "Mai órák (${uiState.todayClasses.size})",
+                    text = "${strings.todayClasses} (${uiState.todayClasses.size})",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
@@ -164,7 +169,7 @@ fun DashboardScreen(
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text(
-                                text = "Ma nincs több órád 🎉",
+                                text = strings.noMoreClassesToday,
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -233,6 +238,7 @@ private fun NextClassCard(
     next: CalendarEvent?,
     onOpenTimetable: () -> Unit
 ) {
+    val strings = currentStrings()
     val event = ongoing ?: next
     Card(
         shape = RoundedCornerShape(20.dp),
@@ -251,15 +257,10 @@ private fun NextClassCard(
         if (event == null) {
             Column(modifier = Modifier.padding(18.dp)) {
                 Text(
-                    text = "Ma nincs több órád",
+                    text = strings.noMoreClassesToday,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = "Pihenj egyet, vagy nézd meg a pénzügyeidet!",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         } else {
@@ -273,7 +274,8 @@ private fun NextClassCard(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = if (ongoing != null) "Épp most zajlik" else "Következő óra",
+                        text = if (ongoing != null) (if (strings.languageCode == "hu") "Épp most zajlik" else if (strings.languageCode == "de") "Läuft gerade" else "In progress")
+                               else strings.nextClass,
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Bold,
                         color = if (ongoing != null) NeptunGreen else MaterialTheme.colorScheme.primary

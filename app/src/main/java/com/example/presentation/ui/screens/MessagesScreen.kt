@@ -67,6 +67,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.core.i18n.currentStrings
 import com.example.domain.model.NeptunMessage
 import com.example.presentation.ui.components.NeptunTopBar
 import com.example.presentation.ui.util.rememberHtmlAnnotatedString
@@ -85,6 +86,7 @@ fun MessagesScreen(
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val strings = currentStrings()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     Column(
@@ -93,8 +95,9 @@ fun MessagesScreen(
             .background(MaterialTheme.colorScheme.background)
     ) {
         NeptunTopBar(
-            title = "Neptun Üzenetek",
-            subtitle = if (uiState.unreadCount > 0) "${uiState.unreadCount} olvasatlan üzenet" else "Minden üzenet elolvasva",
+            title = strings.messagesTitle,
+            subtitle = if (uiState.unreadCount > 0) strings.unreadMessagesCount(uiState.unreadCount)
+                       else (if (strings.languageCode == "hu") "Minden üzenet elolvasva" else if (strings.languageCode == "de") "Alle Nachrichten gelesen" else "All messages read"),
             isRefreshing = uiState.isRefreshing,
             onRefresh = onRefresh
         )
@@ -108,7 +111,8 @@ fun MessagesScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = if (uiState.showUnreadOnly) "Olvasatlan üzenetek" else "Összes üzenet (${uiState.messages.size})",
+                text = if (uiState.showUnreadOnly) strings.unreadOnly
+                       else (if (strings.languageCode == "hu") "Összes üzenet (${uiState.messages.size})" else if (strings.languageCode == "de") "Alle Nachrichten (${uiState.messages.size})" else "All Messages (${uiState.messages.size})"),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
@@ -117,11 +121,11 @@ fun MessagesScreen(
             FilterChip(
                 selected = uiState.showUnreadOnly,
                 onClick = onToggleUnreadFilter,
-                label = { Text("Csak olvasatlanok") },
+                label = { Text(strings.unreadOnly) },
                 leadingIcon = {
                     Icon(
                         imageVector = if (uiState.showUnreadOnly) Icons.Default.MarkEmailRead else Icons.Default.FilterList,
-                        contentDescription = "Szűrés",
+                        contentDescription = strings.unreadOnly,
                         modifier = Modifier.size(16.dp)
                     )
                 },
@@ -140,8 +144,8 @@ fun MessagesScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 2.dp),
-            placeholder = { Text("Keresés feladó vagy tárgy szerint…") },
-            leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Keresés") },
+            placeholder = { Text(strings.searchMessages) },
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = strings.search) },
             singleLine = true,
             shape = RoundedCornerShape(14.dp)
         )

@@ -55,6 +55,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.example.core.i18n.currentStrings
 import com.example.domain.model.ExamItem
 import com.example.domain.model.SubjectGrade
 import com.example.presentation.ui.components.GradeBadge
@@ -81,14 +82,18 @@ fun GradesScreen(
     onRefreshExams: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val strings = currentStrings()
+
     Column(
         modifier = modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
         NeptunTopBar(
-            title = "Jegyek & Átlagszámítás",
-            subtitle = "Kreditindex és Szellemjegy kalkulátor",
+            title = strings.gradesTitle,
+            subtitle = if (strings.languageCode == "hu") "Kreditindex és Szellemjegy kalkulátor"
+                       else if (strings.languageCode == "de") "Kreditindex und Notensimulator"
+                       else "Credit Index & Grade Simulator",
             isRefreshing = if (uiState.selectedTab == 0) uiState.isRefreshing else uiState.isRefreshingExams,
             onRefresh = if (uiState.selectedTab == 0) onRefresh else onRefreshExams
         )
@@ -104,14 +109,14 @@ fun GradesScreen(
                 onClick = { onTabSelect(0) },
                 shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
             ) {
-                Text("Jegyek")
+                Text(strings.navGrades)
             }
             SegmentedButton(
                 selected = uiState.selectedTab == 1,
                 onClick = { onTabSelect(1) },
                 shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
             ) {
-                Text("Vizsgák")
+                Text(if (strings.languageCode == "hu") "Vizsgák" else if (strings.languageCode == "de") "Prüfungen" else "Exams")
             }
         }
 
