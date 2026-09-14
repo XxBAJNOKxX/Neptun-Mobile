@@ -33,6 +33,10 @@ class SyncWorker(
             val notifPrefs = prefs.loadNotificationPreferences()
 
             if (creds != null && creds.isLoggedIn) {
+                val preSyncMessages = app.appContainer.database.messagesDao().getAllMessages().first()
+                val preSyncGrades = app.appContainer.database.gradesDao().getAllGrades().first()
+                val preSyncFinances = app.appContainer.database.financesDao().getAllFinances().first()
+
                 // 1. Sync all repository data from network
                 app.appContainer.neptunRepository.syncAllData(
                     neptunCode = creds.neptunCode,
@@ -44,9 +48,9 @@ class SyncWorker(
                 val tracker = NotifiedItemsTracker(prefs)
                 val quiet = notifPrefs.isQuietNow(currentMinuteOfDay())
 
-                // 2. Új, olvasatlan üzenetekről értesítés (csak egyszer minden üzenetről)
+                // 2. Új, frissen beérkezett üzenetekről értesítés (csak és kizárólag a friss üzenetekről)
                 if (notifPrefs.notifyMessages && !quiet) {
-                    notifyNewMessages(app, tracker)
+                    notifyNewMessages(app, tracker, preSyncMessages)
                 }
 
                 // 3. Órarendi emlékeztetők ütemezése
@@ -56,12 +60,12 @@ class SyncWorker(
 
                 // 4. Új jegyekről értesítés
                 if (notifPrefs.notifyGrades && !quiet) {
-                    notifyNewGrades(app, tracker)
+                    notifyNewGrades(app, tracker, preSyncGrades)
                 }
 
                 // 5. Befizetendő pénzügyi tételekről értesítés
                 if (notifPrefs.notifyFinances && !quiet) {
-                    notifyPendingFinances(app, tracker)
+                    notifyPendingFinances(app, tracker, preSyncFinances)
                 }
 
                 // 6. Kezdőképernyő-widget frissítése
@@ -83,14 +87,47 @@ class SyncWorker(
         return now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE)
     }
 
-    private suspend fun notifyNewMessages(app: NeptunApp, tracker: NotifiedItemsTracker) {
-        val messages = app.appContainer.neptunRepository.getMessages().first()
-        val unread = messages.filter { !it.isRead }
-        if (unread.isEmpty()) return
+    private suspend fun notifyNewMessages(
+        app: NeptunApp,
+        tracker: NotifiedItemsTracker,
+        preSyncMessages: List<com.example.data.local.entity.NeptunMessageEntity>
+    ) {
+        val currentMessages = app.appContainer.neptunRepository.getMessages().first()
+        if (currentMessages.isEmpty()) return
+
+        // Ha ez az első szinkronizáció (üres volt a helyi adatbázis), a meglévő üzeneteket mind látottnak jelöljük, nem küldünk értesítést
+        if (preSyncMessages.isEmpty() || !app.appContainer.prefsManager.isBaselineDone(KEY_MESSAGES)) {
+            tracker.recordKnownItems(
+                key = KEY_MESSAGES,
+                items = currentMessages,
+                idOf = { it.id },
+                altIdOf = { "${it.sender.trim()}_${it.subject.trim()}_${it.sendDate.trim()}" }
+            )
+            return
+        }
+
+        val preSyncIds = preSyncMessages.map { it.id }.toSet()
+        val preSyncKeys = preSyncMessages.map { "${it.sender.trim()}_${it.subject.trim()}_${it.sendDate.trim()}" }.toSet()
+
+        // Csak azok az üzenetek lehetnek újak, amelyek a szinkronizáció előtt még NEM voltak az adatbázisban és olvasatlanok
+        val incomingMessages = currentMessages.filter { msg ->
+            val key = "${msg.sender.trim()}_${msg.subject.trim()}_${msg.sendDate.trim()}"
+            !msg.isRead && msg.id !in preSyncIds && key !in preSyncKeys
+        }
+
+        if (incomingMessages.isEmpty()) {
+            tracker.recordKnownItems(
+                key = KEY_MESSAGES,
+                items = currentMessages,
+                idOf = { it.id },
+                altIdOf = { "${it.sender.trim()}_${it.subject.trim()}_${it.sendDate.trim()}" }
+            )
+            return
+        }
 
         val newOnes = tracker.filterNewItems(
             key = KEY_MESSAGES,
-            items = unread,
+            items = incomingMessages,
             idOf = { it.id },
             altIdOf = { "${it.sender.trim()}_${it.subject.trim()}_${it.sendDate.trim()}" }
         )
@@ -118,16 +155,54 @@ class SyncWorker(
             listOf(msg.id, "${msg.sender.trim()}_${msg.subject.trim()}_${msg.sendDate.trim()}")
         }
         tracker.markNotified(KEY_MESSAGES, idsToMark)
+        tracker.recordKnownItems(
+            key = KEY_MESSAGES,
+            items = currentMessages,
+            idOf = { it.id },
+            altIdOf = { "${it.sender.trim()}_${it.subject.trim()}_${it.sendDate.trim()}" }
+        )
     }
 
-    private suspend fun notifyNewGrades(app: NeptunApp, tracker: NotifiedItemsTracker) {
-        val grades = app.appContainer.neptunRepository.getSubjectGrades().first()
-        val graded = grades.filter { it.grade != null }
+    private suspend fun notifyNewGrades(
+        app: NeptunApp,
+        tracker: NotifiedItemsTracker,
+        preSyncGrades: List<com.example.data.local.entity.SubjectGradeEntity>
+    ) {
+        val currentGrades = app.appContainer.neptunRepository.getSubjectGrades().first()
+        val graded = currentGrades.filter { it.grade != null }
         if (graded.isEmpty()) return
+
+        if (preSyncGrades.isEmpty() || !app.appContainer.prefsManager.isBaselineDone(KEY_GRADES)) {
+            tracker.recordKnownItems(
+                key = KEY_GRADES,
+                items = graded,
+                idOf = { it.id },
+                altIdOf = { "${it.subjectName.trim()}_${it.gradeText.trim()}" }
+            )
+            return
+        }
+
+        val preSyncKeys = preSyncGrades.map { "${it.subjectName.trim()}_${it.gradeText.trim()}" }.toSet()
+        val preSyncIds = preSyncGrades.map { it.id }.toSet()
+
+        val incomingGrades = graded.filter { g ->
+            val key = "${g.subjectName.trim()}_${g.gradeText.trim()}"
+            g.id !in preSyncIds || key !in preSyncKeys
+        }
+
+        if (incomingGrades.isEmpty()) {
+            tracker.recordKnownItems(
+                key = KEY_GRADES,
+                items = graded,
+                idOf = { it.id },
+                altIdOf = { "${it.subjectName.trim()}_${it.gradeText.trim()}" }
+            )
+            return
+        }
 
         val newOnes = tracker.filterNewItems(
             key = KEY_GRADES,
-            items = graded,
+            items = incomingGrades,
             idOf = { it.id },
             altIdOf = { "${it.subjectName.trim()}_${it.gradeText.trim()}" }
         )
@@ -157,9 +232,19 @@ class SyncWorker(
             listOf(grade.id, "${grade.subjectName.trim()}_${grade.gradeText.trim()}")
         }
         tracker.markNotified(KEY_GRADES, idsToMark)
+        tracker.recordKnownItems(
+            key = KEY_GRADES,
+            items = graded,
+            idOf = { it.id },
+            altIdOf = { "${it.subjectName.trim()}_${it.gradeText.trim()}" }
+        )
     }
 
-    private suspend fun notifyPendingFinances(app: NeptunApp, tracker: NotifiedItemsTracker) {
+    private suspend fun notifyPendingFinances(
+        app: NeptunApp,
+        tracker: NotifiedItemsTracker,
+        preSyncFinances: List<com.example.data.local.entity.FinanceItemEntity>
+    ) {
         val finances = app.appContainer.neptunRepository.getFinances().first()
         val pending = finances.filter {
             it.status == com.example.domain.model.FinanceStatus.PENDING ||
@@ -167,9 +252,37 @@ class SyncWorker(
         }
         if (pending.isEmpty()) return
 
+        if (preSyncFinances.isEmpty() || !app.appContainer.prefsManager.isBaselineDone(KEY_FINANCES)) {
+            tracker.recordKnownItems(
+                key = KEY_FINANCES,
+                items = pending,
+                idOf = { it.id },
+                altIdOf = { "${it.title.trim()}_${it.amountHuf}_${it.dueDate.trim()}" }
+            )
+            return
+        }
+
+        val preSyncIds = preSyncFinances.map { it.id }.toSet()
+        val preSyncKeys = preSyncFinances.map { "${it.title.trim()}_${it.amountHuf}_${it.dueDate.trim()}" }.toSet()
+
+        val incomingFinances = pending.filter { f ->
+            val key = "${f.title.trim()}_${f.amountHuf}_${f.dueDate.trim()}"
+            f.id !in preSyncIds && key !in preSyncKeys
+        }
+
+        if (incomingFinances.isEmpty()) {
+            tracker.recordKnownItems(
+                key = KEY_FINANCES,
+                items = pending,
+                idOf = { it.id },
+                altIdOf = { "${it.title.trim()}_${it.amountHuf}_${it.dueDate.trim()}" }
+            )
+            return
+        }
+
         val newOnes = tracker.filterNewItems(
             key = KEY_FINANCES,
-            items = pending,
+            items = incomingFinances,
             idOf = { it.id },
             altIdOf = { "${it.title.trim()}_${it.amountHuf}_${it.dueDate.trim()}" }
         )
@@ -197,6 +310,12 @@ class SyncWorker(
             listOf(item.id, "${item.title.trim()}_${item.amountHuf}_${item.dueDate.trim()}")
         }
         tracker.markNotified(KEY_FINANCES, idsToMark)
+        tracker.recordKnownItems(
+            key = KEY_FINANCES,
+            items = pending,
+            idOf = { it.id },
+            altIdOf = { "${it.title.trim()}_${it.amountHuf}_${it.dueDate.trim()}" }
+        )
     }
 
     private suspend fun scheduleClassAlarms(app: NeptunApp, notifPrefs: com.example.core.security.NotificationPreferences) {

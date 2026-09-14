@@ -497,8 +497,12 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
         val savedPersonalization = loadPersonalization()
         val savedNotifQuiet = loadNotificationPreferences()
 
-        prefs.edit()
-            .clear()
+        // Preserve already notified items and baselines so re-login or sync doesn't re-trigger notifications
+        val savedNotifiedEntries = prefs.all.filter { (k, _) ->
+            k.startsWith(KEY_NOTIFIED_PREFIX) || k.startsWith(KEY_NOTIFIED_BASELINE_PREFIX)
+        }
+
+        val editor = prefs.edit().clear()
             .putString(KEY_SELECTED_UNIVERSITY_ID, savedUniId)
             .putString(KEY_SELECTED_UNIVERSITY_NAME, savedUniName)
             .putString(KEY_SELECTED_UNIVERSITY_URL, savedUniUrl)
@@ -522,7 +526,15 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
             .putInt(KEY_QUIET_START_MINUTE, savedNotifQuiet.quietStartMinute)
             .putInt(KEY_QUIET_END_MINUTE, savedNotifQuiet.quietEndMinute)
             .putBoolean(KEY_IS_LOGGED_IN, false)
-            .apply()
+
+        for ((k, v) in savedNotifiedEntries) {
+            when (v) {
+                is Boolean -> editor.putBoolean(k, v)
+                is Set<*> -> @Suppress("UNCHECKED_CAST") editor.putStringSet(k, v as Set<String>)
+                is String -> editor.putString(k, v)
+            }
+        }
+        editor.apply()
 
         _credentialsFlow.value = null
         _sessionExpiredFlow.value = false
