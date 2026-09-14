@@ -56,8 +56,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.res.pluralStringResource
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -65,7 +63,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.R
 import com.example.domain.model.CalendarEvent
 import com.example.presentation.ui.components.CourseTypeBadge
 import com.example.presentation.ui.components.NeptunTopBar
@@ -73,25 +70,20 @@ import com.example.presentation.viewmodel.TimetableUiState
 import com.example.ui.theme.NeptunBlue40
 import com.example.ui.theme.NeptunCyan40
 import com.example.ui.theme.NeptunGreen
-import java.time.DayOfWeek
-import java.time.format.TextStyle
-import java.util.Locale
 import kotlinx.coroutines.launch
 
-private val DAY_NUMBERS = listOf(1, 2, 3, 4, 5)
+private val DAYS = listOf(
+    1 to "Hétfő",
+    2 to "Kedd",
+    3 to "Szerda",
+    4 to "Csütörtök",
+    5 to "Péntek"
+)
 
-private val WEEKEND_NUMBERS = listOf(6, 7)
-
-/**
- * Napnév az app nyelvén, nagy kezdőbetűvel ("Hétfő" / "Monday" / "Montag").
- * A ViewModel honosított napnevének tartaléka, ha a heti lista még nem elérhető.
- */
-private fun dayDisplayName(dayNum: Int): String {
-    val locale = Locale.getDefault()
-    return DayOfWeek.of(dayNum)
-        .getDisplayName(TextStyle.FULL, locale)
-        .replaceFirstChar { it.uppercase() }
-}
+private val WEEKEND_DAYS = listOf(
+    6 to "Szombat",
+    7 to "Vasárnap"
+)
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
@@ -107,7 +99,7 @@ fun TimetableScreen(
     modifier: Modifier = Modifier
 ) {
     val coroutineScope = rememberCoroutineScope()
-    val dayList = if (uiState.showWeekend) DAY_NUMBERS + WEEKEND_NUMBERS else DAY_NUMBERS
+    val dayList = if (uiState.showWeekend) DAYS + WEEKEND_DAYS else DAYS
     val pageCount = dayList.size
     val pagerState = rememberPagerState(
         initialPage = (uiState.selectedDayOfWeek - 1).coerceIn(0, pageCount - 1),
@@ -129,16 +121,9 @@ fun TimetableScreen(
         }
     }
 
-    // A LaunchedEffect nem @Composable környezet: a szöveget itt oldjuk fel.
-    val scheduledReminderMins = uiState.scheduledReminderMins
-    val reminderScheduledText = pluralStringResource(
-        R.plurals.tt_reminder_scheduled,
-        scheduledReminderMins,
-        scheduledReminderMins
-    )
     LaunchedEffect(uiState.notificationScheduledId) {
         if (uiState.notificationScheduledId != null) {
-            snackbarHostState.showSnackbar(reminderScheduledText)
+            snackbarHostState.showSnackbar("Értesítés beállítva 15 perccel az óra előtt!")
         }
     }
 
@@ -148,8 +133,8 @@ fun TimetableScreen(
             .background(MaterialTheme.colorScheme.background)
     ) {
         NeptunTopBar(
-            title = stringResource(R.string.tt_title),
-            subtitle = if (uiState.isWeekView) stringResource(R.string.tt_sub_week) else stringResource(R.string.tt_sub_day),
+            title = "Heti Órarend",
+            subtitle = if (uiState.isWeekView) "Heti összesített nézet" else "Napi bontás",
             isRefreshing = uiState.isRefreshing,
             onRefresh = onRefresh
         )
@@ -172,7 +157,7 @@ fun TimetableScreen(
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = stringResource(R.string.tt_prev_desc),
+                        contentDescription = "Előző hét",
                         tint = MaterialTheme.colorScheme.primary
                     )
                 }
@@ -190,7 +175,7 @@ fun TimetableScreen(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = uiState.weekLabel.ifEmpty { stringResource(R.string.tt_fallback_title) },
+                        text = uiState.weekLabel.ifEmpty { "Órarend" },
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -204,7 +189,7 @@ fun TimetableScreen(
                             modifier = Modifier.clickable { onCurrentWeek() }
                         ) {
                             Text(
-                                text = stringResource(R.string.tt_this_week),
+                                text = "Mai hét",
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -220,7 +205,7 @@ fun TimetableScreen(
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                        contentDescription = stringResource(R.string.tt_next_desc),
+                        contentDescription = "Következő hét",
                         tint = MaterialTheme.colorScheme.primary
                     )
                 }
@@ -237,12 +222,7 @@ fun TimetableScreen(
         ) {
             val currentDayInfo = uiState.weekDays.getOrNull(uiState.selectedDayOfWeek - 1)
             Text(
-                text = if (uiState.isWeekView) stringResource(R.string.tt_full_week)
-                    else stringResource(
-                        R.string.tt_day_classes,
-                        currentDayInfo?.dayName ?: "",
-                        currentDayInfo?.dateFormatted ?: ""
-                    ),
+                text = if (uiState.isWeekView) "Teljes heti nézet" else "${currentDayInfo?.dayName ?: ""}i órák (${currentDayInfo?.dateFormatted ?: ""})",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
@@ -252,12 +232,12 @@ fun TimetableScreen(
                 selected = uiState.isWeekView,
                 onClick = onToggleWeekView,
                 label = {
-                    Text(if (uiState.isWeekView) stringResource(R.string.tt_to_day) else stringResource(R.string.tt_to_week))
+                    Text(if (uiState.isWeekView) "Napi nézet" else "Heti áttekintés")
                 },
                 leadingIcon = {
                     Icon(
                         imageVector = if (uiState.isWeekView) Icons.Default.ViewAgenda else Icons.Default.ViewWeek,
-                        contentDescription = stringResource(R.string.tt_toggle_desc),
+                        contentDescription = "Nézet váltása",
                         modifier = Modifier.size(16.dp)
                     )
                 },
@@ -277,15 +257,14 @@ fun TimetableScreen(
                 containerColor = MaterialTheme.colorScheme.surface,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                dayList.forEachIndexed { index, dayNum ->
-                    val isSelected = uiState.selectedDayOfWeek == dayNum
+                dayList.forEachIndexed { index, pair ->
+                    val isSelected = uiState.selectedDayOfWeek == pair.first
                     val dayInfo = uiState.weekDays.getOrNull(index)
-                    val name = dayInfo?.dayName ?: dayDisplayName(dayNum)
-                    val label = if (dayInfo != null) "$name (${dayInfo.dateFormatted})" else name
+                    val label = if (dayInfo != null) "${pair.second} (${dayInfo.dateFormatted})" else pair.second
                     Tab(
                         selected = isSelected,
                         onClick = {
-                            onDaySelect(dayNum)
+                            onDaySelect(pair.first)
                             coroutineScope.launch {
                                 pagerState.animateScrollToPage(index)
                             }
@@ -297,7 +276,7 @@ fun TimetableScreen(
                                 color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         },
-                        modifier = Modifier.testTag("day_tab_$dayNum")
+                        modifier = Modifier.testTag("day_tab_${pair.first}")
                     )
                 }
             }
@@ -312,7 +291,7 @@ fun TimetableScreen(
             ) {
                 uiState.ongoingEvent?.let { ongoing ->
                     LiveHighlightBanner(
-                        title = stringResource(R.string.tt_live_ongoing),
+                        title = "Éppen zajló óra",
                         event = ongoing,
                         badgeColor = NeptunGreen,
                         icon = Icons.Default.PlayCircle,
@@ -324,7 +303,7 @@ fun TimetableScreen(
 
                 uiState.nextUpcomingEvent?.let { nextUp ->
                     LiveHighlightBanner(
-                        title = stringResource(R.string.tt_live_next),
+                        title = "Következő óra ma",
                         event = nextUp,
                         badgeColor = NeptunCyan40,
                         icon = Icons.Default.Upcoming,
@@ -354,9 +333,8 @@ fun TimetableScreen(
             ) {
                 item { Spacer(modifier = Modifier.height(4.dp)) }
 
-                dayList.forEachIndexed { idx, dayNum ->
+                dayList.forEachIndexed { idx, (dayNum, dayName) ->
                     val weekDay = uiState.weekDays.getOrNull(idx)
-                    val dayName = weekDay?.dayName ?: dayDisplayName(dayNum)
                     val dayEvents = if (hasDatedEvents && weekDay != null) {
                         uiState.events.filter { it.dateString.startsWith(weekDay.isoDate) }
                     } else {
@@ -376,7 +354,7 @@ fun TimetableScreen(
 
                     if (dayEvents.isEmpty()) {
                         item {
-                            EmptyDayNotice(message = stringResource(R.string.tt_empty_day_week))
+                            EmptyDayNotice(message = "Ezen a napon nincs tanóra ezen a héten.")
                         }
                     } else {
                         items(dayEvents) { event ->
@@ -412,7 +390,7 @@ fun TimetableScreen(
                             .padding(24.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        EmptyDayNotice(message = stringResource(R.string.tt_empty_day))
+                        EmptyDayNotice(message = "Erre a napra nincs felvett órád ezen a héten.")
                     }
                 } else {
                     LazyColumn(
@@ -491,7 +469,7 @@ private fun LiveHighlightBanner(
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = "${event.timeFormatted} • ${formatRoomAndLocation(event.room, event.location, stringResource(R.string.tt_no_room))}",
+                    text = "${event.timeFormatted} • ${formatRoomAndLocation(event.room, event.location)}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -502,7 +480,7 @@ private fun LiveHighlightBanner(
             ) {
                 Icon(
                     imageVector = Icons.Default.Alarm,
-                    contentDescription = stringResource(R.string.tt_alarm_desc_banner),
+                    contentDescription = "Értesítés beállítása",
                     tint = MaterialTheme.colorScheme.primary
                 )
             }
@@ -510,14 +488,14 @@ private fun LiveHighlightBanner(
     }
 }
 
-fun formatRoomAndLocation(room: String, location: String, noRoomText: String): String {
+fun formatRoomAndLocation(room: String, location: String): String {
     val r = room.trim()
     val l = location.trim()
     val isRGeneric = r.isEmpty() || r.equals("Nincs megadva", ignoreCase = true) || r.equals("Nincs terem", ignoreCase = true)
     val isLGeneric = l.isEmpty() || l.equals("Nincs megadva", ignoreCase = true) || l.equals("Nincs terem", ignoreCase = true)
 
     return when {
-        isRGeneric && isLGeneric -> noRoomText
+        isRGeneric && isLGeneric -> "Nincs terem megadva"
         !isRGeneric && isLGeneric -> r
         isRGeneric && !isLGeneric -> l
         r.equals(l, ignoreCase = true) -> r
@@ -584,7 +562,7 @@ fun TimetableEventCard(
                             modifier = Modifier.padding(end = 6.dp)
                         ) {
                             Text(
-                                text = stringResource(R.string.tt_badge_live),
+                                text = "ÉPPEN ZAJLIK",
                                 color = NeptunGreen,
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.ExtraBold,
@@ -598,7 +576,7 @@ fun TimetableEventCard(
                             modifier = Modifier.padding(end = 6.dp)
                         ) {
                             Text(
-                                text = stringResource(R.string.tt_badge_next),
+                                text = "KÖVETKEZŐ",
                                 color = NeptunCyan40,
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.ExtraBold,
@@ -613,7 +591,7 @@ fun TimetableEventCard(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Alarm,
-                            contentDescription = stringResource(R.string.tt_alarm_desc_card),
+                            contentDescription = "Értesítés emlékeztető",
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(18.dp)
                         )
@@ -662,7 +640,7 @@ fun TimetableEventCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         imageVector = Icons.Default.AccessTime,
-                        contentDescription = stringResource(R.string.tt_time_desc),
+                        contentDescription = "Idősáv",
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(16.dp)
                     )
@@ -676,14 +654,13 @@ fun TimetableEventCard(
                 }
 
                 // Room / Location
-                val noRoomText = stringResource(R.string.tt_no_room)
-                val cleanRoomText = remember(event.room, event.location, noRoomText) {
-                    formatRoomAndLocation(event.room, event.location, noRoomText)
+                val cleanRoomText = remember(event.room, event.location) {
+                    formatRoomAndLocation(event.room, event.location)
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         imageVector = Icons.Default.LocationOn,
-                        contentDescription = stringResource(R.string.tt_room_desc),
+                        contentDescription = "Terem",
                         tint = NeptunBlue40,
                         modifier = Modifier.size(16.dp)
                     )
@@ -705,7 +682,7 @@ fun TimetableEventCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         imageVector = Icons.Default.Person,
-                        contentDescription = stringResource(R.string.tt_teacher_desc),
+                        contentDescription = "Oktató",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(14.dp)
                     )

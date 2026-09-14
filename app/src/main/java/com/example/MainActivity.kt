@@ -1,6 +1,5 @@
 package com.example
 
-import android.content.Context
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -12,10 +11,6 @@ import com.example.ui.theme.MyApplicationTheme
 
 // FragmentActivity, mert a biometrikus zár (BiometricPrompt) igényli.
 class MainActivity : FragmentActivity() {
-    override fun attachBaseContext(newBase: Context) {
-        super.attachBaseContext(com.example.core.locale.AppLocales.wrap(newBase))
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()

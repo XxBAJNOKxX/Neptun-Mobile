@@ -33,7 +33,6 @@ import androidx.compose.material.icons.filled.MarkEmailRead
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.foundation.text.selection.SelectionContainer
-import com.example.R
 import com.example.presentation.ui.util.HtmlBlock
 import com.example.presentation.ui.util.HtmlTableView
 import com.example.presentation.ui.util.parseHtmlBlocks
@@ -60,8 +59,6 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.res.pluralStringResource
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -96,12 +93,8 @@ fun MessagesScreen(
             .background(MaterialTheme.colorScheme.background)
     ) {
         NeptunTopBar(
-            title = stringResource(R.string.msg_title),
-            subtitle = if (uiState.unreadCount > 0) pluralStringResource(
-                R.plurals.msg_unread,
-                uiState.unreadCount,
-                uiState.unreadCount
-            ) else stringResource(R.string.msg_all_read),
+            title = "Neptun Üzenetek",
+            subtitle = if (uiState.unreadCount > 0) "${uiState.unreadCount} olvasatlan üzenet" else "Minden üzenet elolvasva",
             isRefreshing = uiState.isRefreshing,
             onRefresh = onRefresh
         )
@@ -115,7 +108,7 @@ fun MessagesScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = if (uiState.showUnreadOnly) stringResource(R.string.msg_unread_only_title) else stringResource(R.string.msg_all_title, uiState.messages.size),
+                text = if (uiState.showUnreadOnly) "Olvasatlan üzenetek" else "Összes üzenet (${uiState.messages.size})",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
@@ -124,11 +117,11 @@ fun MessagesScreen(
             FilterChip(
                 selected = uiState.showUnreadOnly,
                 onClick = onToggleUnreadFilter,
-                label = { Text(stringResource(R.string.msg_filter)) },
+                label = { Text("Csak olvasatlanok") },
                 leadingIcon = {
                     Icon(
                         imageVector = if (uiState.showUnreadOnly) Icons.Default.MarkEmailRead else Icons.Default.FilterList,
-                        contentDescription = stringResource(R.string.msg_filter_desc),
+                        contentDescription = "Szűrés",
                         modifier = Modifier.size(16.dp)
                     )
                 },
@@ -147,8 +140,8 @@ fun MessagesScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 2.dp),
-            placeholder = { Text(stringResource(R.string.msg_search_hint)) },
-            leadingIcon = { Icon(Icons.Default.Search, contentDescription = stringResource(R.string.login_search_desc)) },
+            placeholder = { Text("Keresés feladó vagy tárgy szerint…") },
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Keresés") },
             singleLine = true,
             shape = RoundedCornerShape(14.dp)
         )
@@ -168,13 +161,13 @@ fun MessagesScreen(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(
                         imageVector = Icons.Default.DoneAll,
-                        contentDescription = stringResource(R.string.msg_empty_desc),
+                        contentDescription = "Üres",
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(48.dp)
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        text = if (uiState.showUnreadOnly) stringResource(R.string.msg_empty_unread) else stringResource(R.string.msg_empty),
+                        text = if (uiState.showUnreadOnly) "Nincs olvasatlan üzeneted!" else "Nem érkezett üzenet a fiókodba.",
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -224,13 +217,8 @@ private fun MessageCard(
     message: NeptunMessage,
     onClick: () -> Unit
 ) {
-    val systemSender = stringResource(R.string.msg_system_sender)
-    val displaySender = message.sender.ifBlank { systemSender }
-    // A feladó a szerver nyelvén érkezik: a hivatalos-érzékelés többnyelvű.
-    val isSystem = message.isOfficial || message.sender.isBlank() ||
-        displaySender.contains("hivatal", ignoreCase = true) ||
-        displaySender.contains("official", ignoreCase = true) ||
-        displaySender.contains("offiziell", ignoreCase = true)
+    val displaySender = message.sender.ifBlank { "Rendszerüzenet" }
+    val isSystem = message.isOfficial || displaySender.equals("Rendszerüzenet", ignoreCase = true) || displaySender.contains("hivatal", ignoreCase = true)
 
     Card(
         shape = RoundedCornerShape(16.dp),
@@ -292,7 +280,7 @@ private fun MessageCard(
             Spacer(modifier = Modifier.height(6.dp))
 
             Text(
-                text = message.subject.ifBlank { stringResource(R.string.msg_no_subject) },
+                text = message.subject,
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = if (!message.isRead) FontWeight.Bold else FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface,
@@ -321,13 +309,8 @@ private fun MessageDetailContent(
     onClose: () -> Unit,
     onReload: () -> Unit
 ) {
-    val systemSender = stringResource(R.string.msg_system_sender)
-    val displaySender = message.sender.ifBlank { systemSender }
-    // A feladó a szerver nyelvén érkezik: a hivatalos-érzékelés többnyelvű.
-    val isSystem = message.isOfficial || message.sender.isBlank() ||
-        displaySender.contains("hivatal", ignoreCase = true) ||
-        displaySender.contains("official", ignoreCase = true) ||
-        displaySender.contains("offiziell", ignoreCase = true)
+    val displaySender = message.sender.ifBlank { "Rendszerüzenet" }
+    val isSystem = message.isOfficial || displaySender.equals("Rendszerüzenet", ignoreCase = true) || displaySender.contains("hivatal", ignoreCase = true)
     
     val rawBody = message.bodyHtml.ifBlank { message.previewText }
     val htmlBlocks = remember(rawBody) { parseHtmlBlocks(rawBody) }
@@ -348,7 +331,7 @@ private fun MessageDetailContent(
                 shape = RoundedCornerShape(8.dp)
             ) {
                 Text(
-                    text = if (message.sender.isBlank()) systemSender else if (message.isOfficial || isSystem) stringResource(R.string.msg_badge_official) else stringResource(R.string.msg_badge_teacher),
+                    text = if (displaySender.equals("Rendszerüzenet", ignoreCase = true)) "Rendszerüzenet" else if (message.isOfficial) "Hivatalos Értesítés" else "Oktatói Üzenet",
                     color = if (isSystem) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
@@ -357,14 +340,14 @@ private fun MessageDetailContent(
             }
 
             IconButton(onClick = onClose) {
-                Icon(imageVector = Icons.Default.Close, contentDescription = stringResource(R.string.common_close))
+                Icon(imageVector = Icons.Default.Close, contentDescription = "Bezárás")
             }
         }
 
         Spacer(modifier = Modifier.height(10.dp))
 
         Text(
-            text = message.subject.ifBlank { stringResource(R.string.msg_no_subject) },
+            text = message.subject,
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface
@@ -388,7 +371,7 @@ private fun MessageDetailContent(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = stringResource(R.string.msg_sender, displaySender),
+                        text = "Feladó: $displaySender",
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -403,7 +386,7 @@ private fun MessageDetailContent(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = stringResource(R.string.msg_date, message.sendDate),
+                        text = "Dátum: ${message.sendDate}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -430,7 +413,7 @@ private fun MessageDetailContent(
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        text = stringResource(R.string.msg_loading),
+                        text = "Üzenet tartalmának letöltése a Neptunból...",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -473,7 +456,7 @@ private fun MessageDetailContent(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = stringResource(R.string.msg_empty_body),
+                    text = "A levél tartalma üres vagy nem sikerült közvetlenül betölteni a Neptunból.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -486,7 +469,7 @@ private fun MessageDetailContent(
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text(stringResource(R.string.msg_retry))
+                    Text("Tartalom újrapróbálása")
                 }
             }
         }

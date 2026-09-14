@@ -4,8 +4,6 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.example.R
-import com.example.core.locale.StringProvider
 import com.example.core.security.EncryptedPreferencesManager
 import com.example.core.security.UpdateChannel
 import com.example.core.update.AppUpdateManager
@@ -18,8 +16,7 @@ import kotlinx.coroutines.launch
 import java.io.File
 
 class AppUpdateViewModel(
-    private val strings: StringProvider,
-    private val updateManager: AppUpdateManager = AppUpdateManager(strings),
+    private val updateManager: AppUpdateManager = AppUpdateManager(),
     private val prefsManager: EncryptedPreferencesManager? = null
 ) : ViewModel() {
 
@@ -70,7 +67,7 @@ class AppUpdateViewModel(
                 installDownloadedApk(context, apkFile)
             } catch (e: Exception) {
                 _updateState.value = InAppUpdateState.Error(
-                    e.localizedMessage ?: strings.getString(R.string.update_download_failed)
+                    e.localizedMessage ?: "Hiba történt a letöltés során."
                 )
             }
         }
@@ -94,14 +91,15 @@ class AppUpdateViewModel(
 
     companion object {
         fun provideFactory(
-            strings: StringProvider,
-            updateManager: AppUpdateManager = AppUpdateManager(strings),
+            updateManager: AppUpdateManager = AppUpdateManager(),
             prefsManager: EncryptedPreferencesManager? = null
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                return AppUpdateViewModel(strings, updateManager, prefsManager) as T
+                return AppUpdateViewModel(updateManager, prefsManager) as T
             }
         }
+
+        val Factory: ViewModelProvider.Factory = provideFactory()
     }
 }

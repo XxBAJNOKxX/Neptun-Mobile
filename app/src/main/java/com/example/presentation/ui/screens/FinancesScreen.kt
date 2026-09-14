@@ -34,9 +34,7 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -44,7 +42,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.R
 import com.example.domain.model.FinanceItem
 import com.example.domain.model.FinanceStatus
 import com.example.presentation.ui.components.FinanceStatusBadge
@@ -63,7 +60,7 @@ fun FinancesScreen(
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val numberFormatLocalized = remember { NumberFormat.getNumberInstance(Locale.getDefault()) }
+    val hungarianNumberFormat = NumberFormat.getNumberInstance(Locale("hu", "HU"))
 
     Column(
         modifier = modifier
@@ -71,8 +68,8 @@ fun FinancesScreen(
             .background(MaterialTheme.colorScheme.background)
     ) {
         NeptunTopBar(
-            title = stringResource(R.string.fin_title),
-            subtitle = stringResource(R.string.fin_subtitle),
+            title = "Pénzügyek",
+            subtitle = "Tételek, befizetések és kötelezettségek",
             isRefreshing = uiState.isRefreshing,
             onRefresh = onRefresh
         )
@@ -95,7 +92,7 @@ fun FinancesScreen(
                 FinanceSummaryCard(
                     pendingHuf = uiState.totalPendingHuf,
                     completedHuf = uiState.totalCompletedHuf,
-                    numberFormat = numberFormatLocalized
+                    numberFormat = hungarianNumberFormat
                 )
             }
 
@@ -108,21 +105,21 @@ fun FinancesScreen(
                     FilterChip(
                         selected = uiState.selectedStatusFilter == null,
                         onClick = { onFilterSelect(null) },
-                        label = { Text(stringResource(R.string.fin_filter_all, uiState.allFinances.size)) },
+                        label = { Text("Összes (${uiState.allFinances.size})") },
                         modifier = Modifier.testTag("finance_filter_all")
                     )
 
                     FilterChip(
                         selected = uiState.selectedStatusFilter == FinanceStatus.PENDING,
                         onClick = { onFilterSelect(FinanceStatus.PENDING) },
-                        label = { Text(stringResource(R.string.fin_filter_pending)) },
+                        label = { Text("Kiírva / Fizetendő") },
                         modifier = Modifier.testTag("finance_filter_pending")
                     )
 
                     FilterChip(
                         selected = uiState.selectedStatusFilter == FinanceStatus.COMPLETED,
                         onClick = { onFilterSelect(FinanceStatus.COMPLETED) },
-                        label = { Text(stringResource(FinanceStatus.COMPLETED.labelRes)) },
+                        label = { Text("Teljesítve") },
                         modifier = Modifier.testTag("finance_filter_completed")
                     )
                 }
@@ -147,7 +144,7 @@ fun FinancesScreen(
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = stringResource(R.string.fin_empty),
+                                text = "Nincs ilyen státuszú pénzügyi tétel!",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -158,7 +155,7 @@ fun FinancesScreen(
                 items(uiState.filteredFinances) { item ->
                     FinanceItemCard(
                         item = item,
-                        formattedAmount = stringResource(R.string.fin_amount, numberFormatLocalized.format(item.amountHuf))
+                        formattedAmount = "${hungarianNumberFormat.format(item.amountHuf)} Ft"
                     )
                 }
             }
@@ -192,14 +189,14 @@ private fun FinanceSummaryCard(
                 ) {
                     Icon(
                         imageVector = Icons.Default.AccountBalanceWallet,
-                        contentDescription = stringResource(R.string.fin_title),
+                        contentDescription = "Pénzügyek",
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(20.dp)
                     )
                 }
                 Spacer(modifier = Modifier.width(10.dp))
                 Text(
-                    text = stringResource(R.string.fin_summary),
+                    text = "Pénzügyi Egyenleg",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
@@ -214,13 +211,13 @@ private fun FinanceSummaryCard(
                 // Pending Amount
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = stringResource(R.string.fin_pending),
+                        text = "Fizetendő kötelezettség",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 12.sp
                     )
                     Text(
-                        text = stringResource(R.string.fin_amount, numberFormat.format(pendingHuf)),
+                        text = "${numberFormat.format(pendingHuf)} Ft",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.ExtraBold,
                         color = if (pendingHuf > 0) NeptunRed else MaterialTheme.colorScheme.onSurface
@@ -230,13 +227,13 @@ private fun FinanceSummaryCard(
                 // Completed Amount
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = stringResource(R.string.fin_completed),
+                        text = "Rendezett tételek",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 12.sp
                     )
                     Text(
-                        text = stringResource(R.string.fin_amount, numberFormat.format(completedHuf)),
+                        text = "${numberFormat.format(completedHuf)} Ft",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.ExtraBold,
                         color = NeptunGreen
@@ -291,7 +288,7 @@ private fun FinanceItemCard(
             )
 
             Text(
-                text = stringResource(R.string.fin_meta, item.termName, item.transactionId),
+                text = "Félév: ${item.termName} • Bizonylatszám: ${item.transactionId}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 12.sp
@@ -307,13 +304,13 @@ private fun FinanceItemCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         imageVector = Icons.Default.CalendarToday,
-                        contentDescription = stringResource(R.string.fin_due_desc),
+                        contentDescription = "Határidő",
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(14.dp)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = stringResource(R.string.fin_due, item.dueDate),
+                        text = "Határidő: ${item.dueDate}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurface
                     )
@@ -321,7 +318,7 @@ private fun FinanceItemCard(
 
                 if (item.paymentDate != null) {
                     Text(
-                        text = stringResource(R.string.fin_paid, item.paymentDate ?: ""),
+                        text = "Fizetve: ${item.paymentDate}",
                         style = MaterialTheme.typography.bodySmall,
                         color = NeptunGreen,
                         fontWeight = FontWeight.SemiBold,
