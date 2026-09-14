@@ -1,21 +1,19 @@
 package com.example.ui.theme
 
-import androidx.annotation.StringRes
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
-import com.example.R
 
-enum class ThemeMode(@StringRes val labelRes: Int, @StringRes val descriptionRes: Int) {
-    SYSTEM(R.string.theme_system, R.string.theme_system_desc),
-    LIGHT(R.string.theme_light, R.string.theme_light_desc),
-    DARK(R.string.theme_dark, R.string.theme_dark_desc)
+enum class ThemeMode(val title: String, val description: String) {
+    SYSTEM("Rendszer", "Követi a telefon beállításait"),
+    LIGHT("Világos", "Állandó világos megjelenés"),
+    DARK("Sötét", "Kíméli a szemet sötétben")
 }
 
 enum class AppAccentColor(
     val id: String,
-    @StringRes val labelRes: Int,
+    val title: String,
     val primary: Color,
     val secondary: Color,
     val tertiary: Color,
@@ -24,7 +22,7 @@ enum class AppAccentColor(
 ) {
     BLUE(
         id = "blue",
-        labelRes = R.string.accent_blue,
+        title = "Neptun Kék",
         primary = Color(0xFF1E40AF),
         secondary = Color(0xFF3B82F6),
         tertiary = Color(0xFF0284C7),
@@ -57,7 +55,7 @@ enum class AppAccentColor(
     ),
     INDIGO(
         id = "indigo",
-        labelRes = R.string.accent_indigo,
+        title = "Zafír Indigó",
         primary = Color(0xFF4338CA),
         secondary = Color(0xFF6366F1),
         tertiary = Color(0xFF818CF8),
@@ -90,7 +88,7 @@ enum class AppAccentColor(
     ),
     CYAN(
         id = "cyan",
-        labelRes = R.string.accent_cyan,
+        title = "Óceán Cián",
         primary = Color(0xFF0284C7),
         secondary = Color(0xFF0EA5E9),
         tertiary = Color(0xFF06B6D4),
@@ -123,7 +121,7 @@ enum class AppAccentColor(
     ),
     EMERALD(
         id = "emerald",
-        labelRes = R.string.accent_emerald,
+        title = "Smaragd Zöld",
         primary = Color(0xFF059669),
         secondary = Color(0xFF10B981),
         tertiary = Color(0xFF14B8A6),
@@ -156,7 +154,7 @@ enum class AppAccentColor(
     ),
     GOLD(
         id = "gold",
-        labelRes = R.string.accent_gold,
+        title = "Borostyán Arany",
         primary = Color(0xFFD97706),
         secondary = Color(0xFFF59E0B),
         tertiary = Color(0xFFEAB308),
@@ -189,7 +187,7 @@ enum class AppAccentColor(
     ),
     PURPLE(
         id = "purple",
-        labelRes = R.string.accent_purple,
+        title = "Királyi Lila",
         primary = Color(0xFF7C3AED),
         secondary = Color(0xFF8B5CF6),
         tertiary = Color(0xFFA855F7),
@@ -222,7 +220,7 @@ enum class AppAccentColor(
     ),
     CRIMSON(
         id = "crimson",
-        labelRes = R.string.accent_crimson,
+        title = "Rubin Vörös",
         primary = Color(0xFFDC2626),
         secondary = Color(0xFFEF4444),
         tertiary = Color(0xFFF43F5E),
@@ -255,7 +253,7 @@ enum class AppAccentColor(
     ),
     ROSE(
         id = "rose",
-        labelRes = R.string.accent_rose,
+        title = "Rózsa Korall",
         primary = Color(0xFFE11D48),
         secondary = Color(0xFFF43F5E),
         tertiary = Color(0xFFFB7185),

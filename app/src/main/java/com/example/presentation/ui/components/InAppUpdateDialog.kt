@@ -50,12 +50,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.BuildConfig
-import com.example.R
 import com.example.core.update.InAppUpdateState
 import com.example.core.update.UpdateInfo
 import com.example.ui.theme.NeptunCyan40
@@ -97,7 +95,7 @@ fun InAppUpdateDialog(
                 title = {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            text = stringResource(R.string.update_title),
+                            text = "Új verzió érhető el! 🎉",
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold
                         )
@@ -148,7 +146,7 @@ fun InAppUpdateDialog(
                     ) {
                         if (info.releaseNotes.isNotBlank()) {
                             Text(
-                                text = stringResource(R.string.update_notes),
+                                text = "Újdonságok és változtatások:",
                                 style = MaterialTheme.typography.labelLarge,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurface
@@ -178,7 +176,7 @@ fun InAppUpdateDialog(
                             }
                         } else {
                             Text(
-                                text = stringResource(R.string.update_notes_empty),
+                                text = "Új, javított verzió érhető el a Neptun Mobile alkalmazáshoz.",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -194,7 +192,7 @@ fun InAppUpdateDialog(
                     ) {
                         Icon(imageVector = Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text(stringResource(R.string.update_now), fontWeight = FontWeight.Bold)
+                        Text("Frissítés most", fontWeight = FontWeight.Bold)
                     }
                 },
                 dismissButton = {
@@ -202,7 +200,7 @@ fun InAppUpdateDialog(
                         onClick = onDismiss,
                         modifier = Modifier.testTag("in_app_update_later_button")
                     ) {
-                        Text(stringResource(R.string.common_later))
+                        Text("Később")
                     }
                 }
             )
@@ -237,7 +235,7 @@ fun InAppUpdateDialog(
                 },
                 title = {
                     Text(
-                        text = stringResource(R.string.update_downloading, percent),
+                        text = "Frissítés letöltése... ($percent%)",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
@@ -257,13 +255,13 @@ fun InAppUpdateDialog(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text(
-                                text = stringResource(R.string.update_version, "v${updateState.info.latestVersion}"),
+                                text = "Verzió: v${updateState.info.latestVersion}",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             if (totalMb > 0) {
                                 Text(
-                                    text = stringResource(R.string.update_progress, downloadedMb, totalMb),
+                                    text = String.format("%.1f MB / %.1f MB", downloadedMb, totalMb),
                                     style = MaterialTheme.typography.bodySmall,
                                     fontWeight = FontWeight.SemiBold
                                 )
@@ -273,7 +271,7 @@ fun InAppUpdateDialog(
                 },
                 confirmButton = {
                     TextButton(onClick = onDismiss) {
-                        Text(stringResource(R.string.update_background))
+                        Text("Háttérbe")
                     }
                 }
             )
@@ -303,14 +301,14 @@ fun InAppUpdateDialog(
                 },
                 title = {
                     Text(
-                        text = stringResource(R.string.update_ready),
+                        text = "Letöltés kész!",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold
                     )
                 },
                 text = {
                     Text(
-                        text = stringResource(R.string.update_ready_text, updateState.info.latestVersion),
+                        text = "A frissítés (v${updateState.info.latestVersion}) sikeresen letöltődött. Érintsd meg a gombot a telepítéshez.",
                         style = MaterialTheme.typography.bodyMedium
                     )
                 },
@@ -323,12 +321,12 @@ fun InAppUpdateDialog(
                     ) {
                         Icon(imageVector = Icons.Default.SystemUpdate, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text(stringResource(R.string.update_install), fontWeight = FontWeight.Bold)
+                        Text("Telepítés megnyitása", fontWeight = FontWeight.Bold)
                     }
                 },
                 dismissButton = {
                     TextButton(onClick = onDismiss) {
-                        Text(stringResource(R.string.common_close))
+                        Text("Bezárás")
                     }
                 }
             )
@@ -346,7 +344,7 @@ fun InAppUpdateDialog(
                     )
                 },
                 title = {
-                    Text(stringResource(R.string.update_error_title))
+                    Text("Frissítési hiba")
                 },
                 text = {
                     Text(
@@ -365,12 +363,12 @@ fun InAppUpdateDialog(
                     ) {
                         Icon(imageVector = Icons.Default.OpenInBrowser, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text(stringResource(R.string.update_github))
+                        Text("GitHub letöltés")
                     }
                 },
                 dismissButton = {
                     TextButton(onClick = onDismiss) {
-                        Text(stringResource(R.string.common_cancel))
+                        Text("Mégse")
                     }
                 }
             )

@@ -1,8 +1,6 @@
 package com.example.data.repository
 
 import android.content.Context
-import com.example.R
-import com.example.core.locale.StringProvider
 import com.example.core.security.DataMode
 import com.example.core.security.EncryptedPreferencesManager
 import com.example.data.network.NeptunApiClient
@@ -24,8 +22,7 @@ import java.io.InputStreamReader
 class AuthRepositoryImpl(
     private val context: Context,
     private val prefsManager: EncryptedPreferencesManager,
-    private val strings: StringProvider,
-    private val neptunApiClient: NeptunApiClient = NeptunApiClient(strings)
+    private val neptunApiClient: NeptunApiClient = NeptunApiClient()
 ) : AuthRepository {
 
     private val json = Json {
@@ -66,15 +63,14 @@ class AuthRepositoryImpl(
         lastAttemptedUniversity = university
 
         if (trimmedCode.length != 6) {
-            return@withContext Result.failure(IllegalArgumentException(strings.getString(R.string.auth_err_code_len2)))
+            return@withContext Result.failure(IllegalArgumentException("A Neptun kódnak pontosan 6 karakterből kell állnia!"))
         }
         if (trimmedPassword.isEmpty()) {
-            return@withContext Result.failure(IllegalArgumentException(strings.getString(R.string.auth_err_pass_empty)))
+            return@withContext Result.failure(IllegalArgumentException("A jelszó mező nem lehet üres!"))
         }
 
         // Demo mód: mintaadatokkal való kipróbálás (DEMO jelöléssel jelölve a UI-ban)
-        if (trimmedCode == "DEMO01" || trimmedPassword.equals("demo", ignoreCase = true) || trimmedPassword.equals("jelszo", ignoreCase = true) ||
-            trimmedPassword.equals("password", ignoreCase = true) || trimmedPassword.equals("passwort", ignoreCase = true)) {
+        if (trimmedCode == "DEMO01" || trimmedPassword.equals("demo", ignoreCase = true) || trimmedPassword.equals("jelszo", ignoreCase = true)) {
             prefsManager.saveCredentials(
                 neptunCode = trimmedCode,
                 password = trimmedPassword,
@@ -87,7 +83,6 @@ class AuthRepositoryImpl(
             prefsManager.setBaseUrl(university.neptunUrl)
             prefsManager.setIsModernApi(true)
             prefsManager.setDataMode(DataMode.DEMO)
-            prefsManager.setLoginLcid(prefsManager.getServerLanguageLcid())
             prefsManager.clearSessionExpired()
 
             val creds = prefsManager.loadCredentials() ?: StudentCredentials(
@@ -105,14 +100,12 @@ class AuthRepositoryImpl(
 
         // Real network authentication via NeptunApiClient
         val deviceCookie = prefsManager.getDeviceCookie(trimmedCode)
-        val loginLcid = prefsManager.getServerLanguageLcid()
         val authResult = neptunApiClient.authenticate(
             rawUrl = university.neptunUrl,
             neptunCode = trimmedCode,
             password = trimmedPassword,
             twoFactorCode = twoFactorCode,
-            savedDeviceCookie = deviceCookie,
-            lcid = loginLcid
+            savedDeviceCookie = deviceCookie
         )
 
         when (authResult) {
@@ -144,7 +137,6 @@ class AuthRepositoryImpl(
                 prefsManager.setIsModernApi(authResult.isModernApi)
                 prefsManager.setBaseUrl(authResult.normalizedBaseUrl)
                 prefsManager.setDataMode(DataMode.REAL)
-                prefsManager.setLoginLcid(loginLcid)
                 prefsManager.clearSessionExpired()
 
                 val creds = prefsManager.loadCredentials() ?: StudentCredentials(
@@ -166,7 +158,7 @@ class AuthRepositoryImpl(
     }
 
     override suspend fun request2FAEmailCode(session: Neptun2FASession): Result<Neptun2FASession> {
-        return neptunApiClient.request2FAEmailCode(session, prefsManager.getServerLanguageLcid())
+        return neptunApiClient.request2FAEmailCode(session)
     }
 
     override suspend fun verify2FACode(
@@ -174,17 +166,16 @@ class AuthRepositoryImpl(
         code: String,
         isTotp: Boolean
     ): Result<StudentCredentials> = withContext(Dispatchers.IO) {
-        val loginLcid = prefsManager.getServerLanguageLcid()
-        val authResult = neptunApiClient.verify2FACode(session, code, isTotp, loginLcid)
+        val authResult = neptunApiClient.verify2FACode(session, code, isTotp)
         when (authResult) {
             is NeptunAuthResult.Success -> {
-                val savedUniName = prefsManager.getSelectedUniversityName().ifEmpty { strings.getString(R.string.auth_uni_fallback) }
+                val savedUniName = prefsManager.getSelectedUniversityName().ifEmpty { "Egyetem" }
                 val savedUniId = prefsManager.getSelectedUniversityId().ifEmpty { "custom_uni" }
                 val uni = lastAttemptedUniversity ?: University(
                     id = savedUniId,
                     name = savedUniName,
                     shortName = savedUniName,
-                    city = strings.getString(R.string.auth_custom_city),
+                    city = "Magyarország",
                     neptunUrl = session.baseUrl
                 )
 
@@ -208,7 +199,6 @@ class AuthRepositoryImpl(
                 prefsManager.setIsModernApi(authResult.isModernApi)
                 prefsManager.setBaseUrl(authResult.normalizedBaseUrl)
                 prefsManager.setDataMode(DataMode.REAL)
-                prefsManager.setLoginLcid(loginLcid)
                 prefsManager.clearSessionExpired()
 
                 val creds = prefsManager.loadCredentials() ?: StudentCredentials(
@@ -227,7 +217,7 @@ class AuthRepositoryImpl(
                 Result.failure(Exception(authResult.message))
             }
             else -> {
-                Result.failure(Exception(strings.getString(R.string.auth_err_2fa_incomplete)))
+                Result.failure(Exception("Nem sikerült befejezni a kétlépcsős azonosítást!"))
             }
         }
     }

@@ -54,7 +54,7 @@ class AlarmScheduler(private val context: Context) {
             putExtra(ClassAlarmReceiver.EXTRA_SUBJECT_NAME, event.subjectName)
             putExtra(ClassAlarmReceiver.EXTRA_ROOM, event.room)
             putExtra(ClassAlarmReceiver.EXTRA_START_TIME, "%02d:%02d".format(event.startHour, event.startMinute))
-            putExtra(ClassAlarmReceiver.EXTRA_COURSE_TYPE, event.courseType.name)
+            putExtra(ClassAlarmReceiver.EXTRA_COURSE_TYPE, event.courseType.displayName)
             putExtra(ClassAlarmReceiver.EXTRA_NOTIFICATION_ID, alarmId)
             putExtra(ClassAlarmReceiver.EXTRA_MINUTES_BEFORE, reminderMinutesBefore)
         }

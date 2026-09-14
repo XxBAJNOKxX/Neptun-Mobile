@@ -33,7 +33,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -42,7 +41,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.NeptunApp
 import com.example.core.crash.CrashReporter
-import com.example.R
 import com.example.core.export.IcsExporter
 import com.example.core.security.DataMode
 import com.example.presentation.navigation.NavigationItem
@@ -82,11 +80,11 @@ fun MainAppContent() {
     lastCrashLog?.let { crashLog ->
         AlertDialog(
             onDismissRequest = { lastCrashLog = null },
-            title = { Text(stringResource(R.string.crash_title)) },
+            title = { Text("Az alkalmazás váratlanul leállt") },
             text = {
                 Column {
                     Text(
-                        text = stringResource(R.string.crash_body),
+                        text = "Az előző futás hibanaplója (a hibajelentéshez másolható):",
                         style = MaterialTheme.typography.bodySmall
                     )
                     Spacer(modifier = Modifier.height(8.dp))
@@ -111,22 +109,19 @@ fun MainAppContent() {
                     )
                     lastCrashLog = null
                 }) {
-                    Text(stringResource(R.string.crash_copy))
+                    Text("Másolás")
                 }
             },
             dismissButton = {
                 TextButton(onClick = { lastCrashLog = null }) {
-                    Text(stringResource(R.string.common_close))
+                    Text("Bezárás")
                 }
             }
         )
     }
 
     val appUpdateViewModel: AppUpdateViewModel = viewModel(
-        factory = AppUpdateViewModel.provideFactory(
-            strings = appContainer.stringProvider,
-            prefsManager = appContainer.prefsManager
-        )
+        factory = AppUpdateViewModel.provideFactory(prefsManager = appContainer.prefsManager)
     )
     val updateState by appUpdateViewModel.updateState.collectAsStateWithLifecycle()
 
@@ -138,9 +133,7 @@ fun MainAppContent() {
     val authViewModel: AuthViewModel = viewModel(
         factory = AuthViewModel.provideFactory(
             authRepository = appContainer.authRepository,
-            neptunRepository = appContainer.neptunRepository,
-            languageRepository = appContainer.languageRepository,
-            strings = appContainer.stringProvider
+            neptunRepository = appContainer.neptunRepository
         )
     )
 
@@ -173,10 +166,7 @@ fun MainAppContent() {
             onTwoFactorMethodChange = authViewModel::onTwoFactorMethodChange,
             onRequestEmailCode = authViewModel::requestEmailCode,
             onSubmitTwoFactor = authViewModel::submitTwoFactor,
-            onCancelTwoFactor = authViewModel::cancelTwoFactor,
-            serverLanguage = authState.serverLanguage,
-            onSelectServerLanguage = authViewModel::selectServerLanguage,
-            onRefreshServerLanguages = authViewModel::refreshServerLanguages
+            onCancelTwoFactor = authViewModel::cancelTwoFactor
         )
     } else {
         // Biometrikus zár (ha be van kapcsolva)
@@ -224,8 +214,7 @@ private fun MainDashboard(
 
     val messagesViewModel: MessagesViewModel = viewModel(
         factory = MessagesViewModel.provideFactory(
-            neptunRepository = appContainer.neptunRepository,
-            strings = appContainer.stringProvider
+            neptunRepository = appContainer.neptunRepository
         )
     )
 
@@ -246,9 +235,7 @@ private fun MainDashboard(
         factory = SettingsViewModel.provideFactory(
             prefsManager = appContainer.prefsManager,
             authRepository = appContainer.authRepository,
-            neptunRepository = appContainer.neptunRepository,
-            languageRepository = appContainer.languageRepository,
-            strings = appContainer.stringProvider
+            neptunRepository = appContainer.neptunRepository
         )
     )
 
@@ -293,10 +280,11 @@ private fun MainDashboard(
     if (sessionExpired) {
         AlertDialog(
             onDismissRequest = { appContainer.prefsManager.clearSessionExpired() },
-            title = { Text(stringResource(R.string.session_title)) },
+            title = { Text("Lejárt a munkamenet") },
             text = {
                 Text(
-stringResource(R.string.session_text)
+                    "A Neptun szerver visszautasította a munkamenetet, és nem sikerült automatikusan megújítani. " +
+                        "Kérlek, jelentkezz be újra a friss adatokért."
                 )
             },
             confirmButton = {
@@ -306,14 +294,14 @@ stringResource(R.string.session_text)
                         authViewModel.logout()
                     }
                 ) {
-                    Text(stringResource(R.string.login_title))
+                    Text("Bejelentkezés")
                 }
             },
             dismissButton = {
                 TextButton(
                     onClick = { appContainer.prefsManager.clearSessionExpired() }
                 ) {
-                    Text(stringResource(R.string.common_later))
+                    Text("Később")
                 }
             }
         )
@@ -347,9 +335,9 @@ stringResource(R.string.session_text)
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 text = if (dataMode == DataMode.DEMO) {
-                                    stringResource(R.string.demo_banner_demo)
+                                    "Demo mód – a megjelenített adatok nem valódiak"
                                 } else {
-                                    stringResource(R.string.demo_banner_mock)
+                                    "Mintaadatok láthatók (szinkronizálás nem sikerült)"
                                 },
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onTertiaryContainer
@@ -382,7 +370,7 @@ stringResource(R.string.session_text)
                     when (destination) {
                         NavigationItem.HOME -> DashboardScreen(
                             uiState = dashboardState,
-                            studentName = authState.credentials?.studentName.takeUnless { it.isNullOrBlank() } ?: stringResource(R.string.student_fallback),
+                            studentName = authState.credentials?.studentName ?: "Hallgató",
                             isDemoData = dataMode != DataMode.REAL,
                             onNavigate = { item ->
                                 if (item in visibleItems) {
@@ -457,12 +445,6 @@ stringResource(R.string.session_text)
                             onTargetCreditsChange = settingsViewModel::setTargetCredits,
                             onBiometricLockChange = settingsViewModel::setBiometricLockEnabled,
                             onUpdateChannelChange = settingsViewModel::setUpdateChannel,
-                            serverLanguage = settingsState.serverLanguage,
-                            loginLcid = settingsState.loginLcid,
-                            onSelectServerLanguage = settingsViewModel::selectServerLanguage,
-                            onRefreshServerLanguages = settingsViewModel::refreshServerLanguages,
-                            appLocale = settingsState.appLocale,
-                            onAppLocaleChange = settingsViewModel::setAppLocale,
                             onExportIcs = {
                                 coroutineScope.launch {
                                     exportTimetableAsIcs(app)
@@ -494,14 +476,7 @@ private suspend fun exportTimetableAsIcs(app: NeptunApp) {
         val events = app.appContainer.neptunRepository.getCalendarEvents().first()
         if (events.isEmpty()) return
 
-        // Az Application-kontextus nyelve futásidejű váltás után elavulhat.
-        val localized = com.example.core.locale.AppLocales.wrap(app)
-        val icsContent = IcsExporter.buildIcs(
-            events,
-            courseTypeLabel = { localized.getString(it.labelRes) },
-            teacherLabel = localized.getString(R.string.ics_teacher),
-            reminderLabel = localized.getString(R.string.ics_reminder)
-        )
+        val icsContent = IcsExporter.buildIcs(events)
         val dir = File(app.cacheDir, "export").apply { mkdirs() }
         val file = File(dir, "neptun-orarend.ics")
         file.writeText(icsContent, Charsets.UTF_8)
@@ -516,7 +491,7 @@ private suspend fun exportTimetableAsIcs(app: NeptunApp) {
             putExtra(Intent.EXTRA_STREAM, uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        app.startActivity(Intent.createChooser(shareIntent, app.getString(R.string.share_timetable)).apply {
+        app.startActivity(Intent.createChooser(shareIntent, "Órarend megosztása").apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         })
     } catch (e: Exception) {
