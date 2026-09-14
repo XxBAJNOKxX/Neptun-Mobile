@@ -507,6 +507,15 @@ class NeptunRepositoryImpl(
             if (entitiesToSave.isNotEmpty()) {
                 prefsManager.setDataMode(DataMode.REAL)
                 database.messagesDao().insertMessages(entitiesToSave)
+                if (existingEntities.isEmpty() || !prefsManager.isBaselineDone("messages")) {
+                    val tracker = com.example.core.notification.NotifiedItemsTracker(prefsManager)
+                    tracker.recordKnownItems(
+                        key = "messages",
+                        items = entitiesToSave,
+                        idOf = { it.id },
+                        altIdOf = { "${it.sender.trim()}_${it.subject.trim()}_${it.sendDate.trim()}" }
+                    )
+                }
             }
         } else if (BuildConfig.DEBUG && database.messagesDao().getAllMessages().first().isEmpty()) {
             messagesToInsert = MockNeptunDataSource.getMockMessages()

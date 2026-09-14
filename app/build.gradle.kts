@@ -28,7 +28,7 @@ android {
   compileSdk { version = release(36) { minorApiLevel = 1 } }
 
   defaultConfig {
-    applicationId = "app.neptun.mobile"
+    applicationId = "app.neptun.yrklqi"
     minSdk = 26
     targetSdk = 36
     versionCode = appVersionCode

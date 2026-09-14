@@ -35,8 +35,23 @@ class InMemoryNotifiedStore : NotifiedStore {
  */
 class NotifiedItemsTracker(
     private val store: NotifiedStore,
-    private val maxTrackedIds: Int = 400
+    private val maxTrackedIds: Int = 2000
 ) {
+
+    fun <T> recordKnownItems(
+        key: String,
+        items: List<T>,
+        idOf: (T) -> String,
+        altIdOf: ((T) -> String)? = null
+    ) {
+        val allKeys = items.flatMap { item ->
+            val main = idOf(item)
+            val alt = altIdOf?.invoke(item)
+            listOfNotNull(main, alt)
+        }
+        markNotified(key, allKeys)
+        store.markBaselineDone(key)
+    }
 
     fun <T> filterNewItems(
         key: String,
@@ -50,18 +65,20 @@ class NotifiedItemsTracker(
         idOf: (T) -> String,
         altIdOf: ((T) -> String)?
     ): List<T> {
-        if (items.isEmpty()) return emptyList()
-
         if (!store.isBaselineDone(key)) {
             val allKeys = items.flatMap { item ->
                 val main = idOf(item)
                 val alt = altIdOf?.invoke(item)
                 listOfNotNull(main, alt)
             }.toSet()
-            store.setNotifiedIds(key, allKeys)
+            if (allKeys.isNotEmpty()) {
+                store.setNotifiedIds(key, allKeys)
+            }
             store.markBaselineDone(key)
             return emptyList()
         }
+
+        if (items.isEmpty()) return emptyList()
 
         val notified = store.getNotifiedIds(key)
         return items.filter { item ->
