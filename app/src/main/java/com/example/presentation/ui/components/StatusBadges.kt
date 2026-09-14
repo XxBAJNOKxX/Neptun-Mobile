@@ -12,12 +12,14 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.R
 import com.example.domain.model.CourseType
 import com.example.domain.model.FinanceStatus
 import com.example.ui.theme.NeptunGold
@@ -42,7 +44,7 @@ fun CourseTypeBadge(courseType: CourseType, modifier: Modifier = Modifier) {
         modifier = modifier
     ) {
         Text(
-            text = courseType.displayName,
+            text = stringResource(courseType.labelRes),
             color = textColor,
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
@@ -84,7 +86,7 @@ fun GradeBadge(grade: Int?, gradeText: String, isGhost: Boolean = false, modifie
                         .background(NeptunPurple)
                 )
                 Text(
-                    text = " Szellem: ",
+                    text = stringResource(R.string.grades_ghost_prefix),
                     color = textColor,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Medium
@@ -115,7 +117,7 @@ fun FinanceStatusBadge(status: FinanceStatus, modifier: Modifier = Modifier) {
         modifier = modifier
     ) {
         Text(
-            text = status.displayName,
+            text = stringResource(status.labelRes),
             color = textColor,
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,

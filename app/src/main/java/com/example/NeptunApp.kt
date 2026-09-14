@@ -1,6 +1,7 @@
 package com.example
 
 import android.app.Application
+import android.content.Context
 import com.example.core.crash.CrashReporter
 import com.example.core.di.AppContainer
 import com.example.core.di.DefaultAppContainer
@@ -10,6 +11,10 @@ import com.example.core.work.SyncWorker
 class NeptunApp : Application() {
 
     lateinit var appContainer: AppContainer
+
+    override fun attachBaseContext(base: Context) {
+        super.attachBaseContext(com.example.core.locale.AppLocales.wrap(base))
+    }
 
     override fun onCreate() {
         super.onCreate()

@@ -16,8 +16,11 @@ import kotlinx.coroutines.launch
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import java.time.format.TextStyle
 import java.time.temporal.TemporalAdjusters
 import java.util.Calendar
+import android.os.LocaleList
+import com.example.core.locale.AppLocale
 import java.util.Locale
 
 data class WeekDayInfo(
@@ -39,6 +42,7 @@ data class TimetableUiState(
     val nextUpcomingEvent: CalendarEvent? = null,
     val isRefreshing: Boolean = false,
     val notificationScheduledId: String? = null,
+    val scheduledReminderMins: Int = 15,
     val showWeekend: Boolean = false
 )
 
@@ -68,6 +72,7 @@ class TimetableViewModel(
     init {
         observeCalendar()
         observePreferences()
+        observeAppLocale()
         refreshCalendar()
     }
 
@@ -99,7 +104,11 @@ class TimetableViewModel(
         }
     }
 
-    private fun calculateWeekInfo(offset: Int, includeWeekend: Boolean): Pair<List<WeekDayInfo>, String> {
+    private fun calculateWeekInfo(
+        offset: Int,
+        includeWeekend: Boolean,
+        locale: Locale = Locale.getDefault()
+    ): Pair<List<WeekDayInfo>, String> {
         val today = LocalDate.now()
         val isWeekend = today.dayOfWeek == DayOfWeek.SATURDAY || today.dayOfWeek == DayOfWeek.SUNDAY
         val baseMonday = if (isWeekend) {
@@ -108,17 +117,18 @@ class TimetableViewModel(
             today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
         }
         val monday = baseMonday.plusWeeks(offset.toLong())
-        val dayNames = listOf("Hétfő", "Kedd", "Szerda", "Csütörtök", "Péntek", "Szombat", "Vasárnap")
 
         val dayCount = if (includeWeekend) 7 else 5
         val days = (0 until dayCount).map { i ->
             val date = monday.plusDays(i.toLong())
-            val dateFormatted = date.format(DateTimeFormatter.ofPattern("MM.dd"))
+            val dateFormatted = date.format(DateTimeFormatter.ofPattern(shortDayPattern(locale), locale))
             val isoDate = date.format(DateTimeFormatter.ISO_LOCAL_DATE)
             val isToday = date == today
             WeekDayInfo(
                 dayOfWeek = i + 1,
-                dayName = dayNames[i],
+                dayName = DayOfWeek.of(i + 1)
+                    .getDisplayName(TextStyle.FULL, locale)
+                    .replaceFirstChar { it.uppercase(locale) },
                 dateFormatted = dateFormatted,
                 isoDate = isoDate,
                 isToday = isToday
@@ -126,15 +136,75 @@ class TimetableViewModel(
         }
 
         val lastDay = monday.plusDays((dayCount - 1).toLong())
-        val monthFormatter = DateTimeFormatter.ofPattern("yyyy. MMMM d.", Locale("hu"))
-        val endDayFormatter = DateTimeFormatter.ofPattern("d.", Locale("hu"))
-        val weekLabel = if (monday.month == lastDay.month) {
-            "${monday.format(monthFormatter)} – ${lastDay.format(endDayFormatter)}"
-        } else {
-            "${monday.format(DateTimeFormatter.ofPattern("yyyy. MMM d.", Locale("hu")))} – ${lastDay.format(DateTimeFormatter.ofPattern("MMM d.", Locale("hu")))}"
-        }
+        return days to formatWeekLabel(monday, lastDay, locale)
+    }
 
-        return days to weekLabel
+    /**
+     * Napkártyákon használt rövid dátum: nyelvenként a megszokott sorrenddel.
+     */
+    private fun shortDayPattern(locale: Locale): String = when (locale.language) {
+        "hu" -> "MM.dd"
+        "de" -> "d.M."
+        else -> "M/d"
+    }
+
+    /**
+     * Hét-tartomány felirat az app nyelvén ("2026. szeptember 14. – 18." /
+     * "September 14 – 18, 2026" / "14. – 18. September 2026").
+     */
+    private fun formatWeekLabel(monday: LocalDate, lastDay: LocalDate, locale: Locale): String {
+        fun fmt(date: LocalDate, pattern: String): String =
+            date.format(DateTimeFormatter.ofPattern(pattern, locale))
+        return if (monday.month == lastDay.month) {
+            when (locale.language) {
+                "hu" -> "${fmt(monday, "yyyy. MMMM d.")} – ${fmt(lastDay, "d.")}"
+                "de" -> "${fmt(monday, "d.")} – ${fmt(lastDay, "d. MMMM yyyy")}"
+                else -> "${fmt(monday, "MMMM d")} – ${fmt(lastDay, "d, yyyy")}"
+            }
+        } else {
+            when (locale.language) {
+                "hu" -> "${fmt(monday, "yyyy. MMM d.")} – ${fmt(lastDay, "MMM d.")}"
+                "de" -> "${fmt(monday, "d. MMMM")} – ${fmt(lastDay, "d. MMMM yyyy")}"
+                else -> "${fmt(monday, "MMMM d")} – ${fmt(lastDay, "MMMM d, yyyy")}"
+            }
+        }
+    }
+
+    /**
+     * Az app nyelvének futásidejű váltásakor (a ViewModel túléli az Activity
+     * újralétrehozását) újraszámolja a honosított napneveket és hétfeliratot.
+     */
+    private fun observeAppLocale() {
+        val flow = prefsManager?.appLocaleFlow ?: return
+        var first = true
+        viewModelScope.launch {
+            flow.collect { appLocale ->
+                // Az első (aktuális) értékre nincs teendő: az init állapot már kész.
+                if (first) {
+                    first = false
+                    return@collect
+                }
+                val locale = localeFor(appLocale)
+                _uiState.update { state ->
+                    val (weekDays, weekLabel) = calculateWeekInfo(state.selectedWeekOffset, state.showWeekend, locale)
+                    state.copy(weekDays = weekDays, weekLabel = weekLabel)
+                }
+            }
+        }
+    }
+
+    /**
+     * A flow hamarabb jelez, mint hogy az Activity újrakészülne (és ezzel a
+     * [Locale.getDefault] frissülne), ezért a nyelvet az emitált értékből
+     * oldjuk fel determinisztikusan, nem a még elavult alapértelmezettből.
+     */
+    private fun localeFor(appLocale: AppLocale): Locale {
+        appLocale.languageTag?.let { return Locale.forLanguageTag(it) }
+        return try {
+            LocaleList.getDefault().get(0) ?: Locale.getDefault()
+        } catch (e: Exception) {
+            Locale.getDefault()
+        }
     }
 
     private fun observeCalendar() {
@@ -242,7 +312,7 @@ class TimetableViewModel(
     fun scheduleClassReminder(event: CalendarEvent) {
         val reminderMins = prefsManager?.loadNotificationPreferences()?.reminderMinutesBefore ?: 15
         alarmScheduler.scheduleClassAlarm(event, reminderMins)
-        _uiState.update { it.copy(notificationScheduledId = event.id) }
+        _uiState.update { it.copy(notificationScheduledId = event.id, scheduledReminderMins = reminderMins) }
     }
 
     companion object {

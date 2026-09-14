@@ -61,6 +61,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
@@ -78,9 +79,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.example.R
 import com.example.domain.model.TwoFactorMethod
 import com.example.domain.model.University
+import com.example.presentation.ui.components.LanguageDropdownField
 import com.example.presentation.viewmodel.AuthUiState
+import com.example.presentation.viewmodel.ServerLanguageUiState
 import com.example.ui.theme.NeptunBlue40
 import com.example.ui.theme.NeptunCyan40
 
@@ -98,6 +102,9 @@ fun LoginScreen(
     onRequestEmailCode: () -> Unit = {},
     onSubmitTwoFactor: () -> Unit = {},
     onCancelTwoFactor: () -> Unit = {},
+    serverLanguage: ServerLanguageUiState = ServerLanguageUiState(),
+    onSelectServerLanguage: (Int) -> Unit = {},
+    onRefreshServerLanguages: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var showUniversityDialog by remember { mutableStateOf(false) }
@@ -132,7 +139,7 @@ fun LoginScreen(
             ) {
                 Icon(
                     imageVector = Icons.Default.School,
-                    contentDescription = "Neptun Logo",
+                    contentDescription = stringResource(R.string.login_logo_desc),
                     tint = Color.White,
                     modifier = Modifier.size(42.dp)
                 )
@@ -148,7 +155,7 @@ fun LoginScreen(
             )
 
             Text(
-                text = "Modern alternatív Neptun kliens 2FA támogatással",
+                text = stringResource(R.string.login_subtitle),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
@@ -171,7 +178,7 @@ fun LoginScreen(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = "Bejelentkezés",
+                        text = stringResource(R.string.login_title),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface,
@@ -182,7 +189,7 @@ fun LoginScreen(
 
                     // University Selector Trigger
                     Text(
-                        text = "Intézmény / Egyetem",
+                        text = stringResource(R.string.login_university_label),
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -205,14 +212,14 @@ fun LoginScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.AccountBalance,
-                                contentDescription = "Egyetem",
+                                contentDescription = stringResource(R.string.login_university_desc),
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(22.dp)
                             )
                             Spacer(modifier = Modifier.width(12.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = uiState.selectedUniversity?.name ?: "Válassz egyetemet...",
+                                    text = uiState.selectedUniversity?.name ?: stringResource(R.string.login_university_none),
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.onSurface
@@ -228,7 +235,7 @@ fun LoginScreen(
                             }
                             Icon(
                                 imageVector = Icons.Default.ArrowDropDown,
-                                contentDescription = "Lenyitás",
+                                contentDescription = stringResource(R.string.login_expand_desc),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -236,16 +243,25 @@ fun LoginScreen(
 
                     Spacer(modifier = Modifier.height(14.dp))
 
+                    // Neptun szervernyelv-választó (az intézmény támogatott nyelvei)
+                    LanguageDropdownField(
+                        state = serverLanguage,
+                        onSelect = onSelectServerLanguage,
+                        onRefresh = onRefreshServerLanguages
+                    )
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
                     // Neptun Code Field
                     OutlinedTextField(
                         value = uiState.neptunCode,
                         onValueChange = onNeptunCodeChange,
-                        label = { Text("Neptun kód (6 karakter)") },
+                        label = { Text(stringResource(R.string.login_code_label)) },
                         singleLine = true,
                         leadingIcon = {
                             Icon(
                                 imageVector = Icons.Default.Person,
-                                contentDescription = "Neptun kód",
+                                contentDescription = stringResource(R.string.login_code_desc),
                                 tint = MaterialTheme.colorScheme.primary
                             )
                         },
@@ -265,12 +281,12 @@ fun LoginScreen(
                     OutlinedTextField(
                         value = uiState.password,
                         onValueChange = onPasswordChange,
-                        label = { Text("Jelszó") },
+                        label = { Text(stringResource(R.string.login_password)) },
                         singleLine = true,
                         leadingIcon = {
                             Icon(
                                 imageVector = Icons.Default.Lock,
-                                contentDescription = "Jelszó",
+                                contentDescription = stringResource(R.string.login_password),
                                 tint = MaterialTheme.colorScheme.primary
                             )
                         },
@@ -278,7 +294,7 @@ fun LoginScreen(
                             IconButton(onClick = { passwordVisible = !passwordVisible }) {
                                 Icon(
                                     imageVector = if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                                    contentDescription = if (passwordVisible) "Jelszó elrejtése" else "Jelszó megjelenítése"
+                                    contentDescription = if (passwordVisible) stringResource(R.string.login_password_hide) else stringResource(R.string.login_password_show)
                                 )
                             }
                         },
@@ -340,7 +356,7 @@ fun LoginScreen(
                             )
                         } else {
                             Text(
-                                text = "Bejelentkezés",
+                                text = stringResource(R.string.login_title),
                                 fontSize = 15.sp,
                                 fontWeight = FontWeight.Bold
                             )
@@ -360,12 +376,12 @@ fun LoginScreen(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Key,
-                            contentDescription = "Demo adatok",
+                            contentDescription = stringResource(R.string.login_demo_desc),
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Offline Demo adatok betöltése",
+                            text = stringResource(R.string.login_demo),
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Medium
                         )
@@ -376,7 +392,7 @@ fun LoginScreen(
             Spacer(modifier = Modifier.height(18.dp))
 
             Text(
-                text = "Hitelesítő adataidat az Android Keystore (EncryptedSharedPreferences) biztonságosan, titkosítva tárolja az eszközödön.",
+                text = stringResource(R.string.login_keystore_note),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
                 textAlign = TextAlign.Center,
@@ -399,7 +415,7 @@ fun LoginScreen(
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        text = "Válassz intézményt",
+                        text = stringResource(R.string.login_pick_uni),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
@@ -408,9 +424,9 @@ fun LoginScreen(
                     OutlinedTextField(
                         value = uiState.searchQuery,
                         onValueChange = onSearchQueryChange,
-                        placeholder = { Text("Keresés név, kód vagy város alapján...") },
+                        placeholder = { Text(stringResource(R.string.login_search_hint)) },
                         leadingIcon = {
-                            Icon(imageVector = Icons.Default.Search, contentDescription = "Keresés")
+                            Icon(imageVector = Icons.Default.Search, contentDescription = stringResource(R.string.login_search_desc))
                         },
                         singleLine = true,
                         shape = RoundedCornerShape(10.dp),
@@ -514,7 +530,7 @@ fun LoginScreen(
                     Spacer(modifier = Modifier.height(12.dp))
 
                     Text(
-                        text = "Kétlépcsős Azonosítás (2FA)",
+                        text = stringResource(R.string.tfa_title),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -523,7 +539,7 @@ fun LoginScreen(
                     Spacer(modifier = Modifier.height(4.dp))
 
                     Text(
-                        text = "A Neptun kétlépcsős hitelesítést igényel a(z) ${uiState.neptunCode} fiókhoz.",
+                        text = stringResource(R.string.tfa_subtitle, uiState.neptunCode),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center
@@ -547,7 +563,7 @@ fun LoginScreen(
                                         modifier = Modifier.size(16.dp)
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
-                                    Text("E-mail kód", fontSize = 13.sp)
+                                    Text(stringResource(TwoFactorMethod.EMAIL.labelRes), fontSize = 13.sp)
                                 }
                             }
                         )
@@ -562,7 +578,7 @@ fun LoginScreen(
                                         modifier = Modifier.size(16.dp)
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Hitelesítő App", fontSize = 13.sp)
+                                    Text(stringResource(TwoFactorMethod.TOTP.labelRes), fontSize = 13.sp)
                                 }
                             }
                         )
@@ -588,7 +604,7 @@ fun LoginScreen(
                                         )
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Text(
-                                            text = "Kérj belépési kódot az egyetemi e-mail címedre:",
+                                            text = stringResource(R.string.tfa_email_hint),
                                             style = MaterialTheme.typography.bodySmall,
                                             fontWeight = FontWeight.Medium
                                         )
@@ -617,7 +633,7 @@ fun LoginScreen(
                                         modifier = Modifier.size(18.dp)
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Text("Kód kérése folyamatban...")
+                                    Text(stringResource(R.string.tfa_requesting))
                                 } else {
                                     Icon(
                                         imageVector = Icons.Default.Send,
@@ -625,7 +641,7 @@ fun LoginScreen(
                                         modifier = Modifier.size(16.dp)
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Text("E-mail kód kérése")
+                                    Text(stringResource(R.string.tfa_request))
                                 }
                             }
                         } else {
@@ -648,14 +664,14 @@ fun LoginScreen(
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Column {
                                         Text(
-                                            text = "Kód elküldve az egyetemi fiókodra!",
+                                            text = stringResource(R.string.tfa_sent),
                                             color = Color(0xFF15803D),
                                             fontSize = 12.sp,
                                             fontWeight = FontWeight.Bold
                                         )
                                         if (uiState.codePrefix.isNotEmpty()) {
                                             Text(
-                                                text = "A Neptun által generált előtag: ${uiState.codePrefix}-",
+                                                text = stringResource(R.string.tfa_prefix, "${uiState.codePrefix}-"),
                                                 color = Color(0xFF166534),
                                                 fontSize = 11.sp
                                             )
@@ -690,7 +706,7 @@ fun LoginScreen(
                                 OutlinedTextField(
                                     value = uiState.twoFactorCode,
                                     onValueChange = onTwoFactorCodeChange,
-                                    label = { Text("6 jegyű kód az e-mailből") },
+                                    label = { Text(stringResource(R.string.tfa_code_label)) },
                                     singleLine = true,
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                     shape = RoundedCornerShape(12.dp),
@@ -712,14 +728,14 @@ fun LoginScreen(
                                     shape = RoundedCornerShape(8.dp),
                                     modifier = Modifier.weight(1f).padding(end = 4.dp)
                                 ) {
-                                    Text("Új kód kérése", fontSize = 11.sp)
+                                    Text(stringResource(R.string.tfa_new_code), fontSize = 11.sp)
                                 }
                                 OutlinedButton(
                                     onClick = { onTwoFactorCodeChange("999999") },
                                     shape = RoundedCornerShape(8.dp),
                                     modifier = Modifier.weight(1f).padding(start = 4.dp)
                                 ) {
-                                    Text("Teszt: 999999", fontSize = 11.sp)
+                                    Text(stringResource(R.string.tfa_test), fontSize = 11.sp)
                                 }
                             }
                         }
@@ -732,13 +748,13 @@ fun LoginScreen(
                         ) {
                             Column(modifier = Modifier.padding(12.dp)) {
                                 Text(
-                                    text = "Add meg a Google / Microsoft Authenticator appban megjelenő 6 számjegyű kódot:",
+                                    text = stringResource(R.string.tfa_totp_hint),
                                     style = MaterialTheme.typography.bodySmall
                                 )
                                 if (uiState.twoFactorSession?.hasTotp == false) {
                                     Spacer(modifier = Modifier.height(6.dp))
                                     Text(
-                                        text = "Megjegyzés: A Neptun szerint még nincs TOTP kulcs párosítva ehhez a fiókhoz. Használd az E-mail kód opciót!",
+                                        text = stringResource(R.string.tfa_totp_nokey),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.error,
                                         fontSize = 11.sp
@@ -752,7 +768,7 @@ fun LoginScreen(
                         OutlinedTextField(
                             value = uiState.twoFactorCode,
                             onValueChange = onTwoFactorCodeChange,
-                            label = { Text("TOTP Kód (pl. 482910)") },
+                            label = { Text(stringResource(R.string.tfa_totp_label)) },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             shape = RoundedCornerShape(12.dp),
@@ -791,7 +807,7 @@ fun LoginScreen(
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.weight(1f)
                         ) {
-                            Text("Mégse")
+                            Text(stringResource(R.string.common_cancel))
                         }
                         Button(
                             onClick = onSubmitTwoFactor,
@@ -806,7 +822,7 @@ fun LoginScreen(
                                     modifier = Modifier.size(18.dp)
                                 )
                             } else {
-                                Text("Belépés")
+                                Text(stringResource(R.string.tfa_submit))
                             }
                         }
                     }
