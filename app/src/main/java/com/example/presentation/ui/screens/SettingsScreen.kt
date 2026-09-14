@@ -428,6 +428,13 @@ fun SettingsScreen(
                     }
 
                     if (languageMessage != null) {
+                        val displayLanguageMessage = when {
+                            languageMessage.startsWith("SUCCESS:") -> strings.languageChanged(languageMessage.removePrefix("SUCCESS:"))
+                            languageMessage.startsWith("ERROR:") -> strings.languageChangeError(languageMessage.removePrefix("ERROR:"))
+                            languageMessage.startsWith("Nyelv módosítva: ") -> strings.languageChanged(languageMessage.removePrefix("Nyelv módosítva: "))
+                            languageMessage.startsWith("Hiba a nyelvváltáskor: ") -> strings.languageChangeError(languageMessage.removePrefix("Hiba a nyelvváltáskor: "))
+                            else -> languageMessage
+                        }
                         Surface(
                             color = MaterialTheme.colorScheme.secondaryContainer,
                             shape = RoundedCornerShape(8.dp),
@@ -445,7 +452,7 @@ fun SettingsScreen(
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = languageMessage,
+                                    text = displayLanguageMessage,
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSecondaryContainer
                                 )
@@ -1556,6 +1563,22 @@ fun SettingsScreen(
 
                     // Update Status / Feedback
                     if (updateCheckState.message != null) {
+                        val displayUpdateMessage = when {
+                            updateCheckState.message.startsWith("UPDATE_AVAILABLE:") -> {
+                                val parts = updateCheckState.message.removePrefix("UPDATE_AVAILABLE:").split(":")
+                                val tag = parts.getOrNull(0) ?: ""
+                                val channel = parts.getOrNull(1) ?: ""
+                                strings.updateAvailableOnChannel(tag, channel)
+                            }
+                            updateCheckState.message.startsWith("UP_TO_DATE:") -> {
+                                val ver = updateCheckState.message.removePrefix("UP_TO_DATE:")
+                                strings.appUpToDate(ver)
+                            }
+                            updateCheckState.message == "GITHUB_RELEASES_PROMPT" || updateCheckState.message == "Nyisd meg a GitHub Releases oldalt a letöltéshez." -> {
+                                strings.githubReleasesPrompt
+                            }
+                            else -> updateCheckState.message
+                        }
                         Surface(
                             shape = RoundedCornerShape(10.dp),
                             color = if (updateCheckState.updateAvailable) NeptunGreen.copy(alpha = 0.15f)
@@ -1574,7 +1597,7 @@ fun SettingsScreen(
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = updateCheckState.message,
+                                    text = displayUpdateMessage,
                                     style = MaterialTheme.typography.bodySmall,
                                     fontWeight = FontWeight.Medium,
                                     color = if (updateCheckState.updateAvailable) NeptunGreen else MaterialTheme.colorScheme.onSurfaceVariant
@@ -1662,6 +1685,11 @@ fun SettingsScreen(
                         enter = fadeIn(),
                         exit = fadeOut()
                     ) {
+                        val displaySyncMessage = when (syncSuccessMessage) {
+                            "SUCCESS", "Sikeres szinkronizálás! Minden adat naprakész." -> strings.syncSuccess
+                            "COMPLETED", "Szinkronizálás befejeződött." -> strings.syncCompleted
+                            else -> syncSuccessMessage ?: ""
+                        }
                         Surface(
                             shape = RoundedCornerShape(12.dp),
                             color = NeptunGreen.copy(alpha = 0.15f),
@@ -1680,7 +1708,7 @@ fun SettingsScreen(
                                 )
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Text(
-                                    text = syncSuccessMessage ?: "",
+                                    text = displaySyncMessage,
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Bold,
                                     color = NeptunGreen
@@ -1753,8 +1781,13 @@ fun SettingsScreen(
                         enter = fadeIn(),
                         exit = fadeOut()
                     ) {
+                        val displayCacheMessage = when (cacheClearedMessage) {
+                            "SUCCESS", "A helyi gyorsítótár törölve. A következő szinkronizáláskor friss adatok töltődnek le." -> strings.cacheClearedSuccess
+                            "FAILED", "A törlés nem sikerült." -> strings.cacheClearFailed
+                            else -> cacheClearedMessage ?: ""
+                        }
                         Text(
-                            text = cacheClearedMessage ?: "",
+                            text = displayCacheMessage,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.padding(vertical = 4.dp)

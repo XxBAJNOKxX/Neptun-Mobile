@@ -212,14 +212,19 @@ fun DashboardScreen(
                             )
                             Spacer(modifier = Modifier.width(12.dp))
                             Column(modifier = Modifier.weight(1f)) {
+                                val dueLabel = when (strings.languageCode) {
+                                    "de" -> "Zu zahlen"
+                                    "en" -> "Due"
+                                    else -> "Fizetendő"
+                                }
                                 Text(
-                                    text = "Fizetendő: ${finance.title}",
+                                    text = "$dueLabel: ${finance.title}",
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
-                                    text = "${formatHuf(finance.amountHuf)} Ft · Határidő: ${finance.dueDate}",
+                                    text = "${formatHuf(finance.amountHuf)} Ft · ${strings.dueDate}: ${finance.dueDate}",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )

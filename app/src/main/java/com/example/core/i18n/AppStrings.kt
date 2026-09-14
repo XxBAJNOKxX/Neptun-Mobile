@@ -1,5 +1,6 @@
 package com.example.core.i18n
 
+import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
 import com.example.domain.model.NeptunLanguage
@@ -21,6 +22,11 @@ interface AppStrings {
     val save: String
     val cancel: String
     val close: String
+    val copy: String
+    val later: String
+    val sessionExpiredTitle: String
+    val sessionExpiredDesc: String
+    val shareTimetableChooser: String
     val delete: String
     val edit: String
     val refresh: String
@@ -113,6 +119,7 @@ interface AppStrings {
     val gradeText3: String
     val gradeText2: String
     val gradeText1: String
+    val newEntry: String
     val noGradesYet: String
 
     // Messages
@@ -355,6 +362,73 @@ interface AppStrings {
     // Crash Dialog
     val crashDialogTitle: String
     val crashDialogDesc: String
+
+    // Additional Timetable strings
+    val nextClassToday: String
+    val noClassesScheduledForDay: String
+    val noClassesThisDay: String
+    val noRoomSpecified: String
+    val timeSlot: String
+
+    // Additional Grades & Ghost Mark strings
+    val semesterStats: String
+    val notEnoughDataForStats: String
+    val creditProgress: String
+    val creditProgressFormat: (Int, Int) -> String
+    val creditProgressHint: String
+    val creditsCount: (Int) -> String
+    val signedStatus: String
+    val notRegisteredStatus: String
+    val noDetailsInfo: String
+    val noGradeYet: String
+    val editGhostGrade: (Int) -> String
+    val setGhostGradeTitle: String
+    val ghostGradeDescription: String
+    val removeGhostGrade: String
+    val ghostGradeSimulatorActive: (Int) -> String
+    val ghostCreditIndexSimulation: (Double) -> String
+    val expectedAverageWithGhost: String
+    val noExamsFound: String
+    val examsNotAvailableNotice: String
+
+    // Additional Messages strings
+    val tapToViewFullMessage: String
+    val noUnreadMessages: String
+    val noMessagesInInbox: String
+    val officialNotice: String
+    val downloadingMessageContent: String
+
+    // Demo and fallback banner
+    val demoModeBanner: String
+    val fallbackSampleDataBanner: String
+
+    // Additional Widget strings
+    val widgetTodayClasses: String
+    val widgetNoMoreClasses: String
+    val widgetMoreClassesCount: (Int) -> String
+
+    // Notifications
+    val notifChannelClasses: String
+    val notifChannelClassesDesc: String
+    val notifChannelMessages: String
+    val notifChannelMessagesDesc: String
+    val notifChannelGrades: String
+    val notifChannelGradesDesc: String
+    val notifChannelFinances: String
+    val notifChannelFinancesDesc: String
+    val notifClassReminderTitle: (String) -> String
+    val notifClassReminderText: (String, String, String) -> String
+    val notifClassReminderBigText: (String, String, Int, String, String) -> String
+    val notifNewMessageTitle: (String) -> String
+    val notifNewGradeTitle: (String) -> String
+    val notifNewGradeText: (String, Int) -> String
+    val notifNewGradeBigText: (String, String, Int) -> String
+    val notifFinanceTitle: (String) -> String
+    val notifFinanceText: (String, String) -> String
+    val notifFinanceBigText: (String, String, String) -> String
+    val notifMessagesSummaryTitle: (Int) -> String
+    val notifGradesSummaryTitle: (Int) -> String
+    val notifFinancesSummaryTitle: (Int) -> String
 }
 
 class HungarianStrings : AppStrings {
@@ -372,6 +446,11 @@ class HungarianStrings : AppStrings {
     override val save = "Mentés"
     override val cancel = "Mégse"
     override val close = "Bezárás"
+    override val copy = "Másolás"
+    override val later = "Később"
+    override val sessionExpiredTitle = "Lejárt a munkamenet"
+    override val sessionExpiredDesc = "A Neptun szerver visszautasította a munkamenetet, és nem sikerült automatikusan megújítani. Kérlek, jelentkezz be újra a friss adatokért."
+    override val shareTimetableChooser = "Órarend megosztása"
     override val delete = "Törlés"
     override val edit = "Szerkesztés"
     override val refresh = "Frissítés"
@@ -459,6 +538,7 @@ class HungarianStrings : AppStrings {
     override val gradeText3 = "Közepes (3)"
     override val gradeText2 = "Elégséges (2)"
     override val gradeText1 = "Elégtelen (1)"
+    override val newEntry = "Új bejegyzés"
     override val noGradesYet = "Ebben a félévben még nincs beírt jegy"
 
     override val messagesTitle = "Üzenetek"
@@ -698,6 +778,73 @@ class HungarianStrings : AppStrings {
     // Crash Dialog
     override val crashDialogTitle = "Az alkalmazás váratlanul leállt"
     override val crashDialogDesc = "Az előző futás hibanaplója (a hibajelentéshez másolható):"
+
+    // Additional Timetable strings
+    override val nextClassToday = "Következő óra ma"
+    override val noClassesScheduledForDay = "Erre a napra nincs felvett órád ezen a héten."
+    override val noClassesThisDay = "Ezen a napon nincs tanóra ezen a héten."
+    override val noRoomSpecified = "Nincs terem megadva"
+    override val timeSlot = "Idősáv"
+
+    // Additional Grades & Ghost Mark strings
+    override val semesterStats = "Féléves statisztika"
+    override val notEnoughDataForStats = "Még nincs elég adat a statisztikához."
+    override val creditProgress = "Kredithaladás"
+    override val creditProgressFormat: (Int, Int) -> String = { completed, target -> "$completed / $target kredit" }
+    override val creditProgressHint = "A célt a Beállítások → Személyreszabás menüben módosíthatod."
+    override val creditsCount: (Int) -> String = { "$it kredit" }
+    override val signedStatus = "Aláírva"
+    override val notRegisteredStatus = "Nincs jelentkezve"
+    override val noDetailsInfo = "Nincs részletinformáció"
+    override val noGradeYet = "Még nincs jegy"
+    override val editGhostGrade: (Int) -> String = { "Szellemjegy módosítása ($it)" }
+    override val setGhostGradeTitle = "Szellemjegy beállítása"
+    override val ghostGradeDescription = "Adj meg egy virtuális jegyet a várható féléves átlag és kreditindex azonnali szimulálásához."
+    override val removeGhostGrade = "Szellemjegy eltávolítása"
+    override val ghostGradeSimulatorActive: (Int) -> String = { "$it szellemjegy aktív" }
+    override val ghostCreditIndexSimulation: (Double) -> String = { "Szimulált kreditindex: $it" }
+    override val expectedAverageWithGhost = "Várható átlag szellemjegyekkel"
+    override val noExamsFound = "Nem található vizsgaadat."
+    override val examsNotAvailableNotice = "A vizsgalista ezen az egyetemi szerveren nem elérhető, vagy nincs felvett vizsgád. (Kísérleti funkció)"
+
+    // Additional Messages strings
+    override val tapToViewFullMessage = "Koppints a teljes üzenet megtekintéséhez..."
+    override val noUnreadMessages = "Nincs olvasatlan üzeneted!"
+    override val noMessagesInInbox = "Nem érkezett üzenet a fiókodba."
+    override val officialNotice = "Hivatalos Értesítés"
+    override val downloadingMessageContent = "Üzenet tartalmának letöltése a Neptunból..."
+
+    // Demo and fallback banner
+    override val demoModeBanner = "Demo mód – a megjelenített adatok nem valódiak"
+    override val fallbackSampleDataBanner = "Mintaadatok láthatók (szinkronizálás nem sikerült)"
+
+    // Additional Widget strings
+    override val widgetTodayClasses = "· Mai órák"
+    override val widgetNoMoreClasses = "Ma nincs több órád!"
+    override val widgetMoreClassesCount: (Int) -> String = { "…és még $it óra" }
+
+    // Notifications
+    override val notifChannelClasses = "Órarendi Értesítések"
+    override val notifChannelClassesDesc = "Értesítés az órák megkezdése előtt a terem megjelölésével"
+    override val notifChannelMessages = "Neptun Üzenetek"
+    override val notifChannelMessagesDesc = "Értesítés az új oktatói és tanulmányi üzenetekről"
+    override val notifChannelGrades = "Jegyek és Értékelések"
+    override val notifChannelGradesDesc = "Értesítés az új érdemjegyekről és félévközi eredményekről"
+    override val notifChannelFinances = "Pénzügyi Értesítések"
+    override val notifChannelFinancesDesc = "Értesítés a pénzügyi kiírásokról és határidőkről"
+    override val notifClassReminderTitle: (String) -> String = { "Hamarosan kezdődik: $it" }
+    override val notifClassReminderText: (String, String, String) -> String = { type, time, room -> "$type $time-kor | Terem: $room" }
+    override val notifClassReminderBigText: (String, String, Int, String, String) -> String = { subject, type, minutes, time, room -> "Az órád ($subject - $type) $minutes perc múlva ($time) kezdődik a(z) $room teremben." }
+    override val notifNewMessageTitle: (String) -> String = { "Új üzenet: $it" }
+    override val notifNewGradeTitle: (String) -> String = { "Új érdemjegy: $it" }
+    override val notifNewGradeText: (String, Int) -> String = { grade, credit -> "Eredmény: $grade ($credit kredit)" }
+    override val notifNewGradeBigText: (String, String, Int) -> String = { subject, grade, credit -> "Új értékelés érkezett a(z) $subject tantárgyból!\nÉrdemjegy: $grade | Kreditérték: $credit" }
+    override val notifFinanceTitle: (String) -> String = { "Pénzügyi tétel: $it" }
+    override val notifFinanceText: (String, String) -> String = { amount, due -> "Összeg: $amount Ft | Határidő: $due" }
+    override val notifFinanceBigText: (String, String, String) -> String = { title, amount, due -> "Figyelem! Befizetendő pénzügyi tétel: $title\nÖsszeg: $amount HUF\nFizetési határidő: $due" }
+    override val notifMessagesSummaryTitle: (Int) -> String = { "$it új üzenet" }
+    override val notifGradesSummaryTitle: (Int) -> String = { "$it új érdemjegy" }
+    override val notifFinancesSummaryTitle: (Int) -> String = { "$it befizetendő tétel" }
 }
 
 class EnglishStrings : AppStrings {
@@ -715,6 +862,11 @@ class EnglishStrings : AppStrings {
     override val save = "Save"
     override val cancel = "Cancel"
     override val close = "Close"
+    override val copy = "Copy"
+    override val later = "Later"
+    override val sessionExpiredTitle = "Session Expired"
+    override val sessionExpiredDesc = "The Neptun server rejected the session and it could not be refreshed automatically. Please log in again to fetch fresh data."
+    override val shareTimetableChooser = "Share Timetable"
     override val delete = "Delete"
     override val edit = "Edit"
     override val refresh = "Refresh"
@@ -802,6 +954,7 @@ class EnglishStrings : AppStrings {
     override val gradeText3 = "Satisfactory (3)"
     override val gradeText2 = "Pass (2)"
     override val gradeText1 = "Fail (1)"
+    override val newEntry = "New entry"
     override val noGradesYet = "No grades recorded for this semester yet"
 
     override val messagesTitle = "Messages"
@@ -1041,6 +1194,73 @@ class EnglishStrings : AppStrings {
     // Crash Dialog
     override val crashDialogTitle = "App stopped unexpectedly"
     override val crashDialogDesc = "Crash log from previous run (copyable for bug report):"
+
+    // Additional Timetable strings
+    override val nextClassToday = "Next class today"
+    override val noClassesScheduledForDay = "You have no classes scheduled for this day."
+    override val noClassesThisDay = "No classes on this day this week."
+    override val noRoomSpecified = "No room specified"
+    override val timeSlot = "Time slot"
+
+    // Additional Grades & Ghost Mark strings
+    override val semesterStats = "Semester statistics"
+    override val notEnoughDataForStats = "Not enough data for statistics yet."
+    override val creditProgress = "Credit progress"
+    override val creditProgressFormat: (Int, Int) -> String = { completed, target -> "$completed / $target credits" }
+    override val creditProgressHint = "You can adjust the target under Settings → Personalization."
+    override val creditsCount: (Int) -> String = { "$it credits" }
+    override val signedStatus = "Signed"
+    override val notRegisteredStatus = "Not registered"
+    override val noDetailsInfo = "No details available"
+    override val noGradeYet = "No grade yet"
+    override val editGhostGrade: (Int) -> String = { "Edit simulated grade ($it)" }
+    override val setGhostGradeTitle = "Set simulated grade"
+    override val ghostGradeDescription = "Enter a virtual grade to immediately simulate your expected semester average and credit index."
+    override val removeGhostGrade = "Remove simulated grade"
+    override val ghostGradeSimulatorActive: (Int) -> String = { "$it simulated grade(s) active" }
+    override val ghostCreditIndexSimulation: (Double) -> String = { "Simulated credit index: $it" }
+    override val expectedAverageWithGhost = "Expected average with simulated grades"
+    override val noExamsFound = "No exam data found."
+    override val examsNotAvailableNotice = "Exam list is either unavailable on this university server or you have no registered exams. (Experimental feature)"
+
+    // Additional Messages strings
+    override val tapToViewFullMessage = "Tap to view full message..."
+    override val noUnreadMessages = "No unread messages!"
+    override val noMessagesInInbox = "No messages in your inbox."
+    override val officialNotice = "Official Notice"
+    override val downloadingMessageContent = "Downloading message content from Neptun..."
+
+    // Demo and fallback banner
+    override val demoModeBanner = "Demo mode – displayed data is simulated"
+    override val fallbackSampleDataBanner = "Sample data displayed (synchronization failed)"
+
+    // Additional Widget strings
+    override val widgetTodayClasses = "· Today's classes"
+    override val widgetNoMoreClasses = "No more classes today!"
+    override val widgetMoreClassesCount: (Int) -> String = { "…and $it more classes" }
+
+    // Notifications
+    override val notifChannelClasses = "Timetable Notifications"
+    override val notifChannelClassesDesc = "Reminders before classes begin with room information"
+    override val notifChannelMessages = "Neptun Messages"
+    override val notifChannelMessagesDesc = "Notifications about new official and instructor messages"
+    override val notifChannelGrades = "Grades and Evaluations"
+    override val notifChannelGradesDesc = "Notifications for newly posted grades and midterm results"
+    override val notifChannelFinances = "Financial Notifications"
+    override val notifChannelFinancesDesc = "Notifications for payment liabilities and deadlines"
+    override val notifClassReminderTitle: (String) -> String = { "Starting soon: $it" }
+    override val notifClassReminderText: (String, String, String) -> String = { type, time, room -> "$type at $time | Room: $room" }
+    override val notifClassReminderBigText: (String, String, Int, String, String) -> String = { subject, type, minutes, time, room -> "Your class ($subject - $type) starts in $minutes minutes ($time) in room $room." }
+    override val notifNewMessageTitle: (String) -> String = { "New message: $it" }
+    override val notifNewGradeTitle: (String) -> String = { "New grade: $it" }
+    override val notifNewGradeText: (String, Int) -> String = { grade, credit -> "Result: $grade ($credit credits)" }
+    override val notifNewGradeBigText: (String, String, Int) -> String = { subject, grade, credit -> "New grade posted for $subject!\nGrade: $grade | Credits: $credit" }
+    override val notifFinanceTitle: (String) -> String = { "Financial item: $it" }
+    override val notifFinanceText: (String, String) -> String = { amount, due -> "Amount: $amount HUF | Due: $due" }
+    override val notifFinanceBigText: (String, String, String) -> String = { title, amount, due -> "Attention! Payment due: $title\nAmount: $amount HUF\nDue date: $due" }
+    override val notifMessagesSummaryTitle: (Int) -> String = { "$it new messages" }
+    override val notifGradesSummaryTitle: (Int) -> String = { "$it new grades" }
+    override val notifFinancesSummaryTitle: (Int) -> String = { "$it pending payment items" }
 }
 
 class GermanStrings : AppStrings {
@@ -1058,6 +1278,11 @@ class GermanStrings : AppStrings {
     override val save = "Speichern"
     override val cancel = "Abbrechen"
     override val close = "Schließen"
+    override val copy = "Kopieren"
+    override val later = "Später"
+    override val sessionExpiredTitle = "Sitzung abgelaufen"
+    override val sessionExpiredDesc = "Der Neptun-Server hat die Sitzung abgelehnt und sie konnte nicht automatisch erneuert werden. Bitte melden Sie sich erneut an, um die Daten zu aktualisieren."
+    override val shareTimetableChooser = "Stundenplan teilen"
     override val delete = "Löschen"
     override val edit = "Bearbeiten"
     override val refresh = "Aktualisieren"
@@ -1145,6 +1370,7 @@ class GermanStrings : AppStrings {
     override val gradeText3 = "Befriedigend (3)"
     override val gradeText2 = "Genügend (2)"
     override val gradeText1 = "Nicht genügend (1)"
+    override val newEntry = "Neuer Eintrag"
     override val noGradesYet = "In diesem Semester liegen noch keine Noten vor"
 
     override val messagesTitle = "Nachrichten"
@@ -1384,6 +1610,73 @@ class GermanStrings : AppStrings {
     // Crash Dialog
     override val crashDialogTitle = "Die Anwendung wurde unerwartet beendet"
     override val crashDialogDesc = "Fehlerprotokoll des vorherigen Laufs (für Fehlerbericht kopierbar):"
+
+    // Additional Timetable strings
+    override val nextClassToday = "Nächste Vorlesung heute"
+    override val noClassesScheduledForDay = "Für diesen Tag sind keine Lehrveranstaltungen eingetragen."
+    override val noClassesThisDay = "An diesem Tag finden diese Woche keine Lehrveranstaltungen statt."
+    override val noRoomSpecified = "Kein Raum angegeben"
+    override val timeSlot = "Zeitfenster"
+
+    // Additional Grades & Ghost Mark strings
+    override val semesterStats = "Semesterstatistiken"
+    override val notEnoughDataForStats = "Noch nicht genügend Daten für Statistiken."
+    override val creditProgress = "Kreditfortschritt"
+    override val creditProgressFormat: (Int, Int) -> String = { completed, target -> "$completed / $target Credits" }
+    override val creditProgressHint = "Sie können das Ziel unter Einstellungen → Personalisierung anpassen."
+    override val creditsCount: (Int) -> String = { "$it Credits" }
+    override val signedStatus = "Unterschrieben"
+    override val notRegisteredStatus = "Nicht angemeldet"
+    override val noDetailsInfo = "Keine Details verfügbar"
+    override val noGradeYet = "Noch keine Note"
+    override val editGhostGrade: (Int) -> String = { "Simulierte Note bearbeiten ($it)" }
+    override val setGhostGradeTitle = "Simulierte Note festlegen"
+    override val ghostGradeDescription = "Geben Sie eine virtuelle Note ein, um Ihren voraussichtlichen Notendurchschnitt und Kreditindex zu simulieren."
+    override val removeGhostGrade = "Simulierte Note entfernen"
+    override val ghostGradeSimulatorActive: (Int) -> String = { "$it simulierte Note(n) aktiv" }
+    override val ghostCreditIndexSimulation: (Double) -> String = { "Simulierter Kreditindex: $it" }
+    override val expectedAverageWithGhost = "Voraussichtlicher Durchschnitt mit simulierten Noten"
+    override val noExamsFound = "Keine Prüfungsdaten gefunden."
+    override val examsNotAvailableNotice = "Die Prüfungsliste ist auf diesem Universitätsserver nicht verfügbar oder Sie haben keine Prüfungen angemeldet. (Experimentelle Funktion)"
+
+    // Additional Messages strings
+    override val tapToViewFullMessage = "Tippen Sie hier, um die vollständige Nachricht zu lesen..."
+    override val noUnreadMessages = "Keine ungelesenen Nachrichten!"
+    override val noMessagesInInbox = "Keine Nachrichten in deinem Postfach."
+    override val officialNotice = "Offizielle Mitteilung"
+    override val downloadingMessageContent = "Lade Nachrichteninhalt von Neptun..."
+
+    // Demo and fallback banner
+    override val demoModeBanner = "Demo-Modus – angezeigte Daten sind nicht echt"
+    override val fallbackSampleDataBanner = "Beispieldaten werden angezeigt (Synchronisierung fehlgeschlagen)"
+
+    // Additional Widget strings
+    override val widgetTodayClasses = "· Heutige Stunden"
+    override val widgetNoMoreClasses = "Heute keine weiteren Stunden!"
+    override val widgetMoreClassesCount: (Int) -> String = { "…und noch $it Stunden" }
+
+    // Notifications
+    override val notifChannelClasses = "Stundenplan-Benachrichtigungen"
+    override val notifChannelClassesDesc = "Erinnerungen vor Beginn der Vorlesungen mit Raumangabe"
+    override val notifChannelMessages = "Neptun-Nachrichten"
+    override val notifChannelMessagesDesc = "Benachrichtigungen über neue Mitteilungen und Nachrichten"
+    override val notifChannelGrades = "Noten und Bewertungen"
+    override val notifChannelGradesDesc = "Benachrichtigungen über neue Noten und Prüfungsergebnisse"
+    override val notifChannelFinances = "Finanzielle Benachrichtigungen"
+    override val notifChannelFinancesDesc = "Benachrichtigungen über Zahlungsverpflichtungen und Fristen"
+    override val notifClassReminderTitle: (String) -> String = { "Beginnt in Kürze: $it" }
+    override val notifClassReminderText: (String, String, String) -> String = { type, time, room -> "$type um $time | Raum: $room" }
+    override val notifClassReminderBigText: (String, String, Int, String, String) -> String = { subject, type, minutes, time, room -> "Deine Lehrveranstaltung ($subject - $type) beginnt in $minutes Minuten ($time) im Raum $room." }
+    override val notifNewMessageTitle: (String) -> String = { "Neue Nachricht: $it" }
+    override val notifNewGradeTitle: (String) -> String = { "Neue Note: $it" }
+    override val notifNewGradeText: (String, Int) -> String = { grade, credit -> "Ergebnis: $grade ($credit Credits)" }
+    override val notifNewGradeBigText: (String, String, Int) -> String = { subject, grade, credit -> "Neue Bewertung für $subject erhalten!\nNote: $grade | Credits: $credit" }
+    override val notifFinanceTitle: (String) -> String = { "Finanzposten: $it" }
+    override val notifFinanceText: (String, String) -> String = { amount, due -> "Betrag: $amount HUF | Fälligkeit: $due" }
+    override val notifFinanceBigText: (String, String, String) -> String = { title, amount, due -> "Achtung! Ausstehende Zahlung: $title\nBetrag: $amount HUF\nFälligkeitsdatum: $due" }
+    override val notifMessagesSummaryTitle: (Int) -> String = { "$it neue Nachrichten" }
+    override val notifGradesSummaryTitle: (Int) -> String = { "$it neue Noten" }
+    override val notifFinancesSummaryTitle: (Int) -> String = { "$it ausstehende Zahlungen" }
 }
 
 object AppStringsProvider {
@@ -1396,6 +1689,19 @@ object AppStringsProvider {
             "en" -> ENGLISH
             "de" -> GERMAN
             else -> HUNGARIAN
+        }
+    }
+
+    fun getForContext(context: Context): AppStrings {
+        return try {
+            val prefs = context.getSharedPreferences("neptun_secure_storage", Context.MODE_PRIVATE)
+            val fallback = context.getSharedPreferences("neptun_secure_storage_fallback", Context.MODE_PRIVATE)
+            val code = prefs.getString("key_app_language_code", null)
+                ?: fallback.getString("key_app_language_code", null)
+                ?: "hu"
+            getForCode(code)
+        } catch (e: Exception) {
+            HUNGARIAN
         }
     }
 }

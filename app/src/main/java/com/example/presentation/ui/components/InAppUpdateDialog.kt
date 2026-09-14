@@ -98,7 +98,7 @@ fun InAppUpdateDialog(
                 title = {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            text = "Új verzió érhető el! 🎉",
+                            text = strings.updateDialogNewVersionTitle,
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold
                         )

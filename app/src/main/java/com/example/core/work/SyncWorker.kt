@@ -143,11 +143,12 @@ class SyncWorker(
                 preview = msg.previewText
             )
         } else {
+            val strings = com.example.core.i18n.AppStringsProvider.getForContext(applicationContext)
             NotificationHelper.showSummaryNotification(
                 context = applicationContext,
                 channelId = NotificationHelper.CHANNEL_ID_MESSAGES,
                 notificationId = NOTIFICATION_ID_MESSAGES_SUMMARY,
-                title = "${newOnes.size} új üzenet",
+                title = strings.notifMessagesSummaryTitle(newOnes.size),
                 text = newOnes.take(4).joinToString("\n") { "• ${it.sender}: ${it.subject}" }
             )
         }
@@ -219,11 +220,12 @@ class SyncWorker(
                 credit = grade.credit
             )
         } else {
+            val strings = com.example.core.i18n.AppStringsProvider.getForContext(applicationContext)
             NotificationHelper.showSummaryNotification(
                 context = applicationContext,
                 channelId = NotificationHelper.CHANNEL_ID_GRADES,
                 notificationId = NOTIFICATION_ID_GRADES_SUMMARY,
-                title = "${newOnes.size} új érdemjegy",
+                title = strings.notifGradesSummaryTitle(newOnes.size),
                 text = newOnes.take(4).joinToString("\n") { "• ${it.subjectName}: ${it.gradeText}" },
                 priorityHigh = true
             )
@@ -298,12 +300,13 @@ class SyncWorker(
                 dueDate = item.dueDate
             )
         } else {
+            val strings = com.example.core.i18n.AppStringsProvider.getForContext(applicationContext)
             NotificationHelper.showSummaryNotification(
                 context = applicationContext,
                 channelId = NotificationHelper.CHANNEL_ID_FINANCES,
                 notificationId = NOTIFICATION_ID_FINANCES_SUMMARY,
-                title = "${newOnes.size} befizetendő tétel",
-                text = newOnes.take(4).joinToString("\n") { "• ${it.title} – ${it.amountHuf} Ft (határidő: ${it.dueDate})" }
+                title = strings.notifFinancesSummaryTitle(newOnes.size),
+                text = newOnes.take(4).joinToString("\n") { "• ${it.title} – ${strings.notifFinanceText(it.amountHuf.toString(), it.dueDate)}" }
             )
         }
         val idsToMark = newOnes.flatMap { item ->

@@ -10,6 +10,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.example.MainActivity
 import com.example.R
+import com.example.core.i18n.AppStringsProvider
 
 object NotificationHelper {
 
@@ -28,43 +29,44 @@ object NotificationHelper {
     fun createNotificationChannels(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            val strings = AppStringsProvider.getForContext(context)
 
             val classesChannel = NotificationChannel(
                 CHANNEL_ID_CLASSES,
-                CHANNEL_NAME_CLASSES,
+                strings.notifChannelClasses,
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "Értesítés az órák megkezdése előtt 15 perccel a terem megjelölésével"
+                description = strings.notifChannelClassesDesc
                 enableVibration(true)
                 setShowBadge(true)
             }
 
             val messagesChannel = NotificationChannel(
                 CHANNEL_ID_MESSAGES,
-                CHANNEL_NAME_MESSAGES,
+                strings.notifChannelMessages,
                 NotificationManager.IMPORTANCE_DEFAULT
             ).apply {
-                description = "Értesítés az új oktatói és tanulmányi üzenetekről"
+                description = strings.notifChannelMessagesDesc
                 enableVibration(true)
                 setShowBadge(true)
             }
 
             val gradesChannel = NotificationChannel(
                 CHANNEL_ID_GRADES,
-                CHANNEL_NAME_GRADES,
+                strings.notifChannelGrades,
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "Értesítés az új érdemjegyekről és félévközi eredményekről"
+                description = strings.notifChannelGradesDesc
                 enableVibration(true)
                 setShowBadge(true)
             }
 
             val financesChannel = NotificationChannel(
                 CHANNEL_ID_FINANCES,
-                CHANNEL_NAME_FINANCES,
+                strings.notifChannelFinances,
                 NotificationManager.IMPORTANCE_DEFAULT
             ).apply {
-                description = "Értesítés a pénzügyi kiírásokról és határidőkről"
+                description = strings.notifChannelFinancesDesc
                 enableVibration(true)
                 setShowBadge(true)
             }
@@ -96,6 +98,7 @@ object NotificationHelper {
             return
         }
 
+        val strings = AppStringsProvider.getForContext(context)
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         }
@@ -108,11 +111,11 @@ object NotificationHelper {
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID_CLASSES)
             .setSmallIcon(R.drawable.ic_notif_class)
-            .setContentTitle("Hamarosan kezdődik: $subjectName")
-            .setContentText("$courseType $startTime-kor | Terem: $room")
+            .setContentTitle(strings.notifClassReminderTitle(subjectName))
+            .setContentText(strings.notifClassReminderText(courseType, startTime, room))
             .setStyle(
                 NotificationCompat.BigTextStyle()
-                    .bigText("Az órád ($subjectName - $courseType) $minutesBefore perc múlva ($startTime) kezdődik a(z) $room teremben.")
+                    .bigText(strings.notifClassReminderBigText(subjectName, courseType, minutesBefore, startTime, room))
             )
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
@@ -129,6 +132,7 @@ object NotificationHelper {
         subject: String,
         preview: String
     ) {
+        val strings = AppStringsProvider.getForContext(context)
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         }
@@ -141,7 +145,7 @@ object NotificationHelper {
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID_MESSAGES)
             .setSmallIcon(R.drawable.ic_notif_message)
-            .setContentTitle("Új üzenet: $sender")
+            .setContentTitle(strings.notifNewMessageTitle(sender))
             .setContentText(subject)
             .setStyle(
                 NotificationCompat.BigTextStyle()
@@ -163,6 +167,7 @@ object NotificationHelper {
         gradeText: String,
         credit: Int = 0
     ) {
+        val strings = AppStringsProvider.getForContext(context)
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         }
@@ -174,21 +179,21 @@ object NotificationHelper {
         )
 
         val gradeDisplay = when (grade) {
-            5 -> "Jeles (5)"
-            4 -> "Jó (4)"
-            3 -> "Közepes (3)"
-            2 -> "Elégséges (2)"
-            1 -> "Elégtelen (1)"
-            else -> gradeText.ifEmpty { "Új bejegyzés" }
+            5 -> strings.gradeText5
+            4 -> strings.gradeText4
+            3 -> strings.gradeText3
+            2 -> strings.gradeText2
+            1 -> strings.gradeText1
+            else -> gradeText.ifEmpty { strings.newEntry }
         }
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID_GRADES)
             .setSmallIcon(R.drawable.ic_notif_grade)
-            .setContentTitle("Új érdemjegy: $subjectName")
-            .setContentText("Eredmény: $gradeDisplay ($credit kredit)")
+            .setContentTitle(strings.notifNewGradeTitle(subjectName))
+            .setContentText(strings.notifNewGradeText(gradeDisplay, credit))
             .setStyle(
                 NotificationCompat.BigTextStyle()
-                    .bigText("Új értékelés érkezett a(z) $subjectName tantárgyból!\nÉrdemjegy: $gradeDisplay | Kreditérték: $credit")
+                    .bigText(strings.notifNewGradeBigText(subjectName, gradeDisplay, credit))
             )
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
@@ -239,6 +244,7 @@ object NotificationHelper {
         amount: String,
         dueDate: String
     ) {
+        val strings = AppStringsProvider.getForContext(context)
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         }
@@ -251,11 +257,11 @@ object NotificationHelper {
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID_FINANCES)
             .setSmallIcon(R.drawable.ic_notif_finance)
-            .setContentTitle("Pénzügyi tétel: $title")
-            .setContentText("Összeg: $amount | Határidő: $dueDate")
+            .setContentTitle(strings.notifFinanceTitle(title))
+            .setContentText(strings.notifFinanceText(amount, dueDate))
             .setStyle(
                 NotificationCompat.BigTextStyle()
-                    .bigText("Figyelem! Befizetendő pénzügyi tétel: $title\nÖsszeg: $amount HUF\nFizetési határidő: $dueDate")
+                    .bigText(strings.notifFinanceBigText(title, amount, dueDate))
             )
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setAutoCancel(true)

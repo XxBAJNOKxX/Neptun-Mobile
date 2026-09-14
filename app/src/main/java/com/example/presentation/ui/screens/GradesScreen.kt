@@ -496,6 +496,7 @@ private fun SubjectGradeCard(
     subject: SubjectGrade,
     onOpenGhostDialog: () -> Unit
 ) {
+    val strings = currentStrings()
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -520,7 +521,7 @@ private fun SubjectGradeCard(
                     shape = RoundedCornerShape(6.dp)
                 ) {
                     Text(
-                        text = "${subject.credit} kredit",
+                        text = strings.creditsCount(subject.credit),
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary,
@@ -536,7 +537,7 @@ private fun SubjectGradeCard(
                             modifier = Modifier.padding(end = 6.dp)
                         ) {
                             Text(
-                                text = "Aláírva",
+                                text = strings.signedStatus,
                                 color = NeptunGreen,
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
@@ -550,7 +551,7 @@ private fun SubjectGradeCard(
                     } else if (subject.ghostGrade != null) {
                         GradeBadge(grade = subject.ghostGrade, gradeText = "", isGhost = true)
                     } else {
-                        GradeBadge(grade = null, gradeText = "Még nincs jegy", isGhost = false)
+                        GradeBadge(grade = null, gradeText = strings.noGradeYet, isGhost = false)
                     }
                 }
             }
@@ -589,13 +590,13 @@ private fun SubjectGradeCard(
                 ) {
                     Icon(
                         imageVector = Icons.Default.AutoAwesome,
-                        contentDescription = "Szellemjegy",
+                        contentDescription = strings.ghostGrades,
                         tint = if (subject.ghostGrade != null) NeptunPurple else MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(16.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = if (subject.ghostGrade != null) "Szellemjegy módosítása (${subject.ghostGrade})" else "Szellemjegy hozzáadása",
+                        text = if (subject.ghostGrade != null) strings.editGhostGrade(subject.ghostGrade) else strings.addGhostGrade,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = if (subject.ghostGrade != null) NeptunPurple else MaterialTheme.colorScheme.primary
@@ -612,6 +613,7 @@ private fun GhostMarkPickerModal(
     onClose: () -> Unit,
     onSelectGrade: (Int?) -> Unit
 ) {
+    val strings = currentStrings()
     Dialog(onDismissRequest = onClose) {
         Surface(
             shape = RoundedCornerShape(20.dp),
@@ -632,7 +634,7 @@ private fun GhostMarkPickerModal(
                 ) {
                     Icon(
                         imageVector = Icons.Default.AutoAwesome,
-                        contentDescription = "Szellemjegy",
+                        contentDescription = strings.ghostGrades,
                         tint = NeptunPurple,
                         modifier = Modifier.size(24.dp)
                     )
@@ -641,7 +643,7 @@ private fun GhostMarkPickerModal(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 Text(
-                    text = "Szellemjegy beállítása",
+                    text = strings.setGhostGradeTitle,
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold
                 )
@@ -656,7 +658,7 @@ private fun GhostMarkPickerModal(
                 )
 
                 Text(
-                    text = "Adj meg egy virtuális jegyet a várható féléves átlag és kreditindex azonnali szimulálásához.",
+                    text = strings.ghostGradeDescription,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
@@ -701,7 +703,7 @@ private fun GhostMarkPickerModal(
                             .fillMaxWidth()
                             .padding(bottom = 8.dp)
                     ) {
-                        Text("Szellemjegy eltávolítása", color = MaterialTheme.colorScheme.error)
+                        Text(strings.removeGhostGrade, color = MaterialTheme.colorScheme.error)
                     }
                 }
 
@@ -714,7 +716,7 @@ private fun GhostMarkPickerModal(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text = "Mégse",
+                        text = strings.cancel,
                         color = MaterialTheme.colorScheme.onSecondaryContainer
                     )
                 }
@@ -729,6 +731,7 @@ private fun TermStatisticsCard(
     totalCompletedCredits: Int,
     targetCredits: Int
 ) {
+    val strings = currentStrings()
     Card(
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -742,7 +745,7 @@ private fun TermStatisticsCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Féléves statisztika",
+                    text = strings.semesterStats,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
@@ -759,7 +762,7 @@ private fun TermStatisticsCard(
 
             if (termStats.isEmpty()) {
                 Text(
-                    text = "Még nincs elég adat a statisztikához.",
+                    text = strings.notEnoughDataForStats,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -825,13 +828,13 @@ private fun TermStatisticsCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Kredithaladás",
+                    text = strings.creditProgress,
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = "$totalCompletedCredits / $targetCredits kredit",
+                    text = strings.creditProgressFormat(totalCompletedCredits, targetCredits),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -847,7 +850,7 @@ private fun TermStatisticsCard(
                 trackColor = MaterialTheme.colorScheme.surfaceVariant
             )
             Text(
-                text = "A célt a Beállítások → Tanulmányok menüben módosíthatod.",
+                text = strings.creditProgressHint,
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 10.sp,
@@ -864,6 +867,7 @@ private fun ExamsTabContent(
     isRefreshing: Boolean,
     onRefresh: () -> Unit
 ) {
+    val strings = currentStrings()
     androidx.compose.material3.pulltorefresh.PullToRefreshBox(
         isRefreshing = isRefreshing,
         onRefresh = onRefresh,
@@ -885,12 +889,12 @@ private fun ExamsTabContent(
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        text = "Nem található vizsgaadat.",
+                        text = strings.noExamsFound,
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = "A vizsgalista ezen az egyetemi szerveren nem elérhető, vagy nincs felvett vizsgád. (Kísérleti funkció)",
+                        text = strings.examsNotAvailableNotice,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center,
@@ -917,6 +921,7 @@ private fun ExamsTabContent(
 
 @Composable
 private fun ExamCard(exam: ExamItem) {
+    val strings = currentStrings()
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -949,7 +954,7 @@ private fun ExamCard(exam: ExamItem) {
                         shape = RoundedCornerShape(6.dp)
                     ) {
                         Text(
-                            text = "Nincs jelentkezve",
+                            text = strings.notRegisteredStatus,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onErrorContainer,
@@ -978,7 +983,7 @@ private fun ExamCard(exam: ExamItem) {
             ).joinToString(" · ")
 
             Text(
-                text = details.ifEmpty { "Nincs részletinformáció" },
+                text = details.ifEmpty { strings.noDetailsInfo },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

@@ -299,7 +299,7 @@ fun TimetableScreen(
             ) {
                 uiState.ongoingEvent?.let { ongoing ->
                     LiveHighlightBanner(
-                        title = "Éppen zajló óra",
+                        title = strings.inProgressClass,
                         event = ongoing,
                         badgeColor = NeptunGreen,
                         icon = Icons.Default.PlayCircle,
@@ -311,7 +311,7 @@ fun TimetableScreen(
 
                 uiState.nextUpcomingEvent?.let { nextUp ->
                     LiveHighlightBanner(
-                        title = "Következő óra ma",
+                        title = strings.nextClassToday,
                         event = nextUp,
                         badgeColor = NeptunCyan40,
                         icon = Icons.Default.Upcoming,
@@ -362,7 +362,7 @@ fun TimetableScreen(
 
                     if (dayEvents.isEmpty()) {
                         item {
-                            EmptyDayNotice(message = "Ezen a napon nincs tanóra ezen a héten.")
+                            EmptyDayNotice(message = strings.noClassesThisDay)
                         }
                     } else {
                         items(dayEvents) { event ->
@@ -398,7 +398,7 @@ fun TimetableScreen(
                             .padding(24.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        EmptyDayNotice(message = "Erre a napra nincs felvett órád ezen a héten.")
+                        EmptyDayNotice(message = strings.noClassesScheduledForDay)
                     }
                 } else {
                     LazyColumn(
@@ -436,6 +436,7 @@ private fun LiveHighlightBanner(
     isOngoing: Boolean,
     onScheduleReminder: (CalendarEvent) -> Unit
 ) {
+    val strings = currentStrings()
     Card(
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(
@@ -477,7 +478,7 @@ private fun LiveHighlightBanner(
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = "${event.timeFormatted} • ${formatRoomAndLocation(event.room, event.location)}",
+                    text = "${event.timeFormatted} • ${formatRoomAndLocation(event.room, event.location, strings.noRoomSpecified)}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -488,7 +489,7 @@ private fun LiveHighlightBanner(
             ) {
                 Icon(
                     imageVector = Icons.Default.Alarm,
-                    contentDescription = "Értesítés beállítása",
+                    contentDescription = strings.notifyClasses,
                     tint = MaterialTheme.colorScheme.primary
                 )
             }
@@ -496,14 +497,14 @@ private fun LiveHighlightBanner(
     }
 }
 
-fun formatRoomAndLocation(room: String, location: String): String {
+fun formatRoomAndLocation(room: String, location: String, noRoomText: String = "Nincs terem megadva"): String {
     val r = room.trim()
     val l = location.trim()
     val isRGeneric = r.isEmpty() || r.equals("Nincs megadva", ignoreCase = true) || r.equals("Nincs terem", ignoreCase = true)
     val isLGeneric = l.isEmpty() || l.equals("Nincs megadva", ignoreCase = true) || l.equals("Nincs terem", ignoreCase = true)
 
     return when {
-        isRGeneric && isLGeneric -> "Nincs terem megadva"
+        isRGeneric && isLGeneric -> noRoomText
         !isRGeneric && isLGeneric -> r
         isRGeneric && !isLGeneric -> l
         r.equals(l, ignoreCase = true) -> r
@@ -649,7 +650,7 @@ fun TimetableEventCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         imageVector = Icons.Default.AccessTime,
-                        contentDescription = "Idősáv",
+                        contentDescription = strings.timeSlot,
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(16.dp)
                     )
@@ -663,13 +664,13 @@ fun TimetableEventCard(
                 }
 
                 // Room / Location
-                val cleanRoomText = remember(event.room, event.location) {
-                    formatRoomAndLocation(event.room, event.location)
+                val cleanRoomText = remember(event.room, event.location, strings) {
+                    formatRoomAndLocation(event.room, event.location, strings.noRoomSpecified)
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         imageVector = Icons.Default.LocationOn,
-                        contentDescription = "Terem",
+                        contentDescription = strings.room,
                         tint = NeptunBlue40,
                         modifier = Modifier.size(16.dp)
                     )
@@ -691,7 +692,7 @@ fun TimetableEventCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         imageVector = Icons.Default.Person,
-                        contentDescription = "Oktató",
+                        contentDescription = strings.instructor,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(14.dp)
                     )
