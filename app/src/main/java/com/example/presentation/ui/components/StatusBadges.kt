@@ -18,6 +18,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.core.i18n.currentStrings
 import com.example.domain.model.CourseType
 import com.example.domain.model.FinanceStatus
 import com.example.ui.theme.NeptunGold
@@ -27,6 +28,7 @@ import com.example.ui.theme.NeptunRed
 
 @Composable
 fun CourseTypeBadge(courseType: CourseType, modifier: Modifier = Modifier) {
+    val strings = currentStrings()
     val textColor = when (courseType) {
         CourseType.LECTURE -> Color(0xFF3B82F6)
         CourseType.PRACTICE -> NeptunGreen
@@ -36,13 +38,21 @@ fun CourseTypeBadge(courseType: CourseType, modifier: Modifier = Modifier) {
     }
     val bgColor = textColor.copy(alpha = 0.15f)
 
+    val label = when (courseType) {
+        CourseType.LECTURE -> if (strings.languageCode == "hu") "Előadás" else if (strings.languageCode == "de") "Vorlesung" else "Lecture"
+        CourseType.PRACTICE -> if (strings.languageCode == "hu") "Gyakorlat" else if (strings.languageCode == "de") "Übung" else "Practice"
+        CourseType.LAB -> if (strings.languageCode == "hu") "Labor" else if (strings.languageCode == "de") "Labor" else "Lab"
+        CourseType.SEMINAR -> if (strings.languageCode == "hu") "Szeminárium" else if (strings.languageCode == "de") "Seminar" else "Seminar"
+        CourseType.EXAM -> if (strings.languageCode == "hu") "Vizsga" else if (strings.languageCode == "de") "Prüfung" else "Exam"
+    }
+
     Surface(
         color = bgColor,
         shape = RoundedCornerShape(6.dp),
         modifier = modifier
     ) {
         Text(
-            text = courseType.displayName,
+            text = label,
             color = textColor,
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
@@ -53,6 +63,7 @@ fun CourseTypeBadge(courseType: CourseType, modifier: Modifier = Modifier) {
 
 @Composable
 fun GradeBadge(grade: Int?, gradeText: String, isGhost: Boolean = false, modifier: Modifier = Modifier) {
+    val strings = currentStrings()
     val textColor = if (isGhost) {
         NeptunPurple
     } else {
@@ -66,6 +77,13 @@ fun GradeBadge(grade: Int?, gradeText: String, isGhost: Boolean = false, modifie
         }
     }
     val bgColor = textColor.copy(alpha = 0.15f)
+
+    val ghostPrefix = if (strings.languageCode == "hu") " Szellem: " else if (strings.languageCode == "de") " Sim: " else " Sim: "
+    val fallbackText = if (gradeText == "Még nincs jegy") {
+        if (strings.languageCode == "hu") "Még nincs jegy" else if (strings.languageCode == "de") "Keine Note" else "No grade yet"
+    } else {
+        gradeText
+    }
 
     Surface(
         color = bgColor,
@@ -84,14 +102,14 @@ fun GradeBadge(grade: Int?, gradeText: String, isGhost: Boolean = false, modifie
                         .background(NeptunPurple)
                 )
                 Text(
-                    text = " Szellem: ",
+                    text = ghostPrefix,
                     color = textColor,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Medium
                 )
             }
             Text(
-                text = if (grade != null) "$grade" else gradeText,
+                text = if (grade != null) "$grade" else fallbackText,
                 color = textColor,
                 fontSize = if (grade != null) 14.sp else 12.sp,
                 fontWeight = FontWeight.ExtraBold
@@ -102,6 +120,7 @@ fun GradeBadge(grade: Int?, gradeText: String, isGhost: Boolean = false, modifie
 
 @Composable
 fun FinanceStatusBadge(status: FinanceStatus, modifier: Modifier = Modifier) {
+    val strings = currentStrings()
     val textColor = when (status) {
         FinanceStatus.COMPLETED -> NeptunGreen
         FinanceStatus.PENDING -> Color(0xFFD97706)
@@ -109,13 +128,19 @@ fun FinanceStatusBadge(status: FinanceStatus, modifier: Modifier = Modifier) {
     }
     val bgColor = textColor.copy(alpha = 0.15f)
 
+    val label = when (status) {
+        FinanceStatus.COMPLETED -> if (strings.languageCode == "hu") "Teljesítve" else if (strings.languageCode == "de") "Bezahlt" else "Completed"
+        FinanceStatus.PENDING -> if (strings.languageCode == "hu") "Kiírva" else if (strings.languageCode == "de") "Ausstehend" else "Pending"
+        FinanceStatus.OVERDUE -> if (strings.languageCode == "hu") "Késedelmes" else if (strings.languageCode == "de") "Überfällig" else "Overdue"
+    }
+
     Surface(
         color = bgColor,
         shape = RoundedCornerShape(6.dp),
         modifier = modifier
     ) {
         Text(
-            text = status.displayName,
+            text = label,
             color = textColor,
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,

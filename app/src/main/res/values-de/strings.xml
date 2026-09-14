@@ -1,0 +1,23 @@
+<resources>
+    <string name="app_name">Neptun Mobile</string>
+    <string name="nav_dashboard">Übersicht</string>
+    <string name="nav_timetable">Stundenplan</string>
+    <string name="nav_grades">Noten</string>
+    <string name="nav_messages">Nachrichten</string>
+    <string name="nav_finances">Finanzen</string>
+    <string name="nav_settings">Einstellungen</string>
+
+    <string name="notification_channel_general">Allgemeine Benachrichtigungen</string>
+    <string name="notification_channel_classes">Stundenplan-Erinnerungen</string>
+    <string name="notification_channel_messages">Neue Nachrichten</string>
+    <string name="notification_channel_grades">Neue Noten</string>
+    <string name="notification_channel_finances">Zahlungsfristen</string>
+
+    <string name="btn_login">Anmelden</string>
+    <string name="btn_logout">Abmelden</string>
+    <string name="btn_save">Speichern</string>
+    <string name="btn_cancel">Abbrechen</string>
+    <string name="btn_close">Schließen</string>
+    <string name="btn_retry">Wiederholen</string>
+    <string name="btn_refresh">Aktualisieren</string>
+</resources>

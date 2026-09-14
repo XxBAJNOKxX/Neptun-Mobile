@@ -42,6 +42,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.core.i18n.currentStrings
 import com.example.domain.model.FinanceItem
 import com.example.domain.model.FinanceStatus
 import com.example.presentation.ui.components.FinanceStatusBadge
@@ -60,7 +61,8 @@ fun FinancesScreen(
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val hungarianNumberFormat = NumberFormat.getNumberInstance(Locale("hu", "HU"))
+    val strings = currentStrings()
+    val numberFormat = NumberFormat.getNumberInstance(Locale(strings.languageCode))
 
     Column(
         modifier = modifier
@@ -68,8 +70,10 @@ fun FinancesScreen(
             .background(MaterialTheme.colorScheme.background)
     ) {
         NeptunTopBar(
-            title = "Pénzügyek",
-            subtitle = "Tételek, befizetések és kötelezettségek",
+            title = strings.financesTitle,
+            subtitle = if (strings.languageCode == "hu") "Tételek, befizetések és kötelezettségek"
+                       else if (strings.languageCode == "de") "Gebühren, Zahlungen und Verbindlichkeiten"
+                       else "Items, payments, and liabilities",
             isRefreshing = uiState.isRefreshing,
             onRefresh = onRefresh
         )
@@ -92,7 +96,7 @@ fun FinancesScreen(
                 FinanceSummaryCard(
                     pendingHuf = uiState.totalPendingHuf,
                     completedHuf = uiState.totalCompletedHuf,
-                    numberFormat = hungarianNumberFormat
+                    numberFormat = numberFormat
                 )
             }
 
@@ -105,21 +109,39 @@ fun FinancesScreen(
                     FilterChip(
                         selected = uiState.selectedStatusFilter == null,
                         onClick = { onFilterSelect(null) },
-                        label = { Text("Összes (${uiState.allFinances.size})") },
+                        label = {
+                            Text(
+                                if (strings.languageCode == "hu") "Összes (${uiState.allFinances.size})"
+                                else if (strings.languageCode == "de") "Alle (${uiState.allFinances.size})"
+                                else "All (${uiState.allFinances.size})"
+                            )
+                        },
                         modifier = Modifier.testTag("finance_filter_all")
                     )
 
                     FilterChip(
                         selected = uiState.selectedStatusFilter == FinanceStatus.PENDING,
                         onClick = { onFilterSelect(FinanceStatus.PENDING) },
-                        label = { Text("Kiírva / Fizetendő") },
+                        label = {
+                            Text(
+                                if (strings.languageCode == "hu") "Kiírva / Fizetendő"
+                                else if (strings.languageCode == "de") "Ausstehend"
+                                else "Pending / Due"
+                            )
+                        },
                         modifier = Modifier.testTag("finance_filter_pending")
                     )
 
                     FilterChip(
                         selected = uiState.selectedStatusFilter == FinanceStatus.COMPLETED,
                         onClick = { onFilterSelect(FinanceStatus.COMPLETED) },
-                        label = { Text("Teljesítve") },
+                        label = {
+                            Text(
+                                if (strings.languageCode == "hu") "Teljesítve"
+                                else if (strings.languageCode == "de") "Bezahlt"
+                                else "Completed"
+                            )
+                        },
                         modifier = Modifier.testTag("finance_filter_completed")
                     )
                 }
@@ -144,7 +166,9 @@ fun FinancesScreen(
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = "Nincs ilyen státuszú pénzügyi tétel!",
+                                text = if (strings.languageCode == "hu") "Nincs ilyen státuszú pénzügyi tétel!"
+                                       else if (strings.languageCode == "de") "Keine Finanzposten mit diesem Status gefunden!"
+                                       else "No financial items with this status found!",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -155,7 +179,7 @@ fun FinancesScreen(
                 items(uiState.filteredFinances) { item ->
                     FinanceItemCard(
                         item = item,
-                        formattedAmount = "${hungarianNumberFormat.format(item.amountHuf)} Ft"
+                        formattedAmount = "${numberFormat.format(item.amountHuf)} Ft"
                     )
                 }
             }

@@ -51,6 +51,17 @@ enum class NavigationItem(
         unselectedIcon = Icons.Outlined.Person
     );
 
+    fun getLocalizedTitle(strings: com.example.core.i18n.AppStrings): String {
+        return when (this) {
+            HOME -> strings.navDashboard
+            TIMETABLE -> strings.navTimetable
+            GRADES -> strings.navGrades
+            MESSAGES -> strings.navMessages
+            FINANCES -> strings.navFinances
+            SETTINGS -> strings.navSettings
+        }
+    }
+
     companion object {
         fun fromName(name: String?): NavigationItem {
             return entries.firstOrNull { it.name.equals(name, ignoreCase = true) } ?: HOME

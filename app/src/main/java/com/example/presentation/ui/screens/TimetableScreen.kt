@@ -63,6 +63,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.core.i18n.currentStrings
 import com.example.domain.model.CalendarEvent
 import com.example.presentation.ui.components.CourseTypeBadge
 import com.example.presentation.ui.components.NeptunTopBar
@@ -71,19 +72,6 @@ import com.example.ui.theme.NeptunBlue40
 import com.example.ui.theme.NeptunCyan40
 import com.example.ui.theme.NeptunGreen
 import kotlinx.coroutines.launch
-
-private val DAYS = listOf(
-    1 to "Hétfő",
-    2 to "Kedd",
-    3 to "Szerda",
-    4 to "Csütörtök",
-    5 to "Péntek"
-)
-
-private val WEEKEND_DAYS = listOf(
-    6 to "Szombat",
-    7 to "Vasárnap"
-)
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
@@ -98,8 +86,16 @@ fun TimetableScreen(
     onScheduleReminder: (CalendarEvent) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val strings = currentStrings()
     val coroutineScope = rememberCoroutineScope()
-    val dayList = if (uiState.showWeekend) DAYS + WEEKEND_DAYS else DAYS
+    val dayList = listOf(
+        1 to strings.monday,
+        2 to strings.tuesday,
+        3 to strings.wednesday,
+        4 to strings.thursday,
+        5 to strings.friday
+    ) + if (uiState.showWeekend) listOf(6 to strings.saturday, 7 to strings.sunday) else emptyList()
+
     val pageCount = dayList.size
     val pagerState = rememberPagerState(
         initialPage = (uiState.selectedDayOfWeek - 1).coerceIn(0, pageCount - 1),
@@ -123,7 +119,10 @@ fun TimetableScreen(
 
     LaunchedEffect(uiState.notificationScheduledId) {
         if (uiState.notificationScheduledId != null) {
-            snackbarHostState.showSnackbar("Értesítés beállítva 15 perccel az óra előtt!")
+            val msg = if (strings.languageCode == "hu") "Értesítés beállítva 15 perccel az óra előtt!"
+                      else if (strings.languageCode == "de") "Erinnerung 15 Minuten vor der Vorlesung eingestellt!"
+                      else "Reminder set for 15 minutes before class!"
+            snackbarHostState.showSnackbar(msg)
         }
     }
 
@@ -133,8 +132,9 @@ fun TimetableScreen(
             .background(MaterialTheme.colorScheme.background)
     ) {
         NeptunTopBar(
-            title = "Heti Órarend",
-            subtitle = if (uiState.isWeekView) "Heti összesített nézet" else "Napi bontás",
+            title = strings.timetableTitle,
+            subtitle = if (uiState.isWeekView) (if (strings.languageCode == "hu") "Heti összesített nézet" else if (strings.languageCode == "de") "Wochenübersicht" else "Weekly Overview")
+                       else (if (strings.languageCode == "hu") "Napi bontás" else if (strings.languageCode == "de") "Tagesansicht" else "Daily View"),
             isRefreshing = uiState.isRefreshing,
             onRefresh = onRefresh
         )
@@ -157,7 +157,7 @@ fun TimetableScreen(
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Előző hét",
+                        contentDescription = if (strings.languageCode == "hu") "Előző hét" else if (strings.languageCode == "de") "Vorherige Woche" else "Previous week",
                         tint = MaterialTheme.colorScheme.primary
                     )
                 }
@@ -175,7 +175,7 @@ fun TimetableScreen(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = uiState.weekLabel.ifEmpty { "Órarend" },
+                        text = uiState.weekLabel.ifEmpty { strings.timetableTitle },
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -189,7 +189,7 @@ fun TimetableScreen(
                             modifier = Modifier.clickable { onCurrentWeek() }
                         ) {
                             Text(
-                                text = "Mai hét",
+                                text = if (strings.languageCode == "hu") "Mai hét" else if (strings.languageCode == "de") "Aktuelle Woche" else "Current week",
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -205,7 +205,7 @@ fun TimetableScreen(
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                        contentDescription = "Következő hét",
+                        contentDescription = if (strings.languageCode == "hu") "Következő hét" else if (strings.languageCode == "de") "Nächste Woche" else "Next week",
                         tint = MaterialTheme.colorScheme.primary
                     )
                 }
@@ -221,8 +221,16 @@ fun TimetableScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             val currentDayInfo = uiState.weekDays.getOrNull(uiState.selectedDayOfWeek - 1)
+            val dayName = currentDayInfo?.dayName ?: ""
+            val dayHeader = if (uiState.isWeekView) {
+                if (strings.languageCode == "hu") "Teljes heti nézet" else if (strings.languageCode == "de") "Wochenansicht" else "Full Week View"
+            } else {
+                if (strings.languageCode == "hu") "${dayName}i órák (${currentDayInfo?.dateFormatted ?: ""})"
+                else "$dayName (${currentDayInfo?.dateFormatted ?: ""})"
+            }
+
             Text(
-                text = if (uiState.isWeekView) "Teljes heti nézet" else "${currentDayInfo?.dayName ?: ""}i órák (${currentDayInfo?.dateFormatted ?: ""})",
+                text = dayHeader,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
@@ -232,12 +240,12 @@ fun TimetableScreen(
                 selected = uiState.isWeekView,
                 onClick = onToggleWeekView,
                 label = {
-                    Text(if (uiState.isWeekView) "Napi nézet" else "Heti áttekintés")
+                    Text(if (uiState.isWeekView) strings.dayView else strings.weekView)
                 },
                 leadingIcon = {
                     Icon(
                         imageVector = if (uiState.isWeekView) Icons.Default.ViewAgenda else Icons.Default.ViewWeek,
-                        contentDescription = "Nézet váltása",
+                        contentDescription = null,
                         modifier = Modifier.size(16.dp)
                     )
                 },
@@ -527,6 +535,7 @@ fun TimetableEventCard(
     onScheduleReminder: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val strings = currentStrings()
     val borderColor = when {
         isOngoing -> NeptunGreen
         isNextUpcoming -> NeptunCyan40
@@ -562,7 +571,7 @@ fun TimetableEventCard(
                             modifier = Modifier.padding(end = 6.dp)
                         ) {
                             Text(
-                                text = "ÉPPEN ZAJLIK",
+                                text = if (strings.languageCode == "hu") "ÉPPEN ZAJLIK" else if (strings.languageCode == "de") "LÄUFT GERADE" else "IN PROGRESS",
                                 color = NeptunGreen,
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.ExtraBold,
@@ -576,7 +585,7 @@ fun TimetableEventCard(
                             modifier = Modifier.padding(end = 6.dp)
                         ) {
                             Text(
-                                text = "KÖVETKEZŐ",
+                                text = if (strings.languageCode == "hu") "KÖVETKEZŐ" else if (strings.languageCode == "de") "NÄCHSTE" else "UPCOMING",
                                 color = NeptunCyan40,
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.ExtraBold,
@@ -591,7 +600,7 @@ fun TimetableEventCard(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Alarm,
-                            contentDescription = "Értesítés emlékeztető",
+                            contentDescription = strings.notifyClasses,
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(18.dp)
                         )

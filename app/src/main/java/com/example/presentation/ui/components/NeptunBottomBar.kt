@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+import com.example.core.i18n.currentStrings
 import com.example.presentation.navigation.NavigationItem
 
 @Composable
@@ -24,11 +25,14 @@ fun NeptunBottomBar(
     onNavigate: (NavigationItem) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val strings = currentStrings()
+
     NavigationBar(
         modifier = modifier.testTag("neptun_bottom_navigation")
     ) {
         items.forEach { item ->
             val selected = currentDestination == item
+            val itemTitle = item.getLocalizedTitle(strings)
 
             NavigationBarItem(
                 selected = selected,
@@ -48,19 +52,19 @@ fun NeptunBottomBar(
                         ) {
                             Icon(
                                 imageVector = if (selected) item.selectedIcon else item.unselectedIcon,
-                                contentDescription = item.title
+                                contentDescription = itemTitle
                             )
                         }
                     } else {
                         Icon(
                             imageVector = if (selected) item.selectedIcon else item.unselectedIcon,
-                            contentDescription = item.title
+                            contentDescription = itemTitle
                         )
                     }
                 },
                 label = {
                     Text(
-                        text = item.title,
+                        text = itemTitle,
                         fontSize = 11.sp,
                         fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
                     )
