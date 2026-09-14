@@ -89,9 +89,85 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
     private val _sessionExpiredFlow = MutableStateFlow(prefs.getBoolean(KEY_SESSION_EXPIRED, false))
     val sessionExpiredFlow: StateFlow<Boolean> = _sessionExpiredFlow.asStateFlow()
 
+    private val _languageFlow = MutableStateFlow(loadLanguage())
+    val languageFlow: StateFlow<com.example.domain.model.NeptunLanguage> = _languageFlow.asStateFlow()
+
+    private val _supportedLanguagesFlow = MutableStateFlow(loadCachedSupportedLanguages())
+    val supportedLanguagesFlow: StateFlow<List<com.example.domain.model.NeptunLanguage>> = _supportedLanguagesFlow.asStateFlow()
+
     fun updateLastSyncTime(timestamp: Long = System.currentTimeMillis()) {
         prefs.edit().putLong(KEY_LAST_SYNC, timestamp).apply()
         _credentialsFlow.value = loadCredentials()
+    }
+
+    // ------------------------------------------------------------------ //
+    // Nyelvi beállítások (App & Neptun Szerver)
+    // ------------------------------------------------------------------ //
+
+    fun loadLanguage(): com.example.domain.model.NeptunLanguage {
+        val code = prefs.getString(KEY_APP_LANGUAGE_CODE, "hu") ?: "hu"
+        val name = prefs.getString(KEY_APP_LANGUAGE_NAME, "magyar (Magyarország)") ?: "magyar (Magyarország)"
+        val lcid = prefs.getInt(KEY_APP_LANGUAGE_LCID, 1038)
+        return com.example.domain.model.NeptunLanguage(
+            code = code,
+            name = name,
+            lcid = lcid,
+            isSelected = true
+        )
+    }
+
+    fun setLanguage(language: com.example.domain.model.NeptunLanguage) {
+        prefs.edit()
+            .putString(KEY_APP_LANGUAGE_CODE, language.code.lowercase())
+            .putString(KEY_APP_LANGUAGE_NAME, language.name)
+            .putInt(KEY_APP_LANGUAGE_LCID, language.lcid)
+            .apply()
+        _languageFlow.value = language
+    }
+
+    fun loadCachedSupportedLanguages(): List<com.example.domain.model.NeptunLanguage> {
+        val raw = prefs.getString(KEY_CACHED_LANGUAGES, null) ?: return com.example.domain.model.NeptunLanguage.DEFAULT_LANGUAGES
+        return try {
+            val jsonArray = org.json.JSONArray(raw)
+            val list = mutableListOf<com.example.domain.model.NeptunLanguage>()
+            val activeLcid = prefs.getInt(KEY_APP_LANGUAGE_LCID, 1038)
+            for (i in 0 until jsonArray.length()) {
+                val obj = jsonArray.getJSONObject(i)
+                val code = obj.optString("code", "hu")
+                val name = obj.optString("name", "magyar")
+                val lcid = obj.optInt("lcid", 1038)
+                list.add(
+                    com.example.domain.model.NeptunLanguage(
+                        code = code,
+                        name = name,
+                        lcid = lcid,
+                        isSelected = lcid == activeLcid
+                    )
+                )
+            }
+            if (list.isNotEmpty()) list else com.example.domain.model.NeptunLanguage.DEFAULT_LANGUAGES
+        } catch (e: Exception) {
+            com.example.domain.model.NeptunLanguage.DEFAULT_LANGUAGES
+        }
+    }
+
+    fun saveCachedSupportedLanguages(languages: List<com.example.domain.model.NeptunLanguage>) {
+        try {
+            val jsonArray = org.json.JSONArray()
+            val activeLcid = _languageFlow.value.lcid
+            for (lang in languages) {
+                val obj = org.json.JSONObject()
+                obj.put("code", lang.code)
+                obj.put("name", lang.name)
+                obj.put("lcid", lang.lcid)
+                obj.put("selected", lang.lcid == activeLcid)
+                jsonArray.put(obj)
+            }
+            prefs.edit().putString(KEY_CACHED_LANGUAGES, jsonArray.toString()).apply()
+            _supportedLanguagesFlow.value = languages
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     // ------------------------------------------------------------------ //
@@ -580,6 +656,10 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
         private const val KEY_HIDDEN_PAGES = "key_hidden_pages"
         private const val KEY_DATA_MODE = "key_data_mode"
         private const val KEY_SESSION_EXPIRED = "key_session_expired"
+        private const val KEY_APP_LANGUAGE_CODE = "key_app_language_code"
+        private const val KEY_APP_LANGUAGE_NAME = "key_app_language_name"
+        private const val KEY_APP_LANGUAGE_LCID = "key_app_language_lcid"
+        private const val KEY_CACHED_LANGUAGES = "key_cached_languages"
         private const val KEY_NOTIFIED_PREFIX = "key_notified_"
         private const val KEY_NOTIFIED_BASELINE_PREFIX = "key_notified_baseline_"
     }

@@ -47,7 +47,11 @@ data class SettingsUiState(
     val syncSuccessMessage: String? = null,
     val updateCheckState: UpdateCheckState = UpdateCheckState(),
     val isClearingCache: Boolean = false,
-    val cacheClearedMessage: String? = null
+    val cacheClearedMessage: String? = null,
+    val currentLanguage: com.example.domain.model.NeptunLanguage = com.example.domain.model.NeptunLanguage.HUNGARIAN,
+    val supportedLanguages: List<com.example.domain.model.NeptunLanguage> = com.example.domain.model.NeptunLanguage.DEFAULT_LANGUAGES,
+    val isChangingLanguage: Boolean = false,
+    val languageMessage: String? = null
 )
 
 class SettingsViewModel(
@@ -62,7 +66,9 @@ class SettingsViewModel(
             themeSettings = prefsManager.loadThemeSettings(),
             notificationPreferences = prefsManager.loadNotificationPreferences(),
             personalization = prefsManager.loadPersonalization(),
-            updateChannel = prefsManager.loadUpdateChannel()
+            updateChannel = prefsManager.loadUpdateChannel(),
+            currentLanguage = prefsManager.loadLanguage(),
+            supportedLanguages = prefsManager.loadCachedSupportedLanguages()
         )
     )
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
@@ -91,6 +97,53 @@ class SettingsViewModel(
         viewModelScope.launch {
             prefsManager.updateChannelFlow.collect { channel ->
                 _uiState.update { it.copy(updateChannel = channel) }
+            }
+        }
+        viewModelScope.launch {
+            prefsManager.languageFlow.collect { lang ->
+                _uiState.update { it.copy(currentLanguage = lang) }
+            }
+        }
+        viewModelScope.launch {
+            prefsManager.supportedLanguagesFlow.collect { langs ->
+                _uiState.update { it.copy(supportedLanguages = langs) }
+            }
+        }
+        // Frissítjük a szerver által támogatott nyelveket a háttérben
+        viewModelScope.launch {
+            try {
+                val languages = authRepository.getSupportedLanguages()
+                if (languages.isNotEmpty()) {
+                    _uiState.update { it.copy(supportedLanguages = languages) }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    fun selectLanguage(language: com.example.domain.model.NeptunLanguage) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isChangingLanguage = true) }
+            try {
+                authRepository.setLanguage(language)
+                _uiState.update {
+                    it.copy(
+                        isChangingLanguage = false,
+                        languageMessage = "Nyelv módosítva: ${language.displayLabel}"
+                    )
+                }
+                delay(3000)
+                _uiState.update { it.copy(languageMessage = null) }
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isChangingLanguage = false,
+                        languageMessage = "Hiba a nyelvváltáskor: ${e.message}"
+                    )
+                }
+                delay(3000)
+                _uiState.update { it.copy(languageMessage = null) }
             }
         }
     }

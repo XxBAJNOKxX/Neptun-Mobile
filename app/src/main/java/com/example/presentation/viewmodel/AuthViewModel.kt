@@ -29,6 +29,9 @@ data class AuthUiState(
     val credentials: StudentCredentials? = null,
     val isOfflineModeAvailable: Boolean = false,
     val isUniversityDropdownOpen: Boolean = false,
+    val currentLanguage: com.example.domain.model.NeptunLanguage = com.example.domain.model.NeptunLanguage.HUNGARIAN,
+    val supportedLanguages: List<com.example.domain.model.NeptunLanguage> = com.example.domain.model.NeptunLanguage.DEFAULT_LANGUAGES,
+    val isLanguageDropdownOpen: Boolean = false,
     // 2FA State
     val isTwoFactorRequired: Boolean = false,
     val twoFactorSession: Neptun2FASession? = null,
@@ -67,7 +70,8 @@ class AuthViewModel(
                 (savedUniId.isNotEmpty() && uni.id.equals(savedUniId, ignoreCase = true)) ||
                 (savedUniUrl.isNotEmpty() && uni.neptunUrl.trimEnd('/').equals(savedUniUrl.trimEnd('/'), ignoreCase = true)) ||
                 (savedUniName.isNotEmpty() && uni.name.equals(savedUniName, ignoreCase = true))
-            } ?: list.firstOrNull { uni -> uni.id == "etvslorndtud" || uni.id == "elte" || uni.neptunUrl.contains("elte.hu") }
+            } ?: list.firstOrNull { uni -> uni.id == "ppke_auto" || uni.id == "ppke" || uni.neptunUrl.contains("ppke.hu") }
+              ?: list.firstOrNull { uni -> uni.id == "etvslorndtud" || uni.id == "elte" || uni.neptunUrl.contains("elte.hu") }
               ?: list.firstOrNull()
 
             _uiState.update {
@@ -78,6 +82,22 @@ class AuthViewModel(
                     neptunCode = it.neptunCode.ifEmpty { savedNeptunCode },
                     isOfflineModeAvailable = offlineAvailable
                 )
+            }
+
+            matchedUni?.let { uni ->
+                fetchLanguagesForUniversity(uni.neptunUrl)
+            }
+        }
+
+        viewModelScope.launch {
+            authRepository.getSelectedLanguage().collect { lang ->
+                _uiState.update { it.copy(currentLanguage = lang) }
+            }
+        }
+
+        viewModelScope.launch {
+            authRepository.getCachedSupportedLanguages().collect { langs ->
+                _uiState.update { it.copy(supportedLanguages = langs) }
             }
         }
 
@@ -100,6 +120,30 @@ class AuthViewModel(
                 }
             }
         }
+    }
+
+    private fun fetchLanguagesForUniversity(url: String) {
+        viewModelScope.launch {
+            try {
+                val langs = authRepository.getSupportedLanguages(url)
+                if (langs.isNotEmpty()) {
+                    _uiState.update { it.copy(supportedLanguages = langs) }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    fun selectLanguage(language: com.example.domain.model.NeptunLanguage) {
+        viewModelScope.launch {
+            authRepository.setLanguage(language)
+            _uiState.update { it.copy(isLanguageDropdownOpen = false) }
+        }
+    }
+
+    fun setLanguageDropdownOpen(open: Boolean) {
+        _uiState.update { it.copy(isLanguageDropdownOpen = open) }
     }
 
     fun onSearchQueryChange(query: String) {
@@ -126,6 +170,7 @@ class AuthViewModel(
                 errorMessage = null
             )
         }
+        fetchLanguagesForUniversity(university.neptunUrl)
     }
 
     fun setUniversityDropdownOpen(open: Boolean) {

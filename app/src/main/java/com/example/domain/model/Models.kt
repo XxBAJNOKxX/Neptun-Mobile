@@ -11,6 +11,55 @@ data class University(
     val neptunUrl: String
 )
 
+@Serializable
+data class NeptunLanguage(
+    val code: String,
+    val name: String,
+    val lcid: Int,
+    val isSelected: Boolean = false
+) {
+    val flagEmoji: String
+        get() = when (code.lowercase()) {
+            "hu" -> "🇭🇺"
+            "en" -> "🇬🇧"
+            "de" -> "🇩🇪"
+            "sk" -> "🇸🇰"
+            "fr" -> "🇫🇷"
+            "ro" -> "🇷🇴"
+            "it" -> "🇮🇹"
+            "es" -> "🇪🇸"
+            "sr" -> "🇷🇸"
+            "hr" -> "🇭🇷"
+            "pl" -> "🇵🇱"
+            "uk" -> "🇺🇦"
+            else -> "🌐"
+        }
+
+    val displayShort: String
+        get() = code.uppercase()
+
+    val displayLabel: String
+        get() = when (code.lowercase()) {
+            "hu" -> "Magyar"
+            "en" -> "English"
+            "de" -> "Deutsch"
+            "sk" -> "Slovenčina"
+            "fr" -> "Français"
+            "ro" -> "Română"
+            "it" -> "Italiano"
+            "es" -> "Español"
+            else -> name.split("(").firstOrNull()?.trim() ?: name
+        }
+
+    companion object {
+        val HUNGARIAN = NeptunLanguage("hu", "magyar (Magyarország)", 1038, true)
+        val ENGLISH = NeptunLanguage("en", "English (United States)", 1033, false)
+        val GERMAN = NeptunLanguage("de", "Deutsch (Deutschland)", 1031, false)
+
+        val DEFAULT_LANGUAGES = listOf(HUNGARIAN, ENGLISH, GERMAN)
+    }
+}
+
 data class StudentCredentials(
     val neptunCode: String,
     val universityId: String,
