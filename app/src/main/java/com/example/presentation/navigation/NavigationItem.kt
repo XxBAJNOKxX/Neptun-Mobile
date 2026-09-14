@@ -13,42 +13,40 @@ import androidx.compose.material.icons.outlined.Grading
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Mail
 import androidx.compose.material.icons.outlined.Person
-import androidx.annotation.StringRes
 import androidx.compose.ui.graphics.vector.ImageVector
-import com.example.R
 
 enum class NavigationItem(
-    @StringRes val labelRes: Int,
+    val title: String,
     val selectedIcon: ImageVector,
     val unselectedIcon: ImageVector
 ) {
     HOME(
-        labelRes = R.string.nav_home,
+        title = "Kezdőlap",
         selectedIcon = Icons.Filled.Home,
         unselectedIcon = Icons.Outlined.Home
     ),
     TIMETABLE(
-        labelRes = R.string.nav_timetable,
+        title = "Órarend",
         selectedIcon = Icons.Filled.CalendarMonth,
         unselectedIcon = Icons.Outlined.CalendarMonth
     ),
     GRADES(
-        labelRes = R.string.nav_grades,
+        title = "Jegyek",
         selectedIcon = Icons.Filled.Grading,
         unselectedIcon = Icons.Outlined.Grading
     ),
     MESSAGES(
-        labelRes = R.string.nav_messages,
+        title = "Üzenetek",
         selectedIcon = Icons.Filled.Mail,
         unselectedIcon = Icons.Outlined.Mail
     ),
     FINANCES(
-        labelRes = R.string.nav_finances,
+        title = "Pénzügy",
         selectedIcon = Icons.Filled.AccountBalanceWallet,
         unselectedIcon = Icons.Outlined.AccountBalanceWallet
     ),
     SETTINGS(
-        labelRes = R.string.nav_profile,
+        title = "Profil",
         selectedIcon = Icons.Filled.Person,
         unselectedIcon = Icons.Outlined.Person
     );

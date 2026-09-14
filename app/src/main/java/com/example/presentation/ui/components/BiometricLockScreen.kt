@@ -27,13 +27,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.fragment.app.FragmentActivity
-import com.example.R
 import com.example.core.security.BiometricLockHelper
 
 /**
@@ -85,7 +83,7 @@ fun BiometricLockScreen(
             ) {
                 Icon(
                     imageVector = Icons.Default.Lock,
-                    contentDescription = stringResource(R.string.lock_locked_desc),
+                    contentDescription = "Zárolva",
                     tint = MaterialTheme.colorScheme.onPrimaryContainer,
                     modifier = Modifier.size(40.dp)
                 )
@@ -94,7 +92,7 @@ fun BiometricLockScreen(
             Spacer(modifier = Modifier.height(24.dp))
 
             Text(
-                text = stringResource(R.string.lock_title),
+                text = "Az alkalmazás zárolva van",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface,
@@ -105,8 +103,8 @@ fun BiometricLockScreen(
 
             Text(
                 text = when {
-                    biometricAvailable == false -> stringResource(R.string.lock_unavailable)
-                    else -> stringResource(R.string.lock_prompt)
+                    biometricAvailable == false -> "A biometrikus hitelesítés nem elérhető ezen az eszközön."
+                    else -> "Erősítsd meg az azonosságod az ujjlenyomatoddal vagy arcoddal."
                 },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -139,13 +137,13 @@ fun BiometricLockScreen(
                 },
                 enabled = biometricAvailable != null
             ) {
-                Text(stringResource(R.string.lock_unlock))
+                Text("Feloldás")
             }
 
             if (biometricAvailable == false) {
                 Spacer(modifier = Modifier.height(8.dp))
                 TextButton(onClick = onUnlock) {
-                    Text(stringResource(R.string.common_later))
+                    Text("Később")
                 }
             }
         }

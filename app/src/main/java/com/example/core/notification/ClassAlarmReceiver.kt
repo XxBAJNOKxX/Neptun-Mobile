@@ -3,24 +3,14 @@ package com.example.core.notification
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import com.example.R
-import com.example.domain.model.CourseType
 
 class ClassAlarmReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
-        val subjectName = intent.getStringExtra(EXTRA_SUBJECT_NAME)
-            ?: context.getString(R.string.notif_class_default)
+        val subjectName = intent.getStringExtra(EXTRA_SUBJECT_NAME) ?: "Óra"
         val room = intent.getStringExtra(EXTRA_ROOM) ?: "-"
         val startTime = intent.getStringExtra(EXTRA_START_TIME) ?: ""
-        // Az óratípus nevét az értesítés pillanatában fordítjuk: nyelvválasztás után is helyes.
-        val courseTypeExtra = intent.getStringExtra(EXTRA_COURSE_TYPE)
-        val courseType = runCatching {
-            courseTypeExtra?.let { CourseType.valueOf(it) }
-        }.getOrNull()?.let { context.getString(it.labelRes) }
-            // Régebbi verziók a honosított feliratot tárolták: azt tartsuk meg.
-            ?: courseTypeExtra
-            ?: context.getString(R.string.notif_class_default)
+        val courseType = intent.getStringExtra(EXTRA_COURSE_TYPE) ?: "Óra"
         val notificationId = intent.getIntExtra(EXTRA_NOTIFICATION_ID, 1001)
         val minutesBefore = intent.getIntExtra(EXTRA_MINUTES_BEFORE, 15)
 

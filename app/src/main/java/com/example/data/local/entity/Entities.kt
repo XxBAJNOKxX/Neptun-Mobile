@@ -102,12 +102,21 @@ data class SubjectGradeEntity(
             subjectCode = grade.subjectCode,
             credit = grade.credit,
             grade = grade.grade,
-            // A szerver eredeti szövegét tároljuk; a jegyneveket az app nyelvén a megjelenítés réteg írja ki.
-            gradeText = grade.gradeText,
+            gradeText = gradeTextFor(grade.grade, grade.gradeText),
             isSigned = grade.isSigned,
             ghostGrade = grade.ghostGrade
         )
 
+        private fun gradeTextFor(grade: Int?, fallback: String): String {
+            return when (grade) {
+                5 -> "Jeles (5)"
+                4 -> "Jó (4)"
+                3 -> "Közepes (3)"
+                2 -> "Elégséges (2)"
+                1 -> "Elégtelen (1)"
+                else -> fallback.ifEmpty { "Még nincs jegy" }
+            }
+        }
     }
 }
 

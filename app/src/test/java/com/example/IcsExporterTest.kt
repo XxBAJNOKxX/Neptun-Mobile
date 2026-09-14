@@ -36,13 +36,7 @@ class IcsExporterTest {
 
     @Test
     fun `ics contains calendar envelope and events`() {
-        val ics = IcsExporter.buildIcs(
-            listOf(weeklyEvent()),
-            weeksAhead = 12,
-            courseTypeLabel = { "Előadás" },
-            teacherLabel = "Oktató: ",
-            reminderLabel = "Emlékeztető"
-        )
+        val ics = IcsExporter.buildIcs(listOf(weeklyEvent()), weeksAhead = 12)
 
         assertTrue(ics.startsWith("BEGIN:VCALENDAR"))
         assertTrue(ics.trimEnd().endsWith("END:VCALENDAR"))
@@ -83,24 +77,5 @@ class IcsExporterTest {
         val ics = IcsExporter.buildIcs(listOf(weeklyEvent()))
         assertTrue(ics.contains("BEGIN:VALARM"))
         assertTrue(ics.contains("TRIGGER:-PT15M"))
-    }
-
-    @Test
-    fun `labels are customizable per export language`() {
-        val ics = IcsExporter.buildIcs(
-            listOf(weeklyEvent()),
-            courseTypeLabel = { "Lecture" },
-            teacherLabel = "Teacher: ",
-            reminderLabel = "Reminder"
-        )
-        assertTrue(ics.contains("SUMMARY:Lecture: Analízis 1"))
-        assertTrue(ics.contains("DESCRIPTION:Teacher: Dr. Teszt Elek"))
-        assertTrue(ics.contains("DESCRIPTION:Reminder"))
-    }
-
-    @Test
-    fun `default labels use neutral enum names`() {
-        val ics = IcsExporter.buildIcs(listOf(weeklyEvent()))
-        assertTrue(ics.contains("SUMMARY:LECTURE: Analízis 1"))
     }
 }

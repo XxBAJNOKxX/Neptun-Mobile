@@ -33,7 +33,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -41,7 +40,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.R
 import com.example.domain.model.CalendarEvent
 import com.example.presentation.navigation.NavigationItem
 import com.example.presentation.ui.components.CourseTypeBadge
@@ -68,13 +66,8 @@ fun DashboardScreen(
             .background(MaterialTheme.colorScheme.background)
     ) {
         NeptunTopBar(
-            title = stringResource(NavigationItem.HOME.labelRes),
-            subtitle = LocalDate.now().format(
-                DateTimeFormatter.ofPattern(
-                    stringResource(R.string.dash_date_pattern),
-                    Locale.getDefault()
-                )
-            ),
+            title = "Kezdőlap",
+            subtitle = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy. MMMM d. EEEE", Locale("hu"))),
             isRefreshing = uiState.isRefreshing,
             onRefresh = onRefresh
         )
@@ -91,7 +84,7 @@ fun DashboardScreen(
             item {
                 Column {
                     Text(
-                        text = stringResource(R.string.dash_greeting, greetingWord(), studentName),
+                        text = "${uiState.greeting}, $studentName!",
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -99,7 +92,7 @@ fun DashboardScreen(
                     if (isDemoData) {
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = stringResource(R.string.dash_demo),
+                            text = "Demo adatokat látsz – a valódi adataid bejelentkezés után szinkronizálódnak.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -124,7 +117,7 @@ fun DashboardScreen(
                 ) {
                     QuickStatCard(
                         icon = Icons.Default.Mail,
-                        label = stringResource(R.string.dash_stat_messages),
+                        label = "Olvasatlan\nüzenet",
                         value = "${uiState.unreadMessages}",
                         tint = MaterialTheme.colorScheme.primary,
                         onClick = { onNavigate(NavigationItem.MESSAGES) },
@@ -132,7 +125,7 @@ fun DashboardScreen(
                     )
                     QuickStatCard(
                         icon = Icons.Default.Grading,
-                        label = stringResource(R.string.dash_stat_grade),
+                        label = "Legutóbbi\njegy",
                         value = uiState.latestGrades.firstOrNull()?.grade?.toString() ?: "–",
                         tint = NeptunGreen,
                         onClick = { onNavigate(NavigationItem.GRADES) },
@@ -140,12 +133,8 @@ fun DashboardScreen(
                     )
                     QuickStatCard(
                         icon = Icons.Default.AccountBalanceWallet,
-                        label = stringResource(R.string.dash_stat_pending),
-                        value = if (uiState.pendingFinanceHuf > 0) formatShort(
-                            uiState.pendingFinanceHuf,
-                            thousandSuffix = stringResource(R.string.dash_compact_thousand),
-                            millionSuffix = stringResource(R.string.dash_compact_million)
-                        ) else "0",
+                        label = "Fizetendő\n(Ft)",
+                        value = if (uiState.pendingFinanceHuf > 0) formatShort(uiState.pendingFinanceHuf) else "0",
                         tint = if (uiState.pendingFinanceHuf > 0) MaterialTheme.colorScheme.error else NeptunGreen,
                         onClick = { onNavigate(NavigationItem.FINANCES) },
                         modifier = Modifier.weight(1f)
@@ -156,7 +145,7 @@ fun DashboardScreen(
             // Mai órák listája
             item {
                 Text(
-                    text = stringResource(R.string.dash_today, uiState.todayClasses.size),
+                    text = "Mai órák (${uiState.todayClasses.size})",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
@@ -175,7 +164,7 @@ fun DashboardScreen(
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text(
-                                text = stringResource(R.string.dash_no_more),
+                                text = "Ma nincs több órád 🎉",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -212,13 +201,13 @@ fun DashboardScreen(
                             Spacer(modifier = Modifier.width(12.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = stringResource(R.string.dash_finance_title, finance.title),
+                                    text = "Fizetendő: ${finance.title}",
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
-                                    text = stringResource(R.string.dash_finance_line, formatHuf(finance.amountHuf), finance.dueDate),
+                                    text = "${formatHuf(finance.amountHuf)} Ft · Határidő: ${finance.dueDate}",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -262,13 +251,13 @@ private fun NextClassCard(
         if (event == null) {
             Column(modifier = Modifier.padding(18.dp)) {
                 Text(
-                    text = stringResource(R.string.dash_no_more_plain),
+                    text = "Ma nincs több órád",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = stringResource(R.string.dash_rest),
+                    text = "Pihenj egyet, vagy nézd meg a pénzügyeidet!",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -284,7 +273,7 @@ private fun NextClassCard(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = if (ongoing != null) stringResource(R.string.dash_ongoing) else stringResource(R.string.dash_next),
+                        text = if (ongoing != null) "Épp most zajlik" else "Következő óra",
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Bold,
                         color = if (ongoing != null) NeptunGreen else MaterialTheme.colorScheme.primary
@@ -408,7 +397,7 @@ private fun DashboardClassRow(event: CalendarEvent) {
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = listOf(stringResource(event.courseType.labelRes), event.room.takeIf { it.isNotBlank() })
+                    text = listOf(event.courseType.displayName, event.room.takeIf { it.isNotBlank() })
                         .filterNotNull()
                         .joinToString(" · "),
                     style = MaterialTheme.typography.bodySmall,
@@ -420,29 +409,16 @@ private fun DashboardClassRow(event: CalendarEvent) {
 }
 
 private fun formatHuf(amount: Int): String {
-    return java.text.NumberFormat.getNumberInstance(Locale.getDefault()).format(amount)
+    return java.text.NumberFormat.getNumberInstance(Locale("hu", "HU")).format(amount)
 }
 
-@Composable
-private fun greetingWord(): String {
-    val hour = LocalTime.now().hour
-    val res = when {
-        hour < 5 -> R.string.dash_greet_night
-        hour < 9 -> R.string.dash_greet_morning
-        hour < 18 -> R.string.dash_greet_day
-        else -> R.string.dash_greet_evening
-    }
-    return stringResource(res)
-}
-
-private fun formatShort(amount: Int, thousandSuffix: String, millionSuffix: String): String {
+private fun formatShort(amount: Int): String {
     return when {
         amount >= 1_000_000 -> {
             val m = amount / 100_000.0
-            if (m >= 10) "${m.toInt()}$millionSuffix"
-            else String.format(Locale.getDefault(), "%.1f%s", m, millionSuffix)
+            if (m >= 10) "${m.toInt()}M" else String.format(Locale("hu"), "%.1fM", m)
         }
-        amount >= 1000 -> "${amount / 1000}$thousandSuffix"
+        amount >= 1000 -> "${amount / 1000}e"
         else -> "$amount"
     }
 }

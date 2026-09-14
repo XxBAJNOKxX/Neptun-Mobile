@@ -4,14 +4,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.domain.model.Neptun2FASession
-import com.example.domain.model.NeptunLanguages
 import com.example.domain.model.StudentCredentials
 import com.example.domain.model.TwoFactorMethod
-import com.example.R
-import com.example.core.locale.StringProvider
 import com.example.domain.model.University
 import com.example.domain.repository.AuthRepository
-import com.example.domain.repository.LanguageRepository
 import com.example.domain.repository.NeptunRepository
 import com.example.domain.repository.TwoFactorRequiredException
 import com.example.domain.repository.TwoFactorSessionRequiredException
@@ -19,9 +15,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
 
 data class AuthUiState(
     val universities: List<University> = emptyList(),
@@ -44,21 +38,15 @@ data class AuthUiState(
     val twoFactorCode: String = "",
     val twoFactorSuccessMessage: String? = null,
     val twoFactorErrorMessage: String? = null,
-    val isTwoFactorLoading: Boolean = false,
-    // Neptun szervernyelv-választó
-    val serverLanguage: ServerLanguageUiState = ServerLanguageUiState()
+    val isTwoFactorLoading: Boolean = false
 )
 
 class AuthViewModel(
     private val authRepository: AuthRepository,
-    private val neptunRepository: NeptunRepository,
-    private val languageRepository: LanguageRepository,
-    private val strings: StringProvider
+    private val neptunRepository: NeptunRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AuthUiState())
-    /** Az intézmény nyelvi listáját frissítő háttérfeladat (elavulás-védelemhez). */
-    private var languageRefreshJob: Job? = null
     val uiState: StateFlow<AuthUiState> = _uiState.asStateFlow()
 
     init {
@@ -91,7 +79,6 @@ class AuthViewModel(
                     isOfflineModeAvailable = offlineAvailable
                 )
             }
-            loadServerLanguages(matchedUni)
         }
 
         viewModelScope.launch {
@@ -138,77 +125,6 @@ class AuthViewModel(
                 isUniversityDropdownOpen = false,
                 errorMessage = null
             )
-        }
-        loadServerLanguages(university)
-    }
-
-    /**
-     * Az intézmény támogatott nyelveinek betöltése: először a gyorsítótárból
-     * (azonnal), majd háttérben a szerverről frissítve. A bejelentkezés sosem
-     * blokkolódik emiatt – hiba esetén a beépített hu/en/de lista látszik.
-     */
-    fun loadServerLanguages(university: University?) {
-        if (university == null) return
-        languageRefreshJob?.cancel()
-        val url = university.neptunUrl
-        val cached = languageRepository.getCachedLanguages(url)
-        _uiState.update {
-            it.copy(
-                serverLanguage = ServerLanguageUiState(
-                    languages = cached.languages,
-                    selectedLcid = languageRepository.getSelectedLcid(),
-                    isLoading = true,
-                    isFallback = cached.isFallback
-                )
-            )
-        }
-        languageRefreshJob = viewModelScope.launch {
-            val fresh = languageRepository.refreshLanguages(url)
-            // Elavult válasz (közben másik intézményt választott a felhasználó): eldobjuk.
-            if (_uiState.value.selectedUniversity?.neptunUrl != url) return@launch
-            _uiState.update {
-                it.copy(
-                    serverLanguage = ServerLanguageUiState(
-                        languages = fresh.languages,
-                        selectedLcid = languageRepository.getSelectedLcid(),
-                        isLoading = false,
-                        isFallback = fresh.isFallback
-                    )
-                )
-            }
-        }
-    }
-
-    /**
-     * Végső őr a hitelesítési útvonalon: ha mérvadó (nem tartalék) lista áll
-     * rendelkezésre, a kiválasztott LCID-nek szerepelnie kell benne; ha nem,
-     * a szerver alapértelmezett nyelvére igazítunk, mielőtt a kérést küldenénk.
-     */
-    private suspend fun validateSelectedLcid() {
-        val list = _uiState.value.serverLanguage
-        if (!list.isFallback && list.languages.isNotEmpty() &&
-            list.languages.none { it.lcid == list.selectedLcid }
-        ) {
-            val resolved = NeptunLanguages.resolveLcid(list.languages, list.selectedLcid)
-            languageRepository.setSelectedLcid(resolved)
-            _uiState.update { it.copy(serverLanguage = it.serverLanguage.copy(selectedLcid = resolved)) }
-        }
-    }
-
-    fun refreshServerLanguages() {
-        loadServerLanguages(_uiState.value.selectedUniversity)
-    }
-
-    fun selectServerLanguage(lcid: Int) {
-        viewModelScope.launch {
-            languageRepository.setSelectedLcid(lcid)
-            _uiState.update {
-                it.copy(
-                    serverLanguage = it.serverLanguage.copy(
-                        selectedLcid = languageRepository.getSelectedLcid()
-                    )
-                )
-            }
         }
     }
 
@@ -286,9 +202,9 @@ class AuthViewModel(
                             isEmailCodeRequested = true,
                             codePrefix = updatedSession.codePrefix,
                             twoFactorSuccessMessage = if (prefixText.isNotEmpty()) {
-                                strings.getString(R.string.auth_2fa_sent_prefix, prefixText)
+                                "A Neptun elküldte a 6 jegyű kódot az egyetemi e-mail címedre! Előtag: $prefixText"
                             } else {
-                                strings.getString(R.string.auth_2fa_sent)
+                                "A Neptun elküldte az ellenőrző kódot az e-mail címedre!"
                             }
                         )
                     }
@@ -297,7 +213,7 @@ class AuthViewModel(
                     _uiState.update {
                         it.copy(
                             isTwoFactorLoading = false,
-                            twoFactorErrorMessage = error.message ?: strings.getString(R.string.auth_err_email_send)
+                            twoFactorErrorMessage = error.message ?: "Nem sikerült elküldeni az e-mail kódot."
                         )
                     }
                 }
@@ -309,15 +225,15 @@ class AuthViewModel(
         val state = _uiState.value
         val university = state.selectedUniversity
         if (university == null) {
-            _uiState.update { it.copy(errorMessage = strings.getString(R.string.auth_err_no_uni)) }
+            _uiState.update { it.copy(errorMessage = "Kérjük, válassz egy egyetemet!") }
             return
         }
         if (state.neptunCode.length != 6) {
-            _uiState.update { it.copy(errorMessage = strings.getString(R.string.auth_err_code_len)) }
+            _uiState.update { it.copy(errorMessage = "A Neptun kódnak 6 karakternek kell lennie!") }
             return
         }
         if (state.password.isEmpty()) {
-            _uiState.update { it.copy(errorMessage = strings.getString(R.string.auth_err_no_pass)) }
+            _uiState.update { it.copy(errorMessage = "Kérjük, add meg a jelszavadat!") }
             return
         }
 
@@ -326,10 +242,6 @@ class AuthViewModel(
 
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, errorMessage = null) }
-            // Ha a nyelvi lista még töltődik, korlátosan megvárjuk, hogy ne
-            // hitelesítsünk olyan LCID-vel, amit az intézmény nem támogat.
-            withTimeoutOrNull(8_000) { languageRefreshJob?.join() }
-            validateSelectedLcid()
             val result = authRepository.login(
                 university = university,
                 neptunCode = state.neptunCode,
@@ -364,7 +276,7 @@ class AuthViewModel(
                                     twoFactorMethod = defaultMethod,
                                     isEmailCodeRequested = isEmailReq,
                                     codePrefix = session.codePrefix,
-                                    twoFactorSuccessMessage = if (isEmailReq && session.codePrefix.isNotEmpty()) strings.getString(R.string.auth_2fa_prefix_only, "${session.codePrefix}-") else null,
+                                    twoFactorSuccessMessage = if (isEmailReq && session.codePrefix.isNotEmpty()) "Előtag: ${session.codePrefix}-" else null,
                                     twoFactorErrorMessage = null,
                                     errorMessage = null
                                 )
@@ -385,7 +297,7 @@ class AuthViewModel(
                             _uiState.update {
                                 it.copy(
                                     isLoading = false,
-                                    errorMessage = error.message ?: strings.getString(R.string.auth_err_login_failed)
+                                    errorMessage = error.message ?: "Sikertelen bejelentkezés!"
                                 )
                             }
                         }
@@ -402,7 +314,7 @@ class AuthViewModel(
         if (session != null) {
             val code = state.twoFactorCode.trim()
             if (code.isEmpty()) {
-                _uiState.update { it.copy(twoFactorErrorMessage = strings.getString(R.string.auth_err_2fa_code_empty)) }
+                _uiState.update { it.copy(twoFactorErrorMessage = "Kérjük, add meg a 6 számjegyű kódot!") }
                 return
             }
 
@@ -429,7 +341,7 @@ class AuthViewModel(
                         _uiState.update {
                             it.copy(
                                 isTwoFactorLoading = false,
-                                twoFactorErrorMessage = error.message ?: strings.getString(R.string.auth_err_2fa_failed)
+                                twoFactorErrorMessage = error.message ?: "Hibás 2FA kód!"
                             )
                         }
                     }
@@ -462,13 +374,11 @@ class AuthViewModel(
     companion object {
         fun provideFactory(
             authRepository: AuthRepository,
-            neptunRepository: NeptunRepository,
-            languageRepository: LanguageRepository,
-            strings: StringProvider
+            neptunRepository: NeptunRepository
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                return AuthViewModel(authRepository, neptunRepository, languageRepository, strings) as T
+                return AuthViewModel(authRepository, neptunRepository) as T
             }
         }
     }

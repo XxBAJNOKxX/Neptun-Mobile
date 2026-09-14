@@ -3,8 +3,6 @@ package com.example.presentation.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.example.R
-import com.example.core.locale.StringProvider
 import com.example.domain.model.NeptunMessage
 import com.example.domain.repository.NeptunRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,8 +23,7 @@ data class MessagesUiState(
 )
 
 class MessagesViewModel(
-    private val neptunRepository: NeptunRepository,
-    private val strings: StringProvider
+    private val neptunRepository: NeptunRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MessagesUiState())
@@ -129,7 +126,7 @@ class MessagesViewModel(
         viewModelScope.launch {
             val content = neptunRepository.getMessageContent(message.id)
             val updated = message.copy(
-                bodyHtml = content.ifBlank { strings.getString(R.string.msg_unavailable) },
+                bodyHtml = content.ifBlank { "Az üzenet tartalma nem érhető el vagy üres." },
                 isRead = true
             )
             _uiState.update { state ->
@@ -152,12 +149,11 @@ class MessagesViewModel(
 
     companion object {
         fun provideFactory(
-            neptunRepository: NeptunRepository,
-            strings: StringProvider
+            neptunRepository: NeptunRepository
         ): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                return MessagesViewModel(neptunRepository, strings) as T
+                return MessagesViewModel(neptunRepository) as T
             }
         }
     }
