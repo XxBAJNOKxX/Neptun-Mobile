@@ -77,7 +77,7 @@ class LanguageRepositoryImpl(
         } catch (e: Exception) {
             Log.w(TAG, "Nyelvi lista frissítése sikertelen ($baseUrl): ${e.message}")
         }
-        getCachedLanguages(baseUrl)
+        return getCachedLanguages(baseUrl)
     }
 
     /**
