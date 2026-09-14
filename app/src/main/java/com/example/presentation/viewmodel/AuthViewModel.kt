@@ -139,6 +139,10 @@ class AuthViewModel(
         viewModelScope.launch {
             authRepository.setLanguage(language)
             _uiState.update { it.copy(isLanguageDropdownOpen = false) }
+            val creds = _uiState.value.credentials
+            if (creds != null) {
+                neptunRepository.syncAllData(creds.neptunCode, "")
+            }
         }
     }
 

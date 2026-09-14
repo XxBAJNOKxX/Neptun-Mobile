@@ -133,6 +133,8 @@ class SettingsViewModel(
                         languageMessage = "Nyelv módosítva: ${language.displayLabel}"
                     )
                 }
+                // Automatikus újraszinkronizálás a kiválasztott nyelvvel
+                triggerManualSync()
                 delay(3000)
                 _uiState.update { it.copy(languageMessage = null) }
             } catch (e: Exception) {
