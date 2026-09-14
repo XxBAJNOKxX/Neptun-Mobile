@@ -34,6 +34,7 @@ fun NeptunTopBar(
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val strings = com.example.core.i18n.currentStrings()
     val rotation by if (isRefreshing) {
         val infiniteTransition = rememberInfiniteTransition(label = "refresh")
         infiniteTransition.animateFloat(
@@ -78,7 +79,7 @@ fun NeptunTopBar(
             ) {
                 Icon(
                     imageVector = Icons.Default.Refresh,
-                    contentDescription = "Frissítés",
+                    contentDescription = strings.refresh,
                     modifier = Modifier.rotate(rotation)
                 )
             }

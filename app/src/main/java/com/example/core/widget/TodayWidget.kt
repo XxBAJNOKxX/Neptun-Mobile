@@ -53,8 +53,9 @@ class TodayWidget : GlanceAppWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val classes = loadTodayClasses(context)
         val openAppIntent = Intent(context, MainActivity::class.java)
+        val strings = com.example.core.i18n.AppStringsProvider.getForContext(context)
         provideContent {
-            TodayWidgetContent(classes, openAppIntent)
+            TodayWidgetContent(strings, classes, openAppIntent)
         }
     }
 
@@ -76,7 +77,11 @@ class TodayWidgetReceiver : GlanceAppWidgetReceiver() {
 }
 
 @Composable
-private fun TodayWidgetContent(classes: List<CalendarEvent>, openAppIntent: Intent) {
+private fun TodayWidgetContent(
+    strings: com.example.core.i18n.AppStrings,
+    classes: List<CalendarEvent>,
+    openAppIntent: Intent
+) {
     Column(
         modifier = GlanceModifier
             .fillMaxSize()
@@ -100,7 +105,7 @@ private fun TodayWidgetContent(classes: List<CalendarEvent>, openAppIntent: Inte
             )
             Spacer(GlanceModifier.width(6.dp))
             Text(
-                "· Mai órák",
+                "· ${strings.widgetTodayClasses}",
                 style = TextStyle(
                     color = ColorProvider(R.color.widget_muted),
                     fontSize = 13.sp
@@ -112,7 +117,7 @@ private fun TodayWidgetContent(classes: List<CalendarEvent>, openAppIntent: Inte
         if (actual.isEmpty()) {
             Spacer(GlanceModifier.height(10.dp))
             Text(
-                "Ma nincs több órád!",
+                strings.widgetNoMoreClasses,
                 style = TextStyle(
                     color = ColorProvider(R.color.widget_on_background),
                     fontSize = 13.sp
@@ -153,7 +158,7 @@ private fun TodayWidgetContent(classes: List<CalendarEvent>, openAppIntent: Inte
                             maxLines = 1
                         )
                         Text(
-                            listOf(event.courseType.displayName, event.room.takeIf { it.isNotBlank() } ?: "-")
+                            listOf(event.courseType.getLocalizedName(strings), event.room.takeIf { it.isNotBlank() } ?: "-")
                                 .joinToString(" · "),
                             style = TextStyle(
                                 color = ColorProvider(R.color.widget_muted),
@@ -167,7 +172,7 @@ private fun TodayWidgetContent(classes: List<CalendarEvent>, openAppIntent: Inte
             if (actual.size > 3) {
                 Spacer(GlanceModifier.height(6.dp))
                 Text(
-                    "…és még ${actual.size - 3} óra",
+                    strings.widgetMoreClassesCount(actual.size - 3),
                     style = TextStyle(
                         color = ColorProvider(R.color.widget_muted),
                         fontSize = 10.sp

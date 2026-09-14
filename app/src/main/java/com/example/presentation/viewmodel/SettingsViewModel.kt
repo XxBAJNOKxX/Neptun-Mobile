@@ -130,7 +130,7 @@ class SettingsViewModel(
                 _uiState.update {
                     it.copy(
                         isChangingLanguage = false,
-                        languageMessage = "Nyelv módosítva: ${language.displayLabel}"
+                        languageMessage = "SUCCESS:${language.displayLabel}"
                     )
                 }
                 // Automatikus újraszinkronizálás a kiválasztott nyelvvel
@@ -141,7 +141,7 @@ class SettingsViewModel(
                 _uiState.update {
                     it.copy(
                         isChangingLanguage = false,
-                        languageMessage = "Hiba a nyelvváltáskor: ${e.message}"
+                        languageMessage = "ERROR:${e.message ?: ""}"
                     )
                 }
                 delay(3000)
@@ -237,12 +237,12 @@ class SettingsViewModel(
                 _uiState.update {
                     it.copy(
                         isClearingCache = false,
-                        cacheClearedMessage = "A helyi gyorsítótár törölve. A következő szinkronizáláskor friss adatok töltődnek le."
+                        cacheClearedMessage = "SUCCESS"
                     )
                 }
             } catch (e: Exception) {
                 _uiState.update {
-                    it.copy(isClearingCache = false, cacheClearedMessage = "A törlés nem sikerült.")
+                    it.copy(isClearingCache = false, cacheClearedMessage = "FAILED")
                 }
             }
             kotlinx.coroutines.delay(4000)
@@ -272,7 +272,7 @@ class SettingsViewModel(
                 _uiState.update {
                     it.copy(
                         isSyncing = false,
-                        syncSuccessMessage = "Sikeres szinkronizálás! Minden adat naprakész."
+                        syncSuccessMessage = "SUCCESS"
                     )
                 }
             } catch (e: Exception) {
@@ -281,7 +281,7 @@ class SettingsViewModel(
                 _uiState.update {
                     it.copy(
                         isSyncing = false,
-                        syncSuccessMessage = "Szinkronizálás befejeződött."
+                        syncSuccessMessage = "COMPLETED"
                     )
                 }
             }
@@ -293,43 +293,76 @@ class SettingsViewModel(
     }
 
     fun simulateClassNotification(context: Context) {
+        val strings = com.example.core.i18n.AppStringsProvider.getForContext(context)
         NotificationHelper.showClassReminder(
             context = context,
             notificationId = (1000..9999).random(),
-            subjectName = "Mesterséges intelligencia",
+            subjectName = when (strings.languageCode) {
+                "en" -> "Artificial Intelligence"
+                "de" -> "Künstliche Intelligenz"
+                else -> "Mesterséges intelligencia"
+            },
             room = "IB025",
             startTime = "08:15",
-            courseType = "Előadás",
+            courseType = strings.courseTypeLecture,
             minutesBefore = _uiState.value.notificationPreferences.reminderMinutesBefore
         )
     }
 
     fun simulateMessageNotification(context: Context) {
+        val strings = com.example.core.i18n.AppStringsProvider.getForContext(context)
+        val (sender, subject, preview) = when (strings.languageCode) {
+            "en" -> Triple(
+                "Dr. John Smith (Instructor)",
+                "Exam Course Information & Consultation",
+                "Dear Students! The consultation time for next week has changed..."
+            )
+            "de" -> Triple(
+                "Prof. Dr. Johann Schmidt (Dozent)",
+                "Informationen zum Prüfungskurs & Konsultation",
+                "Liebe Studierende! Der Sprechstundentermin für die nächste Woche wurde geändert..."
+            )
+            else -> Triple(
+                "Dr. Kovács István (Oktató)",
+                "Vizsgakurzus tájékoztató és konzultáció",
+                "Kedves Hallgatók! A jövő heti konzultáció időpontja módosult..."
+            )
+        }
         NotificationHelper.showMessageNotification(
             context = context,
             notificationId = (1000..9999).random(),
-            sender = "Dr. Kovács István (Oktató)",
-            subject = "Vizsgakurzus tájékoztató és konzultáció",
-            preview = "Kedves Hallgatók! A jövő heti konzultáció időpontja módosult..."
+            sender = sender,
+            subject = subject,
+            preview = preview
         )
     }
 
     fun simulateGradeNotification(context: Context) {
+        val strings = com.example.core.i18n.AppStringsProvider.getForContext(context)
         NotificationHelper.showGradeNotification(
             context = context,
             notificationId = (1000..9999).random(),
-            subjectName = "Algoritmuselmélet",
+            subjectName = when (strings.languageCode) {
+                "en" -> "Theory of Algorithms"
+                "de" -> "Algorithmentheorie"
+                else -> "Algoritmuselmélet"
+            },
             grade = 5,
-            gradeText = "Jeles (5)",
+            gradeText = strings.gradeText5,
             credit = 5
         )
     }
 
     fun simulateFinanceNotification(context: Context) {
+        val strings = com.example.core.i18n.AppStringsProvider.getForContext(context)
         NotificationHelper.showFinanceNotification(
             context = context,
             notificationId = (1000..9999).random(),
-            title = "Kollégiumi térítési díj (2026/27/1)",
+            title = when (strings.languageCode) {
+                "en" -> "Dormitory fee (2026/27/1)"
+                "de" -> "Wohnheimgebühr (2026/27/1)"
+                else -> "Kollégiumi térítési díj (2026/27/1)"
+            },
             amount = "14 500",
             dueDate = "2026. 09. 15"
         )
@@ -354,7 +387,7 @@ class SettingsViewModel(
                                     updateAvailable = true,
                                     latestVersionName = info.latestVersion,
                                     downloadUrl = info.downloadUrl,
-                                    message = "Új verzió (${info.tagName}) érhető el a ${currentChannel.displayName} csatornán!"
+                                    message = "UPDATE_AVAILABLE:${info.tagName}:${currentChannel.displayName}"
                                 )
                             )
                         }
@@ -366,7 +399,7 @@ class SettingsViewModel(
                                     updateAvailable = false,
                                     latestVersionName = info.latestVersion,
                                     downloadUrl = info.downloadUrl,
-                                    message = "A legfrissebb verziót használod (v${BuildConfig.VERSION_NAME})."
+                                    message = "UP_TO_DATE:v${BuildConfig.VERSION_NAME}"
                                 )
                             )
                         }
@@ -378,7 +411,7 @@ class SettingsViewModel(
                             updateCheckState = UpdateCheckState(
                                 isChecking = false,
                                 downloadUrl = fallbackUrl,
-                                message = "Nyisd meg a GitHub Releases oldalt a letöltéshez."
+                                message = "GITHUB_RELEASES_PROMPT"
                             )
                         )
                     }
@@ -390,7 +423,7 @@ class SettingsViewModel(
                         updateCheckState = UpdateCheckState(
                             isChecking = false,
                             downloadUrl = fallbackUrl,
-                            message = "Nyisd meg a GitHub Releases oldalt a letöltéshez."
+                            message = "GITHUB_RELEASES_PROMPT"
                         )
                     )
                 }

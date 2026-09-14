@@ -63,6 +63,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import com.example.core.i18n.AppStrings
+import com.example.core.i18n.currentStrings
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -165,13 +167,13 @@ fun MessagesScreen(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(
                         imageVector = Icons.Default.DoneAll,
-                        contentDescription = "Üres",
+                        contentDescription = strings.noMessages,
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(48.dp)
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        text = if (uiState.showUnreadOnly) "Nincs olvasatlan üzeneted!" else "Nem érkezett üzenet a fiókodba.",
+                        text = if (uiState.showUnreadOnly) strings.noUnreadMessages else strings.noMessagesInInbox,
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -216,14 +218,38 @@ fun MessagesScreen(
     }
 }
 
+private fun getDisplaySender(sender: String, strings: AppStrings): String {
+    val trimmed = sender.trim()
+    if (trimmed.isEmpty() ||
+        trimmed.equals("Rendszerüzenet", ignoreCase = true) ||
+        trimmed.equals("System message", ignoreCase = true) ||
+        trimmed.equals("Systemnachricht", ignoreCase = true)
+    ) {
+        return strings.systemMessage
+    }
+    return trimmed
+}
+
+private fun getDisplayPreviewText(previewText: String, strings: AppStrings): String {
+    val trimmed = previewText.trim()
+    if (trimmed.isEmpty() ||
+        trimmed.startsWith("Koppints a teljes üzenet") ||
+        trimmed.startsWith("Tap to view") ||
+        trimmed.startsWith("Tippen Sie")
+    ) {
+        return strings.tapToViewFullMessage
+    }
+    return trimmed
+}
+
 @Composable
 private fun MessageCard(
     message: NeptunMessage,
     onClick: () -> Unit
 ) {
     val strings = currentStrings()
-    val displaySender = message.sender.ifBlank { strings.systemMessage }
-    val isSystem = message.isOfficial || displaySender.equals(strings.systemMessage, ignoreCase = true) || displaySender.equals("Rendszerüzenet", ignoreCase = true) || displaySender.contains("hivatal", ignoreCase = true)
+    val displaySender = getDisplaySender(message.sender, strings)
+    val isSystem = message.isOfficial || displaySender.equals(strings.systemMessage, ignoreCase = true) || displaySender.contains("hivatal", ignoreCase = true)
 
     Card(
         shape = RoundedCornerShape(16.dp),
@@ -296,7 +322,7 @@ private fun MessageCard(
             Spacer(modifier = Modifier.height(4.dp))
 
             Text(
-                text = message.previewText,
+                text = getDisplayPreviewText(message.previewText, strings),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 2,
@@ -315,8 +341,8 @@ private fun MessageDetailContent(
     onReload: () -> Unit
 ) {
     val strings = currentStrings()
-    val displaySender = message.sender.ifBlank { strings.systemMessage }
-    val isSystem = message.isOfficial || displaySender.equals(strings.systemMessage, ignoreCase = true) || displaySender.equals("Rendszerüzenet", ignoreCase = true) || displaySender.contains("hivatal", ignoreCase = true)
+    val displaySender = getDisplaySender(message.sender, strings)
+    val isSystem = message.isOfficial || displaySender.equals(strings.systemMessage, ignoreCase = true) || displaySender.contains("hivatal", ignoreCase = true)
     
     val rawBody = message.bodyHtml.ifBlank { message.previewText }
     val htmlBlocks = remember(rawBody) { parseHtmlBlocks(rawBody) }
@@ -336,10 +362,10 @@ private fun MessageDetailContent(
                 color = if (isSystem) MaterialTheme.colorScheme.tertiary.copy(alpha = 0.12f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
                 shape = RoundedCornerShape(8.dp)
             ) {
-                val tagText = if (displaySender.equals(strings.systemMessage, ignoreCase = true) || displaySender.equals("Rendszerüzenet", ignoreCase = true)) {
+                val tagText = if (displaySender.equals(strings.systemMessage, ignoreCase = true)) {
                     strings.systemMessage
                 } else if (message.isOfficial) {
-                    if (strings.languageCode == "hu") "Hivatalos Értesítés" else if (strings.languageCode == "de") "Offizielle Mitteilung" else "Official Notice"
+                    strings.officialNotice
                 } else {
                     strings.officialMessage
                 }
@@ -425,13 +451,8 @@ private fun MessageDetailContent(
                         color = MaterialTheme.colorScheme.primary
                     )
                     Spacer(modifier = Modifier.height(12.dp))
-                    val loadingMsgText = when (strings.languageCode) {
-                        "de" -> "Lade Nachrichteninhalt von Neptun..."
-                        "en" -> "Downloading message content from Neptun..."
-                        else -> "Üzenet tartalmának letöltése a Neptunból..."
-                    }
                     Text(
-                        text = loadingMsgText,
+                        text = strings.downloadingMessageContent,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -446,7 +467,12 @@ private fun MessageDetailContent(
                                 htmlString = block.htmlText,
                                 linkColor = MaterialTheme.colorScheme.primary
                             )
-                            if (annotated.text.isNotBlank() && !annotated.text.startsWith("Koppints a teljes üzenet")) {
+                            if (annotated.text.isNotBlank() &&
+                                !annotated.text.startsWith("Koppints a teljes üzenet") &&
+                                !annotated.text.startsWith("Tap to view") &&
+                                !annotated.text.startsWith("Tippen Sie") &&
+                                !annotated.text.startsWith(strings.tapToViewFullMessage)
+                            ) {
                                 SelectionContainer {
                                     Text(
                                         text = annotated,

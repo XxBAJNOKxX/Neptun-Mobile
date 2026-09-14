@@ -72,8 +72,8 @@ fun GradeBadge(grade: Int?, gradeText: String, isGhost: Boolean = false, modifie
     val bgColor = textColor.copy(alpha = 0.15f)
 
     val ghostPrefix = if (strings.languageCode == "hu") " Szellem: " else if (strings.languageCode == "de") " Sim: " else " Sim: "
-    val fallbackText = if (gradeText == "Még nincs jegy") {
-        if (strings.languageCode == "hu") "Még nincs jegy" else if (strings.languageCode == "de") "Keine Note" else "No grade yet"
+    val fallbackText = if (gradeText.isBlank() || gradeText == "Még nincs jegy" || gradeText == "No grade yet" || gradeText == "Keine Note") {
+        strings.noGradeYet
     } else {
         gradeText
     }

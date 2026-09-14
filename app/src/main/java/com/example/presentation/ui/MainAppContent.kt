@@ -69,6 +69,7 @@ import java.io.File
 @Composable
 fun MainAppContent() {
     val context = LocalContext.current
+    val strings = com.example.core.i18n.currentStrings()
     val app = context.applicationContext as NeptunApp
     val appContainer = app.appContainer
 
@@ -80,11 +81,11 @@ fun MainAppContent() {
     lastCrashLog?.let { crashLog ->
         AlertDialog(
             onDismissRequest = { lastCrashLog = null },
-            title = { Text("Az alkalmazás váratlanul leállt") },
+            title = { Text(strings.crashDialogTitle) },
             text = {
                 Column {
                     Text(
-                        text = "Az előző futás hibanaplója (a hibajelentéshez másolható):",
+                        text = strings.crashDialogDesc,
                         style = MaterialTheme.typography.bodySmall
                     )
                     Spacer(modifier = Modifier.height(8.dp))
@@ -109,12 +110,12 @@ fun MainAppContent() {
                     )
                     lastCrashLog = null
                 }) {
-                    Text("Másolás")
+                    Text(strings.copy)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { lastCrashLog = null }) {
-                    Text("Bezárás")
+                    Text(strings.close)
                 }
             }
         )
@@ -193,6 +194,7 @@ private fun MainDashboard(
     appUpdateViewModel: AppUpdateViewModel
 ) {
     val context = LocalContext.current
+    val strings = com.example.core.i18n.currentStrings()
     val appContainer = app.appContainer
     val coroutineScope = rememberCoroutineScope()
     val authState by authViewModel.uiState.collectAsStateWithLifecycle()
@@ -281,12 +283,9 @@ private fun MainDashboard(
     if (sessionExpired) {
         AlertDialog(
             onDismissRequest = { appContainer.prefsManager.clearSessionExpired() },
-            title = { Text("Lejárt a munkamenet") },
+            title = { Text(strings.sessionExpiredTitle) },
             text = {
-                Text(
-                    "A Neptun szerver visszautasította a munkamenetet, és nem sikerült automatikusan megújítani. " +
-                        "Kérlek, jelentkezz be újra a friss adatokért."
-                )
+                Text(strings.sessionExpiredDesc)
             },
             confirmButton = {
                 TextButton(
@@ -295,14 +294,14 @@ private fun MainDashboard(
                         authViewModel.logout()
                     }
                 ) {
-                    Text("Bejelentkezés")
+                    Text(strings.loginTitle)
                 }
             },
             dismissButton = {
                 TextButton(
                     onClick = { appContainer.prefsManager.clearSessionExpired() }
                 ) {
-                    Text("Később")
+                    Text(strings.later)
                 }
             }
         )
@@ -336,9 +335,9 @@ private fun MainDashboard(
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 text = if (dataMode == DataMode.DEMO) {
-                                    "Demo mód – a megjelenített adatok nem valódiak"
+                                    strings.demoModeBanner
                                 } else {
-                                    "Mintaadatok láthatók (szinkronizálás nem sikerült)"
+                                    strings.fallbackSampleDataBanner
                                 },
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onTertiaryContainer
@@ -371,7 +370,7 @@ private fun MainDashboard(
                     when (destination) {
                         NavigationItem.HOME -> DashboardScreen(
                             uiState = dashboardState,
-                            studentName = authState.credentials?.studentName ?: "Hallgató",
+                            studentName = authState.credentials?.studentName ?: strings.studentDefaultName,
                             isDemoData = dataMode != DataMode.REAL,
                             onNavigate = { item ->
                                 if (item in visibleItems) {
@@ -497,7 +496,8 @@ private suspend fun exportTimetableAsIcs(app: NeptunApp) {
             putExtra(Intent.EXTRA_STREAM, uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        app.startActivity(Intent.createChooser(shareIntent, "Órarend megosztása").apply {
+        val strings = com.example.core.i18n.AppStringsProvider.getForContext(app)
+        app.startActivity(Intent.createChooser(shareIntent, strings.shareTimetableChooser).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         })
     } catch (e: Exception) {
