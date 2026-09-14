@@ -1,7 +1,6 @@
 package com.example.core.export
 
 import com.example.domain.model.CalendarEvent
-import com.example.domain.model.CourseType
 import java.time.LocalDate
 import java.time.temporal.WeekFields
 
@@ -24,18 +23,10 @@ object IcsExporter {
         7 to "SU"
     )
 
-    /**
-     * @param courseTypeLabel az óratípus neve az export nyelvén (pl. az app erőforrásaiból).
-     * @param teacherLabel az "Oktató: " / "Teacher: " előtag (szóközzel a végén).
-     * @param reminderLabel a naptári emlékeztető szövege.
-     */
     fun buildIcs(
         events: List<CalendarEvent>,
         weeksAhead: Int = 14,
-        today: LocalDate = LocalDate.now(),
-        courseTypeLabel: (CourseType) -> String = { it.name },
-        teacherLabel: String = "Teacher: ",
-        reminderLabel: String = "Reminder"
+        today: LocalDate = LocalDate.now()
     ): String {
         val sb = StringBuilder()
         sb.append("BEGIN:VCALENDAR\r\n")
@@ -49,7 +40,7 @@ object IcsExporter {
 
         for (event in interesting) {
             if (event.dateString.isNotBlank()) {
-                appendVEvent(sb, event, event.dateString.take(10), recurring = false, count = 1, counter++, courseTypeLabel, teacherLabel, reminderLabel)
+                appendVEvent(sb, event, event.dateString.take(10), recurring = false, count = 1, counter++)
             } else {
                 // Következő előfordulás kiszámítása a mai napról nézve
                 var date = today
@@ -66,7 +57,7 @@ object IcsExporter {
                     }
                 }
                 if (guard >= 16) continue
-                appendVEvent(sb, event, date.toString(), recurring = true, count = weeksAhead, counter++, courseTypeLabel, teacherLabel, reminderLabel)
+                appendVEvent(sb, event, date.toString(), recurring = true, count = weeksAhead, counter++)
             }
         }
 
@@ -80,10 +71,7 @@ object IcsExporter {
         startDateIso: String,
         recurring: Boolean,
         count: Int,
-        index: Int,
-        courseTypeLabel: (CourseType) -> String,
-        teacherLabel: String,
-        reminderLabel: String
+        index: Int
     ) {
         val start = "%02d%02d00".format(event.startHour, event.startMinute)
         val end = "%02d%02d00".format(event.endHour, event.endMinute)
@@ -94,7 +82,7 @@ object IcsExporter {
         sb.append("DTSTAMP:${nowStamp()}\r\n")
         sb.append("DTSTART;TZID=Europe/Budapest:${dateCompact}T$start\r\n")
         sb.append("DTEND;TZID=Europe/Budapest:${dateCompact}T$end\r\n")
-        sb.append("SUMMARY:").append(escape(courseTypeLabel(event.courseType) + ": " + event.subjectName)).append("\r\n")
+        sb.append("SUMMARY:").append(escape(event.courseType.displayName + ": " + event.subjectName)).append("\r\n")
         val location = listOfNotNull(
             event.location.takeIf { it.isNotBlank() },
             event.room.takeIf { it.isNotBlank() && it != event.location }
@@ -103,7 +91,7 @@ object IcsExporter {
             sb.append("LOCATION:").append(escape(location)).append("\r\n")
         }
         if (event.teacherName.isNotBlank()) {
-            sb.append("DESCRIPTION:").append(escape(teacherLabel + event.teacherName)).append("\r\n")
+            sb.append("DESCRIPTION:").append(escape("Oktató: " + event.teacherName)).append("\r\n")
         }
         if (recurring) {
             val byDay = dayIcalMap[event.dayOfWeek] ?: "MO"
@@ -112,7 +100,7 @@ object IcsExporter {
         sb.append("BEGIN:VALARM\r\n")
         sb.append("TRIGGER:-PT15M\r\n")
         sb.append("ACTION:DISPLAY\r\n")
-        sb.append("DESCRIPTION:").append(escape(reminderLabel)).append("\r\n")
+        sb.append("DESCRIPTION:Emlékeztető\r\n")
         sb.append("END:VALARM\r\n")
         sb.append("END:VEVENT\r\n")
     }

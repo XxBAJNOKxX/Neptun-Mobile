@@ -4,7 +4,6 @@ import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
-import com.example.R
 
 /**
  * Biometrikus (ujjlenyomat / arcfelismerés) zár kezelése.
@@ -20,8 +19,8 @@ object BiometricLockHelper {
 
     fun showPrompt(
         activity: FragmentActivity,
-        title: String? = null,
-        subtitle: String? = null,
+        title: String = "Neptun Mobile feloldása",
+        subtitle: String = "Erősítsd meg az azonosságod a folytatáshoz",
         onSuccess: () -> Unit,
         onError: (String) -> Unit
     ) {
@@ -40,10 +39,10 @@ object BiometricLockHelper {
             }
         )
         val info = BiometricPrompt.PromptInfo.Builder()
-            .setTitle(title ?: activity.getString(R.string.bio_title))
-            .setSubtitle(subtitle ?: activity.getString(R.string.bio_subtitle))
+            .setTitle(title)
+            .setSubtitle(subtitle)
             .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_WEAK)
-            .setNegativeButtonText(activity.getString(R.string.common_cancel))
+            .setNegativeButtonText("Mégse")
             .build()
         prompt.authenticate(info)
     }

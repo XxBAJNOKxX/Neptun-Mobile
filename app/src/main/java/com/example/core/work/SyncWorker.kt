@@ -12,9 +12,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.glance.appwidget.updateAll
 import com.example.NeptunApp
-import com.example.R
 import com.example.core.notification.NotificationHelper
-import com.example.core.locale.AppLocales
 import com.example.core.notification.NotifiedItemsTracker
 import com.example.core.security.EncryptedPreferencesManager
 import com.example.core.widget.TodayWidget
@@ -26,13 +24,6 @@ class SyncWorker(
     appContext: Context,
     workerParams: WorkerParameters
 ) : CoroutineWorker(appContext, workerParams) {
-
-    /**
-     * Aktuális app-nyelvre csomagolt kontextus az értesítések szövegeihez:
-     * futásidejű nyelvválasztás után az Application-kontextus még a régi
-     * nyelvet adná vissza.
-     */
-    private fun localizedContext(): Context = AppLocales.wrap(applicationContext)
 
     override suspend fun doWork(): Result {
         return try {
@@ -104,12 +95,11 @@ class SyncWorker(
             altIdOf = { "${it.sender.trim()}_${it.subject.trim()}_${it.sendDate.trim()}" }
         )
         if (newOnes.isEmpty()) return
-        val ctx = localizedContext()
 
         if (newOnes.size == 1) {
             val msg = newOnes.first()
             NotificationHelper.showMessageNotification(
-                context = ctx,
+                context = applicationContext,
                 notificationId = msg.id.hashCode(),
                 sender = msg.sender,
                 subject = msg.subject,
@@ -117,10 +107,10 @@ class SyncWorker(
             )
         } else {
             NotificationHelper.showSummaryNotification(
-                context = ctx,
+                context = applicationContext,
                 channelId = NotificationHelper.CHANNEL_ID_MESSAGES,
                 notificationId = NOTIFICATION_ID_MESSAGES_SUMMARY,
-                title = ctx.resources.getQuantityString(R.plurals.sync_new_messages, newOnes.size, newOnes.size),
+                title = "${newOnes.size} új üzenet",
                 text = newOnes.take(4).joinToString("\n") { "• ${it.sender}: ${it.subject}" }
             )
         }
@@ -142,12 +132,11 @@ class SyncWorker(
             altIdOf = { "${it.subjectName.trim()}_${it.gradeText.trim()}" }
         )
         if (newOnes.isEmpty()) return
-        val ctx = localizedContext()
 
         if (newOnes.size == 1) {
             val grade = newOnes.first()
             NotificationHelper.showGradeNotification(
-                context = ctx,
+                context = applicationContext,
                 notificationId = grade.id.hashCode(),
                 subjectName = grade.subjectName,
                 grade = grade.grade,
@@ -156,10 +145,10 @@ class SyncWorker(
             )
         } else {
             NotificationHelper.showSummaryNotification(
-                context = ctx,
+                context = applicationContext,
                 channelId = NotificationHelper.CHANNEL_ID_GRADES,
                 notificationId = NOTIFICATION_ID_GRADES_SUMMARY,
-                title = ctx.resources.getQuantityString(R.plurals.sync_new_grades, newOnes.size, newOnes.size),
+                title = "${newOnes.size} új érdemjegy",
                 text = newOnes.take(4).joinToString("\n") { "• ${it.subjectName}: ${it.gradeText}" },
                 priorityHigh = true
             )
@@ -185,24 +174,23 @@ class SyncWorker(
             altIdOf = { "${it.title.trim()}_${it.amountHuf}_${it.dueDate.trim()}" }
         )
         if (newOnes.isEmpty()) return
-        val ctx = localizedContext()
 
         if (newOnes.size == 1) {
             val item = newOnes.first()
             NotificationHelper.showFinanceNotification(
-                context = ctx,
+                context = applicationContext,
                 notificationId = item.id.hashCode(),
                 title = item.title,
-                amount = formatHuf(item.amountHuf),
+                amount = item.amountHuf.toString(),
                 dueDate = item.dueDate
             )
         } else {
             NotificationHelper.showSummaryNotification(
-                context = ctx,
+                context = applicationContext,
                 channelId = NotificationHelper.CHANNEL_ID_FINANCES,
                 notificationId = NOTIFICATION_ID_FINANCES_SUMMARY,
-                title = ctx.resources.getQuantityString(R.plurals.sync_new_finances, newOnes.size, newOnes.size),
-                text = newOnes.take(4).joinToString("\n") { ctx.getString(R.string.sync_finance_line, it.title, formatHuf(it.amountHuf), it.dueDate) }
+                title = "${newOnes.size} befizetendő tétel",
+                text = newOnes.take(4).joinToString("\n") { "• ${it.title} – ${it.amountHuf} Ft (határidő: ${it.dueDate})" }
             )
         }
         val idsToMark = newOnes.flatMap { item ->
@@ -210,10 +198,6 @@ class SyncWorker(
         }
         tracker.markNotified(KEY_FINANCES, idsToMark)
     }
-
-    /** Forintösszeg az app nyelvének megfelelő ezres tagolással (pl. "14 500" / "14,500"). */
-    private fun formatHuf(amount: Int): String =
-        java.text.NumberFormat.getIntegerInstance(java.util.Locale.getDefault()).format(amount)
 
     private suspend fun scheduleClassAlarms(app: NeptunApp, notifPrefs: com.example.core.security.NotificationPreferences) {
         val events = app.appContainer.neptunRepository.getCalendarEvents().first()

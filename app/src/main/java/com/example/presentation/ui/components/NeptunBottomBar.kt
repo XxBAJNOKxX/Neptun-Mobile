@@ -12,7 +12,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import com.example.presentation.navigation.NavigationItem
@@ -49,19 +48,19 @@ fun NeptunBottomBar(
                         ) {
                             Icon(
                                 imageVector = if (selected) item.selectedIcon else item.unselectedIcon,
-                                contentDescription = stringResource(item.labelRes)
+                                contentDescription = item.title
                             )
                         }
                     } else {
                         Icon(
                             imageVector = if (selected) item.selectedIcon else item.unselectedIcon,
-                            contentDescription = stringResource(item.labelRes)
+                            contentDescription = item.title
                         )
                     }
                 },
                 label = {
                     Text(
-                        text = stringResource(item.labelRes),
+                        text = item.title,
                         fontSize = 11.sp,
                         fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
                     )

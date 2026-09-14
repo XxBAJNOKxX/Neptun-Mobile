@@ -1,7 +1,6 @@
 package com.example.core.crash
 
 import android.content.Context
-import com.example.R
 import android.util.Log
 import java.io.File
 import java.util.Date
@@ -24,9 +23,9 @@ object CrashReporter {
                 val file = File(appContext.filesDir, FILE_NAME)
                 file.writeText(
                     buildString {
-                        appendLine("${appContext.getString(R.string.crash_time)}: ${Date()}")
-                        appendLine(appContext.getString(R.string.update_version, appContext.packageManager.getPackageInfo(appContext.packageName, 0).versionName))
-                        appendLine("${appContext.getString(R.string.crash_thread)}: ${thread.name}")
+                        appendLine("Időpont: ${Date()}")
+                        appendLine("Verzió: ${appContext.packageManager.getPackageInfo(appContext.packageName, 0).versionName}")
+                        appendLine("Szál: ${thread.name}")
                         appendLine()
                         appendLine(Log.getStackTraceString(throwable))
                     }
