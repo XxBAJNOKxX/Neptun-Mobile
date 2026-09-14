@@ -196,6 +196,7 @@ private fun FinanceSummaryCard(
     completedHuf: Int,
     numberFormat: NumberFormat
 ) {
+    val strings = currentStrings()
     Card(
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -213,14 +214,19 @@ private fun FinanceSummaryCard(
                 ) {
                     Icon(
                         imageVector = Icons.Default.AccountBalanceWallet,
-                        contentDescription = "Pénzügyek",
+                        contentDescription = strings.financesTitle,
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(20.dp)
                     )
                 }
                 Spacer(modifier = Modifier.width(10.dp))
+                val balanceLabel = when (strings.languageCode) {
+                    "de" -> "Finanzsaldo"
+                    "en" -> "Financial Balance"
+                    else -> "Pénzügyi Egyenleg"
+                }
                 Text(
-                    text = "Pénzügyi Egyenleg",
+                    text = balanceLabel,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
@@ -234,8 +240,13 @@ private fun FinanceSummaryCard(
             ) {
                 // Pending Amount
                 Column(modifier = Modifier.weight(1f)) {
+                    val pendingLabel = when (strings.languageCode) {
+                        "de" -> "Ausstehende Verbindlichkeiten"
+                        "en" -> "Pending Liabilities"
+                        else -> "Fizetendő kötelezettség"
+                    }
                     Text(
-                        text = "Fizetendő kötelezettség",
+                        text = pendingLabel,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 12.sp
@@ -250,8 +261,13 @@ private fun FinanceSummaryCard(
 
                 // Completed Amount
                 Column(modifier = Modifier.weight(1f)) {
+                    val completedLabel = when (strings.languageCode) {
+                        "de" -> "Bezahlte Posten"
+                        "en" -> "Settled Items"
+                        else -> "Rendezett tételek"
+                    }
                     Text(
-                        text = "Rendezett tételek",
+                        text = completedLabel,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 12.sp
@@ -273,6 +289,7 @@ private fun FinanceItemCard(
     item: FinanceItem,
     formattedAmount: String
 ) {
+    val strings = currentStrings()
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -311,8 +328,13 @@ private fun FinanceItemCard(
                 color = MaterialTheme.colorScheme.onSurface
             )
 
+            val detailsText = when (strings.languageCode) {
+                "de" -> "Semester: ${item.termName} • Beleg-Nr.: ${item.transactionId}"
+                "en" -> "Term: ${item.termName} • Doc ID: ${item.transactionId}"
+                else -> "Félév: ${item.termName} • Bizonylatszám: ${item.transactionId}"
+            }
             Text(
-                text = "Félév: ${item.termName} • Bizonylatszám: ${item.transactionId}",
+                text = detailsText,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 12.sp
@@ -328,21 +350,31 @@ private fun FinanceItemCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         imageVector = Icons.Default.CalendarToday,
-                        contentDescription = "Határidő",
+                        contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(14.dp)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
+                    val dueLabel = when (strings.languageCode) {
+                        "de" -> "Fälligkeit: ${item.dueDate}"
+                        "en" -> "Due: ${item.dueDate}"
+                        else -> "Határidő: ${item.dueDate}"
+                    }
                     Text(
-                        text = "Határidő: ${item.dueDate}",
+                        text = dueLabel,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                 }
 
                 if (item.paymentDate != null) {
+                    val paidLabel = when (strings.languageCode) {
+                        "de" -> "Bezahlt: ${item.paymentDate}"
+                        "en" -> "Paid: ${item.paymentDate}"
+                        else -> "Fizetve: ${item.paymentDate}"
+                    }
                     Text(
-                        text = "Fizetve: ${item.paymentDate}",
+                        text = paidLabel,
                         style = MaterialTheme.typography.bodySmall,
                         color = NeptunGreen,
                         fontWeight = FontWeight.SemiBold,

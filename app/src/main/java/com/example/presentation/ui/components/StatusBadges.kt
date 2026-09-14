@@ -37,14 +37,7 @@ fun CourseTypeBadge(courseType: CourseType, modifier: Modifier = Modifier) {
         CourseType.EXAM -> NeptunRed
     }
     val bgColor = textColor.copy(alpha = 0.15f)
-
-    val label = when (courseType) {
-        CourseType.LECTURE -> if (strings.languageCode == "hu") "Előadás" else if (strings.languageCode == "de") "Vorlesung" else "Lecture"
-        CourseType.PRACTICE -> if (strings.languageCode == "hu") "Gyakorlat" else if (strings.languageCode == "de") "Übung" else "Practice"
-        CourseType.LAB -> if (strings.languageCode == "hu") "Labor" else if (strings.languageCode == "de") "Labor" else "Lab"
-        CourseType.SEMINAR -> if (strings.languageCode == "hu") "Szeminárium" else if (strings.languageCode == "de") "Seminar" else "Seminar"
-        CourseType.EXAM -> if (strings.languageCode == "hu") "Vizsga" else if (strings.languageCode == "de") "Prüfung" else "Exam"
-    }
+    val label = courseType.getLocalizedName(strings)
 
     Surface(
         color = bgColor,
@@ -129,9 +122,9 @@ fun FinanceStatusBadge(status: FinanceStatus, modifier: Modifier = Modifier) {
     val bgColor = textColor.copy(alpha = 0.15f)
 
     val label = when (status) {
-        FinanceStatus.COMPLETED -> if (strings.languageCode == "hu") "Teljesítve" else if (strings.languageCode == "de") "Bezahlt" else "Completed"
-        FinanceStatus.PENDING -> if (strings.languageCode == "hu") "Kiírva" else if (strings.languageCode == "de") "Ausstehend" else "Pending"
-        FinanceStatus.OVERDUE -> if (strings.languageCode == "hu") "Késedelmes" else if (strings.languageCode == "de") "Überfällig" else "Overdue"
+        FinanceStatus.COMPLETED -> strings.statusCompleted
+        FinanceStatus.PENDING -> strings.statusPending
+        FinanceStatus.OVERDUE -> strings.statusOverdue
     }
 
     Surface(

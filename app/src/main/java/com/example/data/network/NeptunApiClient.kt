@@ -17,6 +17,8 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import com.example.core.network.SslTrustHelper
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
@@ -1029,25 +1031,29 @@ class NeptunApiClient {
         // Modern API Login
         try {
             val modernUrl = "$baseUrl/api/Account/Authenticate"
-            val requestJson = """
-                {
-                    "userName": "$username",
-                    "password": "$pwd",
-                    "captcha": "",
-                    "captchaIdentifier": "",
-                    "token": "$twoFactorCode",
-                    "LCID": 1038
-                }
-            """.trimIndent()
+            val payloadObj = buildJsonObject {
+                put("userName", username)
+                put("password", pwd)
+                put("captcha", "")
+                put("captchaIdentifier", "")
+                put("token", twoFactorCode)
+                put("LCID", 1038)
+            }
+            val requestJson = payloadObj.toString()
 
             val reqBuilder = Request.Builder()
                 .url(modernUrl)
-                .post(requestJson.toRequestBody("application/json".toMediaType()))
-                .addHeader("Content-Type", "application/json")
+                .post(requestJson.toRequestBody("application/json; charset=utf-8".toMediaType()))
+                .header("Content-Type", "application/json; charset=utf-8")
+                .header("Accept", "application/json, text/plain, */*")
+                .header("User-Agent", DEFAULT_USER_AGENT)
+                .header("Accept-Language", "hu-HU,hu;q=0.9,en-US;q=0.8,en;q=0.7")
+                .header("Origin", baseUrl)
+                .header("Referer", "$baseUrl/")
 
             if (savedDeviceCookie.isNotEmpty()) {
                 val b64User = Base64.encodeToString(username.toByteArray(), Base64.NO_WRAP)
-                reqBuilder.addHeader("Cookie", "devicecookie-$b64User=$savedDeviceCookie")
+                reqBuilder.header("Cookie", "devicecookie-$b64User=$savedDeviceCookie")
             }
 
             val response = okHttpClient.newCall(reqBuilder.build()).execute()
@@ -1075,7 +1081,7 @@ class NeptunApiClient {
                         normalizedBaseUrl = getLegacyBaseUrl(baseUrl)
                     )
                 }
-                return@withContext aspResult
+                return@withContext if (aspResult is NeptunAuthResult.Failure) aspResult else NeptunAuthResult.Failure("Nem sikerült a bejelentkezés (szerver válasz formátum hiba)")
             }
 
             val parsed = safeParseJsonObject(responseBody)
@@ -1096,17 +1102,26 @@ class NeptunApiClient {
                         normalizedBaseUrl = getLegacyBaseUrl(baseUrl)
                     )
                 }
-                return@withContext NeptunAuthResult.Failure("Érvénytelen válasz a szervertől.")
+                return@withContext if (aspResult is NeptunAuthResult.Failure) {
+                    aspResult
+                } else {
+                    NeptunAuthResult.Failure(
+                        if (response.code in 400..401) "Hibás felhasználónév vagy jelszó!"
+                        else "Nem sikerült a bejelentkezés (HTTP ${response.code})"
+                    )
+                }
             }
 
             val dataObj = parsed["data"]?.jsonObject
-            val is2Fa = dataObj != null && (
+            val is2Fa = (dataObj != null && (
                     dataObj["isTwoFactorRequired"]?.jsonPrimitive?.booleanOrNull == true ||
                             dataObj["requiresTwoFactor"]?.jsonPrimitive?.booleanOrNull == true
-                    )
+                    )) || parsed["isTwoFactorRequired"]?.jsonPrimitive?.booleanOrNull == true
 
             if (is2Fa) {
-                val twoFactorToken = dataObj["twoFactorLoginToken"]?.jsonPrimitive?.contentOrNull ?: ""
+                val twoFactorToken = dataObj?.get("twoFactorLoginToken")?.jsonPrimitive?.contentOrNull
+                    ?: parsed["twoFactorLoginToken"]?.jsonPrimitive?.contentOrNull
+                    ?: ""
                 return@withContext NeptunAuthResult.TwoFactorRequired(
                     twoFactorToken = twoFactorToken,
                     normalizedBaseUrl = baseUrl
@@ -1114,6 +1129,11 @@ class NeptunApiClient {
             }
 
             val accessToken = dataObj?.get("accessToken")?.jsonPrimitive?.contentOrNull
+                ?: dataObj?.get("token")?.jsonPrimitive?.contentOrNull
+                ?: parsed["accessToken"]?.jsonPrimitive?.contentOrNull
+                ?: parsed["token"]?.jsonPrimitive?.contentOrNull
+                ?: parsed["Token"]?.jsonPrimitive?.contentOrNull
+
             if (!accessToken.isNullOrEmpty()) {
                 val userInfo = try {
                     getUserInfo(baseUrl, accessToken)
@@ -1141,7 +1161,14 @@ class NeptunApiClient {
             val errMsg = parsed["errorMessage"]?.jsonPrimitive?.contentOrNull
                 ?: parsed["ErrorMessage"]?.jsonPrimitive?.contentOrNull
                 ?: parsed["message"]?.jsonPrimitive?.contentOrNull
-                ?: "Hibás felhasználónév vagy jelszó!"
+                ?: parsed["Message"]?.jsonPrimitive?.contentOrNull
+                ?: parsed["error"]?.jsonPrimitive?.contentOrNull
+                ?: parsed["Error"]?.jsonPrimitive?.contentOrNull
+                ?: parsed["error_description"]?.jsonPrimitive?.contentOrNull
+                ?: dataObj?.get("errorMessage")?.jsonPrimitive?.contentOrNull
+                ?: dataObj?.get("ErrorMessage")?.jsonPrimitive?.contentOrNull
+                ?: dataObj?.get("message")?.jsonPrimitive?.contentOrNull
+                ?: if (response.code in 400..401) "Hibás felhasználónév vagy jelszó!" else "Sikertelen bejelentkezés (HTTP ${response.code})"
 
             if (response.code == 404) {
                 val aspResult = authenticateAspDotNet(baseUrl, username, pwd)
@@ -1181,7 +1208,11 @@ class NeptunApiClient {
                     normalizedBaseUrl = getLegacyBaseUrl(baseUrl)
                 )
             } else {
-                NeptunAuthResult.Failure("Hálózati hiba a Neptunhoz kapcsolódáskor: ${e.localizedMessage}")
+                if (aspResult is NeptunAuthResult.Failure) {
+                    aspResult
+                } else {
+                    NeptunAuthResult.Failure("Hálózati hiba a Neptunhoz kapcsolódáskor: ${e.localizedMessage}")
+                }
             }
         }
     }
@@ -1205,6 +1236,8 @@ class NeptunApiClient {
                 val dataObj = parsed?.get("data")?.jsonObject
                 val newAccessToken = dataObj?.get("accessToken")?.jsonPrimitive?.contentOrNull
                     ?: dataObj?.get("token")?.jsonPrimitive?.contentOrNull
+                    ?: parsed?.get("accessToken")?.jsonPrimitive?.contentOrNull
+                    ?: parsed?.get("token")?.jsonPrimitive?.contentOrNull
                 val newRefreshToken = dataObj?.get("refreshToken")?.jsonPrimitive?.contentOrNull
                     ?: dataObj?.get("refresh_token")?.jsonPrimitive?.contentOrNull
                     ?: parsed?.get("refreshToken")?.jsonPrimitive?.contentOrNull
@@ -1231,11 +1264,16 @@ class NeptunApiClient {
     private suspend fun tryLegacyLogin(baseUrl: String, username: String, password: String): Boolean = withContext(Dispatchers.IO) {
         try {
             val url = getLegacyServiceUrl(baseUrl, "GetTrainings")
-            val body = """{"UserLogin":"$username","Password":"$password"}"""
+            val payload = buildJsonObject {
+                put("UserLogin", username)
+                put("Password", password)
+            }
             val req = Request.Builder()
                 .url(url)
-                .post(body.toRequestBody("application/json".toMediaType()))
-                .addHeader("Content-Type", "application/json")
+                .post(payload.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
+                .header("Content-Type", "application/json; charset=utf-8")
+                .header("Accept", "application/json, text/plain, */*")
+                .header("User-Agent", DEFAULT_USER_AGENT)
                 .build()
 
             val resp = okHttpClient.newCall(req).execute()
@@ -1460,10 +1498,10 @@ class NeptunApiClient {
         val fullText = (extractAllText(item) + " " + courseCode + " " + name).lowercase()
         return when {
             fullText.contains("labor") || fullText.contains("lab") || courseCode.contains("lab", ignoreCase = true) || courseCode.startsWith("L", ignoreCase = true) -> CourseType.LAB
-            fullText.contains("gyakorlat") || fullText.contains("gyak") || courseCode.contains("gyak", ignoreCase = true) || courseCode.startsWith("G", ignoreCase = true) -> CourseType.PRACTICE
-            fullText.contains("szeminárium") || fullText.contains("szem") -> CourseType.SEMINAR
-            fullText.contains("vizsga") -> CourseType.EXAM
-            fullText.contains("előadás") || fullText.contains("elmélet") || fullText.contains("ea") -> CourseType.LECTURE
+            fullText.contains("gyakorlat") || fullText.contains("gyak") || fullText.contains("practice") || fullText.contains("practical") || fullText.contains("übung") || courseCode.contains("gyak", ignoreCase = true) || courseCode.startsWith("G", ignoreCase = true) -> CourseType.PRACTICE
+            fullText.contains("szeminárium") || fullText.contains("szem") || fullText.contains("seminar") -> CourseType.SEMINAR
+            fullText.contains("vizsga") || fullText.contains("exam") || fullText.contains("prüfung") -> CourseType.EXAM
+            fullText.contains("előadás") || fullText.contains("elmélet") || fullText.contains("ea") || fullText.contains("lecture") || fullText.contains("vorlesung") -> CourseType.LECTURE
             else -> CourseType.LECTURE
         }
     }

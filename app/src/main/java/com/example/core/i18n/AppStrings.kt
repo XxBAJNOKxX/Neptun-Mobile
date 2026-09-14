@@ -137,6 +137,17 @@ interface AppStrings {
     val amount: String
     val noFinances: String
 
+    // Course Types
+    val courseTypeLecture: String
+    val courseTypePractice: String
+    val courseTypeLab: String
+    val courseTypeSeminar: String
+    val courseTypeExam: String
+
+    // Extra UI strings
+    val inProgressClass: String
+    val allMessagesRead: String
+
     // Settings
     val settingsTitle: String
     val sectionAccount: String
@@ -284,6 +295,66 @@ interface AppStrings {
     val twoFactorNoTotpNote: String
     val twoFactorTotpInputLabel: String
     val twoFactorVerifyBtn: String
+
+    // Theme Mode
+    val themeModeSystem: String
+    val themeModeLight: String
+    val themeModeDark: String
+    val themeModeSystemDesc: String
+    val themeModeLightDesc: String
+    val themeModeDarkDesc: String
+
+    // Accent Colors
+    val colorBlue: String
+    val colorIndigo: String
+    val colorCyan: String
+    val colorEmerald: String
+    val colorGold: String
+    val colorPurple: String
+    val colorCrimson: String
+    val colorRose: String
+
+    // Update Channel
+    val updateChannelStable: String
+    val updateChannelStableDesc: String
+    val updateChannelDev: String
+    val updateChannelDevDesc: String
+
+    // Feedback messages
+    val languageChanged: (String) -> String
+    val languageChangeError: (String) -> String
+    val syncSuccess: String
+    val syncCompleted: String
+    val cacheClearedSuccess: String
+    val cacheClearFailed: String
+    val updateAvailableOnChannel: (String, String) -> String
+    val appUpToDate: (String) -> String
+    val githubReleasesPrompt: String
+
+    // In-App Update Dialog
+    val updateDialogNewVersionTitle: String
+    val updateDialogReleaseNotes: String
+    val updateDialogDefaultDesc: String
+    val updateDialogUpdateNow: String
+    val updateDialogLater: String
+    val updateDialogDownloadingTitle: (Int) -> String
+    val updateDialogVersion: (String) -> String
+    val updateDialogBackground: String
+    val updateDialogReadyTitle: String
+    val updateDialogReadyMessage: (String) -> String
+    val updateDialogOpenInstall: String
+    val updateDialogErrorTitle: String
+    val updateDialogGithubDownload: String
+
+    // Biometric Lock Screen
+    val biometricLockedTitle: String
+    val biometricLockedDesc: String
+    val biometricUnlockBtn: String
+    val biometricNotAvailable: String
+
+    // Crash Dialog
+    val crashDialogTitle: String
+    val crashDialogDesc: String
 }
 
 class HungarianStrings : AppStrings {
@@ -409,6 +480,17 @@ class HungarianStrings : AppStrings {
     override val paymentDate = "Befizetés dátuma"
     override val amount = "Összeg"
     override val noFinances = "Nincsenek pénzügyi tételek"
+
+    // Course Types
+    override val courseTypeLecture = "Előadás"
+    override val courseTypePractice = "Gyakorlat"
+    override val courseTypeLab = "Labor"
+    override val courseTypeSeminar = "Szeminárium"
+    override val courseTypeExam = "Vizsga"
+
+    // Extra UI strings
+    override val inProgressClass = "Éppen zajló óra"
+    override val allMessagesRead = "Minden üzenet elolvasva"
 
     override val settingsTitle = "Beállítások"
     override val sectionAccount = "Fiók és Intézmény"
@@ -556,6 +638,66 @@ class HungarianStrings : AppStrings {
     override val twoFactorNoTotpNote = "Megjegyzés: A Neptun szerint még nincs TOTP kulcs párosítva ehhez a fiókhoz. Használd az E-mail kód opciót!"
     override val twoFactorTotpInputLabel = "TOTP Kód (pl. 482910)"
     override val twoFactorVerifyBtn = "Belépés"
+
+    // Theme Mode
+    override val themeModeSystem = "Rendszer"
+    override val themeModeLight = "Világos"
+    override val themeModeDark = "Sötét"
+    override val themeModeSystemDesc = "Követi a telefon beállításait"
+    override val themeModeLightDesc = "Állandó világos megjelenés"
+    override val themeModeDarkDesc = "Kíméli a szemet sötétben"
+
+    // Accent Colors
+    override val colorBlue = "Neptun Kék"
+    override val colorIndigo = "Zafír Indigó"
+    override val colorCyan = "Türkiz Cselló"
+    override val colorEmerald = "Smaragd Zöld"
+    override val colorGold = "Neptun Arany"
+    override val colorPurple = "Ametiszt Bíbor"
+    override val colorCrimson = "Rubin Piros"
+    override val colorRose = "Rózsakvarc"
+
+    // Update Channel
+    override val updateChannelStable = "Stabil kiadások"
+    override val updateChannelStableDesc = "Kizárólag hivatalosan tesztelt, megbízható verziók"
+    override val updateChannelDev = "Fejlesztői (Dev)"
+    override val updateChannelDevDesc = "A legújabb fejlesztői buildek és előzetes funkciók"
+
+    // Feedback messages
+    override val languageChanged: (String) -> String = { lang -> "Nyelv módosítva: $lang" }
+    override val languageChangeError: (String) -> String = { lang -> "Nem sikerült a nyelvet átállítani erre: $lang" }
+    override val syncSuccess = "Sikeres szinkronizálás! Minden adat naprakész."
+    override val syncCompleted = "Szinkronizálás befejeződött."
+    override val cacheClearedSuccess = "A helyi gyorsítótár törölve. A következő szinkronizáláskor friss adatok töltődnek le."
+    override val cacheClearFailed = "A törlés nem sikerült."
+    override val updateAvailableOnChannel: (String, String) -> String = { version, channel -> "Új verzió ($version) érhető el a $channel csatornán!" }
+    override val appUpToDate: (String) -> String = { version -> "A legfrissebb verziót használod ($version)." }
+    override val githubReleasesPrompt = "Nyisd meg a GitHub Releases oldalt a letöltéshez."
+
+    // In-App Update Dialog
+    override val updateDialogNewVersionTitle = "Frissítés érhető el!"
+    override val updateDialogReleaseNotes = "Újdonságok és változtatások:"
+    override val updateDialogDefaultDesc = "A Neptun Mobile új verziója készen áll a frissítésre hibajavításokkal és teljesítmény-fejlesztésekkel."
+    override val updateDialogUpdateNow = "Frissítés most"
+    override val updateDialogLater = "Később"
+    override val updateDialogDownloadingTitle: (Int) -> String = { progress -> "Frissítés letöltése... ($progress%)" }
+    override val updateDialogVersion: (String) -> String = { version -> "Verzió: $version" }
+    override val updateDialogBackground = "Háttérbe"
+    override val updateDialogReadyTitle = "Letöltés kész!"
+    override val updateDialogReadyMessage: (String) -> String = { version -> "A frissítés ($version) sikeresen letöltődött. Érintsd meg a gombot a telepítéshez." }
+    override val updateDialogOpenInstall = "Telepítés megnyitása"
+    override val updateDialogErrorTitle = "Frissítési hiba"
+    override val updateDialogGithubDownload = "GitHub letöltés"
+
+    // Biometric Lock Screen
+    override val biometricLockedTitle = "Az alkalmazás zárolva van"
+    override val biometricLockedDesc = "Erősítsd meg az azonosságod az ujjlenyomatoddal vagy arcoddal."
+    override val biometricUnlockBtn = "Feloldás"
+    override val biometricNotAvailable = "A biometrikus hitelesítés nem elérhető ezen az eszközön."
+
+    // Crash Dialog
+    override val crashDialogTitle = "Az alkalmazás váratlanul leállt"
+    override val crashDialogDesc = "Az előző futás hibanaplója (a hibajelentéshez másolható):"
 }
 
 class EnglishStrings : AppStrings {
@@ -681,6 +823,17 @@ class EnglishStrings : AppStrings {
     override val paymentDate = "Payment Date"
     override val amount = "Amount"
     override val noFinances = "No financial items"
+
+    // Course Types
+    override val courseTypeLecture = "Lecture"
+    override val courseTypePractice = "Practice"
+    override val courseTypeLab = "Lab"
+    override val courseTypeSeminar = "Seminar"
+    override val courseTypeExam = "Exam"
+
+    // Extra UI strings
+    override val inProgressClass = "Class in progress"
+    override val allMessagesRead = "All messages read"
 
     override val settingsTitle = "Settings"
     override val sectionAccount = "Account & University"
@@ -828,6 +981,66 @@ class EnglishStrings : AppStrings {
     override val twoFactorNoTotpNote = "Note: No TOTP key is paired with this account in Neptun. Please use the Email code option!"
     override val twoFactorTotpInputLabel = "TOTP Code (e.g. 482910)"
     override val twoFactorVerifyBtn = "Log In"
+
+    // Theme Mode
+    override val themeModeSystem = "System"
+    override val themeModeLight = "Light"
+    override val themeModeDark = "Dark"
+    override val themeModeSystemDesc = "Follows system settings"
+    override val themeModeLightDesc = "Always light appearance"
+    override val themeModeDarkDesc = "Easy on the eyes in dark"
+
+    // Accent Colors
+    override val colorBlue = "Neptune Blue"
+    override val colorIndigo = "Sapphire Indigo"
+    override val colorCyan = "Turquoise Cyan"
+    override val colorEmerald = "Emerald Green"
+    override val colorGold = "Neptune Gold"
+    override val colorPurple = "Amethyst Purple"
+    override val colorCrimson = "Crimson Red"
+    override val colorRose = "Rose Quartz"
+
+    // Update Channel
+    override val updateChannelStable = "Stable releases"
+    override val updateChannelStableDesc = "Officially tested and reliable versions only"
+    override val updateChannelDev = "Developer (Dev)"
+    override val updateChannelDevDesc = "Latest developer builds and preview features"
+
+    // Feedback messages
+    override val languageChanged: (String) -> String = { lang -> "Language changed to: $lang" }
+    override val languageChangeError: (String) -> String = { lang -> "Failed to change language to: $lang" }
+    override val syncSuccess = "Sync successful! All data up to date."
+    override val syncCompleted = "Synchronization completed."
+    override val cacheClearedSuccess = "Local cache cleared. Fresh data will be downloaded on next sync."
+    override val cacheClearFailed = "Failed to clear local cache."
+    override val updateAvailableOnChannel: (String, String) -> String = { version, channel -> "New version ($version) available on $channel channel!" }
+    override val appUpToDate: (String) -> String = { version -> "You are using the latest version ($version)." }
+    override val githubReleasesPrompt = "Open GitHub Releases page to download."
+
+    // In-App Update Dialog
+    override val updateDialogNewVersionTitle = "Update available!"
+    override val updateDialogReleaseNotes = "What's new & Changes:"
+    override val updateDialogDefaultDesc = "A new version of Neptun Mobile is ready to update with bug fixes and performance improvements."
+    override val updateDialogUpdateNow = "Update now"
+    override val updateDialogLater = "Later"
+    override val updateDialogDownloadingTitle: (Int) -> String = { progress -> "Downloading update... ($progress%)" }
+    override val updateDialogVersion: (String) -> String = { version -> "Version: $version" }
+    override val updateDialogBackground = "Background"
+    override val updateDialogReadyTitle = "Download complete!"
+    override val updateDialogReadyMessage: (String) -> String = { version -> "Update ($version) downloaded. Tap the button to install." }
+    override val updateDialogOpenInstall = "Open Installer"
+    override val updateDialogErrorTitle = "Update error"
+    override val updateDialogGithubDownload = "GitHub download"
+
+    // Biometric Lock Screen
+    override val biometricLockedTitle = "App is locked"
+    override val biometricLockedDesc = "Confirm your identity with fingerprint or face."
+    override val biometricUnlockBtn = "Unlock"
+    override val biometricNotAvailable = "Biometric authentication is not available on this device."
+
+    // Crash Dialog
+    override val crashDialogTitle = "App stopped unexpectedly"
+    override val crashDialogDesc = "Crash log from previous run (copyable for bug report):"
 }
 
 class GermanStrings : AppStrings {
@@ -953,6 +1166,17 @@ class GermanStrings : AppStrings {
     override val paymentDate = "Zahlungsdatum"
     override val amount = "Betrag"
     override val noFinances = "Keine Finanzpositionen"
+
+    // Course Types
+    override val courseTypeLecture = "Vorlesung"
+    override val courseTypePractice = "Übung"
+    override val courseTypeLab = "Labor"
+    override val courseTypeSeminar = "Seminar"
+    override val courseTypeExam = "Prüfung"
+
+    // Extra UI strings
+    override val inProgressClass = "Laufende Vorlesung"
+    override val allMessagesRead = "Alle Nachrichten gelesen"
 
     override val settingsTitle = "Einstellungen"
     override val sectionAccount = "Konto & Universität"
@@ -1100,6 +1324,66 @@ class GermanStrings : AppStrings {
     override val twoFactorNoTotpNote = "Hinweis: Für dieses Konto ist noch kein TOTP-Schlüssel im Neptun gekoppelt. Bitte verwenden Sie die E-Mail-Option!"
     override val twoFactorTotpInputLabel = "TOTP-Code (z.B. 482910)"
     override val twoFactorVerifyBtn = "Anmelden"
+
+    // Theme Mode
+    override val themeModeSystem = "System"
+    override val themeModeLight = "Hell"
+    override val themeModeDark = "Dunkel"
+    override val themeModeSystemDesc = "Folgt den Systemeinstellungen"
+    override val themeModeLightDesc = "Dauerhaft helles Erscheinungsbild"
+    override val themeModeDarkDesc = "Schont die Augen im Dunkeln"
+
+    // Accent Colors
+    override val colorBlue = "Neptun Blau"
+    override val colorIndigo = "Saphir Indigo"
+    override val colorCyan = "Türkis Cello"
+    override val colorEmerald = "Smaragd Grün"
+    override val colorGold = "Neptun Gold"
+    override val colorPurple = "Amethyst Violett"
+    override val colorCrimson = "Rubinrot"
+    override val colorRose = "Rosenquarz"
+
+    // Update Channel
+    override val updateChannelStable = "Stabile Veröffentlichungen"
+    override val updateChannelStableDesc = "Nur offiziell getestete, zuverlässige Versionen"
+    override val updateChannelDev = "Entwickler (Dev)"
+    override val updateChannelDevDesc = "Die neuesten Developer-Builds und Vorschau-Funktionen"
+
+    // Feedback messages
+    override val languageChanged: (String) -> String = { lang -> "Sprache geändert auf: $lang" }
+    override val languageChangeError: (String) -> String = { lang -> "Fehler beim Ändern der Sprache auf: $lang" }
+    override val syncSuccess = "Synchronisierung erfolgreich! Alle Daten sind aktuell."
+    override val syncCompleted = "Synchronisierung abgeschlossen."
+    override val cacheClearedSuccess = "Lokaler Cache geleert. Bei der nächsten Synchronisierung werden frische Daten heruntergeladen."
+    override val cacheClearFailed = "Cache konnte nicht geleert werden."
+    override val updateAvailableOnChannel: (String, String) -> String = { version, channel -> "Neue Version ($version) auf Kanal $channel verfügbar!" }
+    override val appUpToDate: (String) -> String = { version -> "Sie verwenden die neueste Version ($version)." }
+    override val githubReleasesPrompt = "Öffnen Sie die GitHub Releases Seite zum Herunterladen."
+
+    // In-App Update Dialog
+    override val updateDialogNewVersionTitle = "Update verfügbar!"
+    override val updateDialogReleaseNotes = "Neuerungen und Änderungen:"
+    override val updateDialogDefaultDesc = "Eine neue Version von Neptun Mobile steht mit Fehlerbehebungen und Leistungsverbesserungen bereit."
+    override val updateDialogUpdateNow = "Jetzt aktualisieren"
+    override val updateDialogLater = "Später"
+    override val updateDialogDownloadingTitle: (Int) -> String = { progress -> "Update wird heruntergeladen... ($progress%)" }
+    override val updateDialogVersion: (String) -> String = { version -> "Version: $version" }
+    override val updateDialogBackground = "Hintergrund"
+    override val updateDialogReadyTitle = "Download abgeschlossen!"
+    override val updateDialogReadyMessage: (String) -> String = { version -> "Das Update ($version) wurde heruntergeladen. Tippen Sie auf die Schaltfläche zur Installation." }
+    override val updateDialogOpenInstall = "Installer öffnen"
+    override val updateDialogErrorTitle = "Update-Fehler"
+    override val updateDialogGithubDownload = "GitHub Download"
+
+    // Biometric Lock Screen
+    override val biometricLockedTitle = "App ist gesperrt"
+    override val biometricLockedDesc = "Bestätigen Sie Ihre Identität mit Fingerabdruck oder Gesicht."
+    override val biometricUnlockBtn = "Entsperren"
+    override val biometricNotAvailable = "Biometrische Authentifizierung ist auf diesem Gerät nicht verfügbar."
+
+    // Crash Dialog
+    override val crashDialogTitle = "Die Anwendung wurde unerwartet beendet"
+    override val crashDialogDesc = "Fehlerprotokoll des vorherigen Laufs (für Fehlerbericht kopierbar):"
 }
 
 object AppStringsProvider {

@@ -76,7 +76,17 @@ enum class CourseType(val displayName: String) {
     PRACTICE("Gyakorlat"),
     LAB("Labor"),
     SEMINAR("Szeminárium"),
-    EXAM("Vizsga")
+    EXAM("Vizsga");
+
+    fun getLocalizedName(strings: com.example.core.i18n.AppStrings): String {
+        return when (this) {
+            LECTURE -> strings.courseTypeLecture
+            PRACTICE -> strings.courseTypePractice
+            LAB -> strings.courseTypeLab
+            SEMINAR -> strings.courseTypeSeminar
+            EXAM -> strings.courseTypeExam
+        }
+    }
 }
 
 data class CalendarEvent(

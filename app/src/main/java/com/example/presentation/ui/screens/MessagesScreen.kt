@@ -221,8 +221,9 @@ private fun MessageCard(
     message: NeptunMessage,
     onClick: () -> Unit
 ) {
-    val displaySender = message.sender.ifBlank { "Rendszerüzenet" }
-    val isSystem = message.isOfficial || displaySender.equals("Rendszerüzenet", ignoreCase = true) || displaySender.contains("hivatal", ignoreCase = true)
+    val strings = currentStrings()
+    val displaySender = message.sender.ifBlank { strings.systemMessage }
+    val isSystem = message.isOfficial || displaySender.equals(strings.systemMessage, ignoreCase = true) || displaySender.equals("Rendszerüzenet", ignoreCase = true) || displaySender.contains("hivatal", ignoreCase = true)
 
     Card(
         shape = RoundedCornerShape(16.dp),
@@ -313,8 +314,9 @@ private fun MessageDetailContent(
     onClose: () -> Unit,
     onReload: () -> Unit
 ) {
-    val displaySender = message.sender.ifBlank { "Rendszerüzenet" }
-    val isSystem = message.isOfficial || displaySender.equals("Rendszerüzenet", ignoreCase = true) || displaySender.contains("hivatal", ignoreCase = true)
+    val strings = currentStrings()
+    val displaySender = message.sender.ifBlank { strings.systemMessage }
+    val isSystem = message.isOfficial || displaySender.equals(strings.systemMessage, ignoreCase = true) || displaySender.equals("Rendszerüzenet", ignoreCase = true) || displaySender.contains("hivatal", ignoreCase = true)
     
     val rawBody = message.bodyHtml.ifBlank { message.previewText }
     val htmlBlocks = remember(rawBody) { parseHtmlBlocks(rawBody) }
@@ -334,8 +336,15 @@ private fun MessageDetailContent(
                 color = if (isSystem) MaterialTheme.colorScheme.tertiary.copy(alpha = 0.12f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
                 shape = RoundedCornerShape(8.dp)
             ) {
+                val tagText = if (displaySender.equals(strings.systemMessage, ignoreCase = true) || displaySender.equals("Rendszerüzenet", ignoreCase = true)) {
+                    strings.systemMessage
+                } else if (message.isOfficial) {
+                    if (strings.languageCode == "hu") "Hivatalos Értesítés" else if (strings.languageCode == "de") "Offizielle Mitteilung" else "Official Notice"
+                } else {
+                    strings.officialMessage
+                }
                 Text(
-                    text = if (displaySender.equals("Rendszerüzenet", ignoreCase = true)) "Rendszerüzenet" else if (message.isOfficial) "Hivatalos Értesítés" else "Oktatói Üzenet",
+                    text = tagText,
                     color = if (isSystem) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
@@ -344,7 +353,7 @@ private fun MessageDetailContent(
             }
 
             IconButton(onClick = onClose) {
-                Icon(imageVector = Icons.Default.Close, contentDescription = "Bezárás")
+                Icon(imageVector = Icons.Default.Close, contentDescription = strings.close)
             }
         }
 
@@ -375,7 +384,7 @@ private fun MessageDetailContent(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "Feladó: $displaySender",
+                        text = "${strings.sender}: $displaySender",
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -390,7 +399,7 @@ private fun MessageDetailContent(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "Dátum: ${message.sendDate}",
+                        text = "${strings.date}: ${message.sendDate}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -416,8 +425,13 @@ private fun MessageDetailContent(
                         color = MaterialTheme.colorScheme.primary
                     )
                     Spacer(modifier = Modifier.height(12.dp))
+                    val loadingMsgText = when (strings.languageCode) {
+                        "de" -> "Lade Nachrichteninhalt von Neptun..."
+                        "en" -> "Downloading message content from Neptun..."
+                        else -> "Üzenet tartalmának letöltése a Neptunból..."
+                    }
                     Text(
-                        text = "Üzenet tartalmának letöltése a Neptunból...",
+                        text = loadingMsgText,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -459,8 +473,13 @@ private fun MessageDetailContent(
                     .padding(vertical = 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                val emptyContentText = when (strings.languageCode) {
+                    "de" -> "Der Inhalt der Nachricht ist leer oder konnte nicht von Neptun geladen werden."
+                    "en" -> "The message content is empty or failed to load from Neptun."
+                    else -> "A levél tartalma üres vagy nem sikerült közvetlenül betölteni a Neptunból."
+                }
                 Text(
-                    text = "A levél tartalma üres vagy nem sikerült közvetlenül betölteni a Neptunból.",
+                    text = emptyContentText,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -473,7 +492,7 @@ private fun MessageDetailContent(
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Tartalom újrapróbálása")
+                    Text(strings.retry)
                 }
             }
         }

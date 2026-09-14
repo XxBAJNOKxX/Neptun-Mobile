@@ -292,6 +292,35 @@ enum class AppAccentColor(
     }
 }
 
+fun ThemeMode.getLocalizedTitle(strings: com.example.core.i18n.AppStrings): String {
+    return when (this) {
+        ThemeMode.SYSTEM -> strings.themeModeSystem
+        ThemeMode.LIGHT -> strings.themeModeLight
+        ThemeMode.DARK -> strings.themeModeDark
+    }
+}
+
+fun ThemeMode.getLocalizedDescription(strings: com.example.core.i18n.AppStrings): String {
+    return when (this) {
+        ThemeMode.SYSTEM -> strings.themeModeSystemDesc
+        ThemeMode.LIGHT -> strings.themeModeLightDesc
+        ThemeMode.DARK -> strings.themeModeDarkDesc
+    }
+}
+
+fun AppAccentColor.getLocalizedTitle(strings: com.example.core.i18n.AppStrings): String {
+    return when (this) {
+        AppAccentColor.BLUE -> strings.colorBlue
+        AppAccentColor.INDIGO -> strings.colorIndigo
+        AppAccentColor.CYAN -> strings.colorCyan
+        AppAccentColor.EMERALD -> strings.colorEmerald
+        AppAccentColor.GOLD -> strings.colorGold
+        AppAccentColor.PURPLE -> strings.colorPurple
+        AppAccentColor.CRIMSON -> strings.colorCrimson
+        AppAccentColor.ROSE -> strings.colorRose
+    }
+}
+
 data class ThemeSettings(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val useDynamicColor: Boolean = true,

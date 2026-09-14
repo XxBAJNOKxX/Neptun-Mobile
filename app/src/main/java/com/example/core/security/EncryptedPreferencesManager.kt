@@ -32,6 +32,20 @@ enum class UpdateChannel(val displayName: String, val description: String) {
     STABLE("Stabil kiadások", "Kizárólag hivatalosan tesztelt, megbízható verziók"),
     DEV("Fejlesztői (Dev)", "A legújabb fejlesztői buildek és előzetes funkciók");
 
+    fun getLocalizedDisplayName(strings: com.example.core.i18n.AppStrings): String {
+        return when (this) {
+            STABLE -> strings.updateChannelStable
+            DEV -> strings.updateChannelDev
+        }
+    }
+
+    fun getLocalizedDescription(strings: com.example.core.i18n.AppStrings): String {
+        return when (this) {
+            STABLE -> strings.updateChannelStableDesc
+            DEV -> strings.updateChannelDevDesc
+        }
+    }
+
     companion object {
         fun fromName(name: String?): UpdateChannel {
             return entries.firstOrNull { it.name.equals(name, ignoreCase = true) } ?: STABLE

@@ -123,6 +123,8 @@ import com.example.ui.theme.NeptunGold
 import com.example.ui.theme.NeptunGreen
 import com.example.ui.theme.ThemeMode
 import com.example.ui.theme.ThemeSettings
+import com.example.ui.theme.getLocalizedTitle
+import com.example.ui.theme.getLocalizedDescription
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -534,14 +536,14 @@ fun SettingsScreen(
                                             }
                                             Icon(
                                                 imageVector = icon,
-                                                contentDescription = mode.title,
+                                                contentDescription = mode.getLocalizedTitle(strings),
                                                 modifier = Modifier.size(18.dp)
                                             )
                                         }
                                     },
                                     label = {
                                         Text(
-                                            text = mode.title,
+                                            text = mode.getLocalizedTitle(strings),
                                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                                             fontSize = 13.sp
                                         )
@@ -551,7 +553,7 @@ fun SettingsScreen(
                         }
 
                         Text(
-                            text = themeSettings.themeMode.description,
+                            text = themeSettings.themeMode.getLocalizedDescription(strings),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 12.sp,
@@ -708,7 +710,7 @@ fun SettingsScreen(
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Text(
-                                    text = "${strings.accentColorSelected} ${themeSettings.accentColor.title}",
+                                    text = "${strings.accentColorSelected} ${themeSettings.accentColor.getLocalizedTitle(strings)}",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.primary,
                                     fontWeight = FontWeight.Medium
@@ -797,7 +799,7 @@ fun SettingsScreen(
                                         )
                                         Spacer(modifier = Modifier.width(6.dp))
                                         Text(
-                                            text = "${strings.activeThemeLabel} ${if (themeSettings.useDynamicColor && isDynamicColorSupported) strings.dynamicColors else themeSettings.accentColor.title}",
+                                            text = "${strings.activeThemeLabel} ${if (themeSettings.useDynamicColor && isDynamicColorSupported) strings.dynamicColors else themeSettings.accentColor.getLocalizedTitle(strings)}",
                                             style = MaterialTheme.typography.bodySmall,
                                             fontWeight = FontWeight.Bold,
                                             color = MaterialTheme.colorScheme.onSurface
@@ -809,7 +811,7 @@ fun SettingsScreen(
                                         color = MaterialTheme.colorScheme.primaryContainer
                                     ) {
                                         Text(
-                                            text = themeSettings.themeMode.title,
+                                            text = themeSettings.themeMode.getLocalizedTitle(strings),
                                             style = MaterialTheme.typography.labelSmall,
                                             color = MaterialTheme.colorScheme.onPrimaryContainer,
                                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
@@ -1083,7 +1085,7 @@ fun SettingsScreen(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             OutlinedTextField(
-                                value = selectedStartItem.title,
+                                value = selectedStartItem.getLocalizedTitle(strings),
                                 onValueChange = {},
                                 readOnly = true,
                                 singleLine = true,
@@ -1115,7 +1117,7 @@ fun SettingsScreen(
                                         text = {
                                             Column {
                                                 Text(
-                                                    text = item.title,
+                                                    text = item.getLocalizedTitle(strings),
                                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                                     color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                                                 )
@@ -1209,7 +1211,7 @@ fun SettingsScreen(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
-                                        text = item.title,
+                                        text = item.getLocalizedTitle(strings),
                                         style = MaterialTheme.typography.bodyMedium
                                     )
                                     Switch(
@@ -1502,7 +1504,7 @@ fun SettingsScreen(
                                     )
                                 ) {
                                     Text(
-                                        text = channel.displayName,
+                                        text = channel.getLocalizedDisplayName(strings),
                                         fontSize = 12.sp,
                                         fontWeight = if (updateChannel == channel) FontWeight.Bold else FontWeight.Normal
                                     )
@@ -1510,7 +1512,7 @@ fun SettingsScreen(
                             }
                         }
                         Text(
-                            text = updateChannel.description,
+                            text = updateChannel.getLocalizedDescription(strings),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 11.sp
@@ -1964,7 +1966,7 @@ private fun AccentColorTile(
             Spacer(modifier = Modifier.height(4.dp))
 
             Text(
-                text = accent.title,
+                text = accent.getLocalizedTitle(currentStrings()),
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                 color = if (isSelected) accent.primary else MaterialTheme.colorScheme.onSurface,
