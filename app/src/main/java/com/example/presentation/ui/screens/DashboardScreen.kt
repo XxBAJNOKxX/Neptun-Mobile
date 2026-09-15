@@ -101,6 +101,16 @@ fun DashboardScreen(
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
+                    val academicInfo = listOf(trainingProgram, universityName).filter { it.isNotBlank() }.joinToString(" • ")
+                    if (academicInfo.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = academicInfo,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
                     if (isDemoData) {
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(

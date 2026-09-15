@@ -287,10 +287,11 @@ class NeptunApiClient {
         val candidateUrls = if (rawUrl.contains("ppke.hu", ignoreCase = true)) {
             listOf(
                 rawUrl,
+                "https://neptun2.ppke.hu/hallgato2_uj",
                 "https://neptun2.ppke.hu/hallgato_uj",
+                "https://neptun3.ppke.hu/hallgato2_uj",
                 "https://neptun3.ppke.hu/hallgato_uj",
-                "https://neptun3.ppke.hu/hallgato3_uj",
-                "https://neptun3.ppke.hu/hallgato2_uj"
+                "https://neptun3.ppke.hu/hallgato3_uj"
             ).distinct()
         } else {
             listOf(rawUrl)
@@ -732,7 +733,7 @@ class NeptunApiClient {
                 refreshToken = null,
                 deviceCookie = cookieHeaderString(modernCookieMap),
                 studentName = "Hallgató ($username)",
-                trainingProgram = "ELTE Egyetemi Képzés",
+                trainingProgram = "Egyetemi képzés",
                 isModernApi = false,
                 normalizedBaseUrl = cleanBase
             )
@@ -743,7 +744,7 @@ class NeptunApiClient {
                 refreshToken = null,
                 deviceCookie = cookieHeaderString(cookies),
                 studentName = "Hallgató ($username)",
-                trainingProgram = "ELTE Egyetemi Képzés",
+                trainingProgram = "Egyetemi képzés",
                 isModernApi = false,
                 normalizedBaseUrl = aspBaseUrl
             )
@@ -836,7 +837,7 @@ class NeptunApiClient {
         } catch (e: Exception) {
             null
         }
-        val trainingName = trainingInfo?.second ?: "ELTE Felsőoktatási Képzés"
+        val trainingName = trainingInfo?.second?.takeIf { it.isNotBlank() } ?: "Egyetemi képzés"
         val trainingId = userInfo?.studentTrainingId?.takeIf { it.isNotBlank() } ?: trainingInfo?.first
 
         NeptunAuthResult.Success(
@@ -1143,7 +1144,7 @@ class NeptunApiClient {
                 val trainingInfo = try {
                     getStudentTrainingInfo(baseUrl, accessToken)
                 } catch (e: Exception) { null }
-                val trainingName = trainingInfo?.second ?: "Egyetemi képzés"
+                val trainingName = trainingInfo?.second?.takeIf { it.isNotBlank() } ?: "Egyetemi képzés"
                 val trainingId = userInfo?.studentTrainingId?.takeIf { it.isNotBlank() } ?: trainingInfo?.first
 
                 return@withContext NeptunAuthResult.Success(
@@ -1386,6 +1387,47 @@ class NeptunApiClient {
 
     // --- STUDENT TRAINING INFO ---
     suspend fun getStudentTrainingInfo(baseUrl: String, token: String): Pair<String, String>? = withContext(Dispatchers.IO) {
+        // 1. Try modern dedicated MyTrainings endpoint
+        try {
+            val url = "$baseUrl/api/MyTrainings"
+            val req = Request.Builder()
+                .url(url)
+                .get()
+                .addHeader("Authorization", "Bearer $token")
+                .addHeader("Content-Type", "application/json")
+                .build()
+
+            val resp = okHttpClient.newCall(req).execute()
+            if (resp.isSuccessful) {
+                val body = resp.body?.string() ?: ""
+                val parsed = safeParseJsonObject(body)
+                val dataArr = parsed?.get("data")?.jsonArray
+                if (!dataArr.isNullOrEmpty()) {
+                    var selected = dataArr.first().jsonObject
+                    for (item in dataArr) {
+                        val obj = item.jsonObject
+                        val hasActual = obj["hasActualTerm"]?.jsonPrimitive?.booleanOrNull == true
+                        val notClosed = obj["isClosedTraining"]?.jsonPrimitive?.booleanOrNull == false
+                        if (hasActual && notClosed) {
+                            selected = obj
+                            break
+                        }
+                    }
+                    val id = selected["studentTrainingId"]?.jsonPrimitive?.contentOrNull ?: ""
+                    val name = selected["trainingName"]?.jsonPrimitive?.contentOrNull
+                        ?: selected["studentTrainingName"]?.jsonPrimitive?.contentOrNull
+                        ?: selected["programName"]?.jsonPrimitive?.contentOrNull
+                        ?: ""
+                    if (name.isNotBlank()) {
+                        return@withContext Pair(id, name)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.d(tag, "MyTrainings query failed, falling back to Calendar/GetStudentTrainings: ${e.message}")
+        }
+
+        // 2. Fallback to Calendar/GetStudentTrainings
         try {
             val url = "$baseUrl/api/Calendar/GetStudentTrainings"
             val req = Request.Builder()
@@ -1410,8 +1452,14 @@ class NeptunApiClient {
                         }
                     }
                     val id = selected["studentTrainingId"]?.jsonPrimitive?.contentOrNull ?: ""
-                    val name = selected["trainingName"]?.jsonPrimitive?.contentOrNull ?: "Mérnökinformatikus képzés"
-                    return@withContext Pair(id, name)
+                    val name = selected["studentTrainingName"]?.jsonPrimitive?.contentOrNull
+                        ?: selected["trainingName"]?.jsonPrimitive?.contentOrNull
+                        ?: selected["programName"]?.jsonPrimitive?.contentOrNull
+                        ?: selected["name"]?.jsonPrimitive?.contentOrNull
+                        ?: ""
+                    if (name.isNotBlank()) {
+                        return@withContext Pair(id, name)
+                    }
                 }
             }
         } catch (e: Exception) {
@@ -1552,8 +1600,7 @@ class NeptunApiClient {
             urlBuilder.append("&displayOtherEvents=true")
             urlBuilder.append("&displayTasks=true")
             if (trainId.isNotEmpty()) {
-                urlBuilder.append("&studentTrainingIds[0]=").append(trainId)
-                urlBuilder.append("&studentTrainingIds=").append(trainId)
+                urlBuilder.append("&studentTrainingId=").append(trainId)
             }
 
             val reqBuilder = Request.Builder()

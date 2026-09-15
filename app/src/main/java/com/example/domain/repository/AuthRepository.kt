@@ -9,7 +9,7 @@ class TwoFactorRequiredException(val twoFactorToken: String) :
     Exception("Kétlépcsős azonosítás (2FA) szükséges! Kérjük, add meg az SMS-ben vagy hitelesítő appban kapott kódot.")
 
 class TwoFactorSessionRequiredException(val session: Neptun2FASession) :
-    Exception("Kétlépcsős azonosítás (2FA) szükséges az ELTE / Neptun fiókhoz!")
+    Exception("Kétlépcsős azonosítás (2FA) szükséges a Neptun fiókhoz!")
 
 interface AuthRepository {
     fun getUniversities(): Flow<List<University>>
