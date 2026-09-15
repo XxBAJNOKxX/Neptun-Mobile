@@ -301,13 +301,17 @@ fun SettingsScreen(
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.primary
                         )
+                        val rawUni = credentials?.universityName ?: strings.studentDefaultUni
+                        val displayUni = com.example.core.i18n.AcademicDataLocalizer.localizeUniversityName(rawUni, strings.languageCode)
                         Text(
-                            text = credentials?.universityName ?: strings.studentDefaultUni,
+                            text = displayUni,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                        val rawProg = credentials?.trainingProgram ?: strings.studentDefaultProgram
+                        val displayProg = com.example.core.i18n.AcademicDataLocalizer.localizeProgramName(rawProg, strings.languageCode)
                         Text(
-                            text = credentials?.trainingProgram ?: strings.studentDefaultProgram,
+                            text = displayProg,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 11.sp
