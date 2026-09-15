@@ -302,16 +302,14 @@ fun SettingsScreen(
                             color = MaterialTheme.colorScheme.primary
                         )
                         val rawUni = credentials?.universityName ?: strings.studentDefaultUni
-                        val displayUni = com.example.core.i18n.AcademicDataLocalizer.localizeUniversityName(rawUni, strings.languageCode)
                         Text(
-                            text = displayUni,
+                            text = rawUni,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         val rawProg = credentials?.trainingProgram ?: strings.studentDefaultProgram
-                        val displayProg = com.example.core.i18n.AcademicDataLocalizer.localizeProgramName(rawProg, strings.languageCode)
                         Text(
-                            text = displayProg,
+                            text = rawProg,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 11.sp

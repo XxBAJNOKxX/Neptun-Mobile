@@ -258,11 +258,7 @@ fun LoginScreen(
                             )
                             Spacer(modifier = Modifier.width(12.dp))
                             Column(modifier = Modifier.weight(1f)) {
-                                val selectedUniName = if (uiState.selectedUniversity != null) {
-                                    com.example.core.i18n.AcademicDataLocalizer.localizeUniversity(uiState.selectedUniversity, strings.languageCode)
-                                } else {
-                                    strings.selectUniversityPlaceholder
-                                }
+                                val selectedUniName = uiState.selectedUniversity?.name ?: strings.selectUniversityPlaceholder
                                 Text(
                                     text = selectedUniName,
                                     style = MaterialTheme.typography.bodyMedium,
@@ -507,21 +503,12 @@ fun LoginScreen(
                                 }
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Column(modifier = Modifier.weight(1f)) {
-                                    val localizedName = com.example.core.i18n.AcademicDataLocalizer.localizeUniversity(uni, strings.languageCode)
                                     Text(
-                                        text = localizedName,
+                                        text = uni.name,
                                         style = MaterialTheme.typography.bodyMedium,
                                         fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
-                                    if (strings.languageCode != "hu" && localizedName != uni.name) {
-                                        Text(
-                                            text = uni.name,
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-                                            fontSize = 11.sp
-                                        )
-                                    }
                                     Text(
                                         text = "${uni.city} • ${uni.neptunUrl}",
                                         style = MaterialTheme.typography.bodySmall,
