@@ -52,6 +52,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -197,12 +198,16 @@ fun GradesScreen(
                         text = subjectsHeader,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f, fill = false),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
 
                     if (uiState.calculation?.ghostCount ?: 0 > 0) {
+                        Spacer(modifier = Modifier.width(8.dp))
                         Surface(
-                            color = Color(0xFFEDE9FE),
+                            color = NeptunPurple.copy(alpha = 0.16f),
                             shape = RoundedCornerShape(8.dp),
                             modifier = Modifier.clickable { onResetAllGhostGrades() }
                         ) {
@@ -284,7 +289,10 @@ private fun AcademicSummaryCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Box(
                         contentAlignment = Alignment.Center,
                         modifier = Modifier
@@ -300,37 +308,44 @@ private fun AcademicSummaryCard(
                         )
                     }
                     Spacer(modifier = Modifier.width(10.dp))
-                    Column {
+                    Column(modifier = Modifier.weight(1f, fill = false)) {
                         Text(
                             text = if (strings.languageCode == "de") "Studienergebnisse" else if (strings.languageCode == "hu") "Tanulmányi Eredmények" else "Academic Results",
                             style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                         Text(
                             text = if (strings.languageCode == "de") "Formel: (Σ Note * Credits) / Σ Erreichte Credits" else if (strings.languageCode == "hu") "Formula: (Σ Jegy * Kredit) / Σ Teljesített Kredit" else "Formula: (Σ Grade * Credits) / Σ Completed Credits",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontSize = 11.sp
+                            fontSize = 11.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
 
                 if (hasGhost) {
+                    Spacer(modifier = Modifier.width(8.dp))
                     Surface(
-                        color = Color(0xFFEDE9FE),
-                        shape = RoundedCornerShape(6.dp)
+                        color = NeptunPurple.copy(alpha = 0.18f),
+                        shape = RoundedCornerShape(8.dp)
                     ) {
                         val ghostActiveText = when (strings.languageCode) {
-                            "de" -> "${calc?.ghostCount} simulierte Noten aktiv"
-                            "en" -> "${calc?.ghostCount} simulated grade(s) active"
-                            else -> "${calc?.ghostCount} szellemjegy aktív"
+                            "de" -> "${calc?.ghostCount} Noten simuliert"
+                            "en" -> "${calc?.ghostCount} simulated"
+                            else -> "${calc?.ghostCount} szellemjegy"
                         }
                         Text(
                             text = ghostActiveText,
                             color = NeptunPurple,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            maxLines = 1,
+                            softWrap = false
                         )
                     }
                 }

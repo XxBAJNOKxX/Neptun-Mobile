@@ -158,7 +158,9 @@ class AuthViewModel(
                 state.universities.filter { uni ->
                     uni.name.contains(query, ignoreCase = true) ||
                             uni.shortName.contains(query, ignoreCase = true) ||
-                            uni.city.contains(query, ignoreCase = true)
+                            uni.city.contains(query, ignoreCase = true) ||
+                            com.example.core.i18n.AcademicDataLocalizer.localizeUniversityName(uni.name, "en").contains(query, ignoreCase = true) ||
+                            com.example.core.i18n.AcademicDataLocalizer.localizeUniversityName(uni.name, "de").contains(query, ignoreCase = true)
                 }
             }
             state.copy(searchQuery = query, filteredUniversities = filtered)

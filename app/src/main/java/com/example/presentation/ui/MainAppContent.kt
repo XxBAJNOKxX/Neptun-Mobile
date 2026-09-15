@@ -371,6 +371,8 @@ private fun MainDashboard(
                         NavigationItem.HOME -> DashboardScreen(
                             uiState = dashboardState,
                             studentName = authState.credentials?.studentName ?: strings.studentDefaultName,
+                            universityName = authState.credentials?.universityName ?: "",
+                            trainingProgram = authState.credentials?.trainingProgram ?: "",
                             isDemoData = dataMode != DataMode.REAL,
                             onNavigate = { item ->
                                 if (item in visibleItems) {
