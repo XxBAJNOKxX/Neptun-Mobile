@@ -379,6 +379,18 @@ private fun MainDashboard(
                                     currentDestination = item
                                 }
                             },
+                            onOpenExams = {
+                                gradesViewModel.selectTab(1)
+                                if (NavigationItem.GRADES in visibleItems) {
+                                    currentDestination = NavigationItem.GRADES
+                                }
+                            },
+                            onOpenProgress = {
+                                gradesViewModel.selectTab(2)
+                                if (NavigationItem.GRADES in visibleItems) {
+                                    currentDestination = NavigationItem.GRADES
+                                }
+                            },
                             onRefresh = dashboardViewModel::refresh
                         )
 

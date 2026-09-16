@@ -71,6 +71,8 @@ fun DashboardScreen(
     trainingProgram: String = "",
     isDemoData: Boolean,
     onNavigate: (NavigationItem) -> Unit,
+    onOpenExams: () -> Unit = { onNavigate(NavigationItem.GRADES) },
+    onOpenProgress: () -> Unit = { onNavigate(NavigationItem.GRADES) },
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -149,7 +151,7 @@ fun DashboardScreen(
                 item {
                     UpcomingExamDashboardCard(
                         exam = exam,
-                        onOpenExams = { onNavigate(NavigationItem.GRADES) }
+                        onOpenExams = onOpenExams
                     )
                 }
             }
@@ -201,7 +203,7 @@ fun DashboardScreen(
                 item {
                     DegreeProgressMiniCard(
                         progress = progress,
-                        onOpenProgress = { onNavigate(NavigationItem.GRADES) }
+                        onOpenProgress = onOpenProgress
                     )
                 }
             }
