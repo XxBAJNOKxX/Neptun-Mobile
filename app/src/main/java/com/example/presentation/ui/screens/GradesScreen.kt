@@ -25,6 +25,9 @@ import androidx.compose.material.icons.filled.Calculate
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.HourglassEmpty
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Place
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -46,6 +49,7 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -79,8 +83,10 @@ fun GradesScreen(
     onSetGhostGrade: (String, Int?) -> Unit,
     onResetAllGhostGrades: () -> Unit,
     onTabSelect: (Int) -> Unit = {},
+    onExamFilterChange: (Int) -> Unit = {},
     onRefresh: () -> Unit,
     onRefreshExams: () -> Unit = {},
+    onRefreshProgress: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val strings = currentStrings()
@@ -92,14 +98,26 @@ fun GradesScreen(
     ) {
         NeptunTopBar(
             title = strings.gradesTitle,
-            subtitle = if (strings.languageCode == "hu") "Kreditindex és Szellemjegy kalkulátor"
-                       else if (strings.languageCode == "de") "Kreditindex und Notensimulator"
-                       else "Credit Index & Grade Simulator",
-            isRefreshing = if (uiState.selectedTab == 0) uiState.isRefreshing else uiState.isRefreshingExams,
-            onRefresh = if (uiState.selectedTab == 0) onRefresh else onRefreshExams
+            subtitle = when (uiState.selectedTab) {
+                1 -> strings.tabExams
+                2 -> strings.tabProgress
+                else -> if (strings.languageCode == "hu") "Kreditindex és Szellemjegy kalkulátor"
+                        else if (strings.languageCode == "de") "Kreditindex und Notensimulator"
+                        else "Credit Index & Grade Simulator"
+            },
+            isRefreshing = when (uiState.selectedTab) {
+                1 -> uiState.isRefreshingExams
+                2 -> uiState.isRefreshingProgress
+                else -> uiState.isRefreshing
+            },
+            onRefresh = when (uiState.selectedTab) {
+                1 -> onRefreshExams
+                2 -> onRefreshProgress
+                else -> onRefresh
+            }
         )
 
-        // Jegyek / Vizsgák váltó
+        // Jegyek / Vizsgák / Haladás váltó (3 fül)
         SingleChoiceSegmentedButtonRow(
             modifier = Modifier
                 .fillMaxWidth()
@@ -108,21 +126,44 @@ fun GradesScreen(
             SegmentedButton(
                 selected = uiState.selectedTab == 0,
                 onClick = { onTabSelect(0) },
-                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 3)
             ) {
-                Text(strings.navGrades)
+                Text(strings.tabGrades)
             }
             SegmentedButton(
                 selected = uiState.selectedTab == 1,
                 onClick = { onTabSelect(1) },
-                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
+                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 3)
             ) {
-                Text(if (strings.languageCode == "hu") "Vizsgák" else if (strings.languageCode == "de") "Prüfungen" else "Exams")
+                Text(strings.tabExams)
+            }
+            SegmentedButton(
+                selected = uiState.selectedTab == 2,
+                onClick = { onTabSelect(2) },
+                shape = SegmentedButtonDefaults.itemShape(index = 2, count = 3)
+            ) {
+                Text(strings.tabProgress)
             }
         }
 
         if (uiState.selectedTab == 1) {
-            ExamsTabContent(exams = uiState.exams, isRefreshing = uiState.isRefreshingExams, onRefresh = onRefreshExams)
+            ExamsTabContent(
+                exams = uiState.exams,
+                examFilter = uiState.examFilter,
+                onFilterChange = onExamFilterChange,
+                isRefreshing = uiState.isRefreshingExams,
+                onRefresh = onRefreshExams
+            )
+            return@Column
+        }
+
+        if (uiState.selectedTab == 2) {
+            DegreeProgressTabContent(
+                progress = uiState.degreeProgress,
+                termStats = uiState.termStats,
+                isRefreshing = uiState.isRefreshingProgress,
+                onRefresh = onRefreshProgress
+            )
             return@Column
         }
 
@@ -879,57 +920,94 @@ private fun TermStatisticsCard(
 @Composable
 private fun ExamsTabContent(
     exams: List<ExamItem>,
+    examFilter: Int,
+    onFilterChange: (Int) -> Unit,
     isRefreshing: Boolean,
     onRefresh: () -> Unit
 ) {
     val strings = currentStrings()
+
+    val filteredExams = remember(exams, examFilter) {
+        when (examFilter) {
+            1 -> exams.filter { it.isSignedUp }
+            2 -> exams.filter { (it.daysUntilExam ?: 0) >= 0 }
+            else -> exams
+        }
+    }
+
     androidx.compose.material3.pulltorefresh.PullToRefreshBox(
         isRefreshing = isRefreshing,
         onRefresh = onRefresh,
         modifier = Modifier.fillMaxSize()
     ) {
-        if (exams.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(32.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        imageVector = Icons.Default.HourglassEmpty,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(48.dp)
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    FilterChip(
+                        selected = examFilter == 0,
+                        onClick = { onFilterChange(0) },
+                        label = { Text(strings.examFilterAll) }
                     )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        text = strings.noExamsFound,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    FilterChip(
+                        selected = examFilter == 1,
+                        onClick = { onFilterChange(1) },
+                        label = { Text(strings.examFilterSignedUp) }
                     )
-                    Text(
-                        text = strings.examsNotAvailableNotice,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                        modifier = Modifier.padding(top = 4.dp)
+                    FilterChip(
+                        selected = examFilter == 2,
+                        onClick = { onFilterChange(2) },
+                        label = { Text(strings.examFilterUpcoming) }
                     )
                 }
             }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                item { Spacer(modifier = Modifier.height(4.dp)) }
-                items(exams) { exam ->
+
+            if (filteredExams.isEmpty()) {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 48.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                imageVector = Icons.Default.HourglassEmpty,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(48.dp)
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                text = strings.noExamsFound,
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = strings.examsNotAvailableNotice,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                modifier = Modifier.padding(top = 4.dp)
+                            )
+                        }
+                    }
+                }
+            } else {
+                items(filteredExams) { exam ->
                     ExamCard(exam = exam)
                 }
-                item { Spacer(modifier = Modifier.height(20.dp)) }
             }
+            item { Spacer(modifier = Modifier.height(20.dp)) }
         }
     }
 }
@@ -949,37 +1027,89 @@ private fun ExamCard(exam: ExamItem) {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                if (exam.examType.isNotBlank()) {
-                    Surface(
-                        color = MaterialTheme.colorScheme.primaryContainer,
-                        shape = RoundedCornerShape(6.dp)
-                    ) {
-                        Text(
-                            text = exam.examType,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (exam.examType.isNotBlank()) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            shape = RoundedCornerShape(6.dp)
+                        ) {
+                            Text(
+                                text = exam.examType,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                            )
+                        }
+                    }
+                    if (exam.isSignedUp) {
+                        Surface(
+                            color = NeptunGreen.copy(alpha = 0.15f),
+                            shape = RoundedCornerShape(6.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = null,
+                                    tint = NeptunGreen,
+                                    modifier = Modifier.size(12.dp)
+                                )
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text(
+                                    text = strings.signedStatus,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = NeptunGreen
+                                )
+                            }
+                        }
+                    } else {
+                        Surface(
+                            color = MaterialTheme.colorScheme.errorContainer,
+                            shape = RoundedCornerShape(6.dp)
+                        ) {
+                            Text(
+                                text = strings.notRegisteredStatus,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
                     }
                 }
-                if (!exam.isSignedUp) {
+
+                // Countdown badge
+                val days = exam.daysUntilExam
+                if (days != null) {
+                    val (badgeBg, badgeFg, label) = when {
+                        days < 0 -> Triple(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.onSurfaceVariant, strings.examFinished)
+                        days == 0L -> Triple(NeptunRed.copy(alpha = 0.15f), NeptunRed, strings.examCountdownToday)
+                        days == 1L -> Triple(NeptunGold.copy(alpha = 0.2f), NeptunGold, strings.examCountdownTomorrow)
+                        else -> Triple(NeptunBlue40.copy(alpha = 0.15f), NeptunBlue40, strings.examCountdownDays(days))
+                    }
                     Surface(
-                        color = MaterialTheme.colorScheme.errorContainer,
-                        shape = RoundedCornerShape(6.dp)
+                        color = badgeBg,
+                        shape = RoundedCornerShape(8.dp)
                     ) {
                         Text(
-                            text = strings.notRegisteredStatus,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onErrorContainer,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            text = label,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = badgeFg,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             Text(
                 text = exam.subjectName,
@@ -988,19 +1118,331 @@ private fun ExamCard(exam: ExamItem) {
                 color = MaterialTheme.colorScheme.onSurface
             )
 
-            Spacer(modifier = Modifier.height(4.dp))
+            if (exam.subjectCode.isNotBlank() || exam.courseCode.isNotBlank()) {
+                val codeText = listOf(exam.subjectCode, exam.courseCode).filter { it.isNotBlank() }.joinToString(" • ")
+                Text(
+                    text = codeText,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+            }
 
-            val details = listOfNotNull(
-                exam.examDate.takeIf { it.isNotBlank() },
-                exam.startTime.takeIf { it.isNotBlank() },
-                listOf(exam.room, exam.location).filter { it.isNotBlank() }.distinct().joinToString(", ").takeIf { it.isNotBlank() },
-                exam.courseCode.takeIf { it.isNotBlank() }
-            ).joinToString(" · ")
+            Spacer(modifier = Modifier.height(10.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+            Spacer(modifier = Modifier.height(8.dp))
 
-            Text(
-                text = details.ifEmpty { strings.noDetailsInfo },
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Time / Date
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Schedule,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = exam.fullDateTimeString,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+
+                // Room / Location
+                val place = listOf(exam.room, exam.location).filter { it.isNotBlank() }.distinct().joinToString(", ")
+                if (place.isNotBlank()) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Place,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = place,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            if (exam.teacherName.isNotBlank()) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Person,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(15.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "${strings.examinerLabel}: ${exam.teacherName}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+    }
+}
+
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun DegreeProgressTabContent(
+    progress: com.example.domain.model.DegreeProgress?,
+    termStats: List<com.example.presentation.viewmodel.TermStat>,
+    isRefreshing: Boolean,
+    onRefresh: () -> Unit
+) {
+    val strings = currentStrings()
+    androidx.compose.material3.pulltorefresh.PullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = onRefresh,
+        modifier = Modifier.fillMaxSize()
+    ) {
+        if (progress == null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(32.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = strings.loading,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                item { Spacer(modifier = Modifier.height(4.dp)) }
+
+                // Hero Completion Card
+                item {
+                    Card(
+                        shape = RoundedCornerShape(20.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(20.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text(
+                                        text = strings.degreeProgressTitle,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                    Text(
+                                        text = "${progress.completedCredits} / ${progress.totalRequiredCredits} kredit",
+                                        style = MaterialTheme.typography.headlineMedium,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                }
+                                Surface(
+                                    color = MaterialTheme.colorScheme.primary,
+                                    shape = CircleShape,
+                                    modifier = Modifier.size(56.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Text(
+                                            text = "${progress.progressPercentage}%",
+                                            color = MaterialTheme.colorScheme.onPrimary,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 16.sp
+                                        )
+                                    }
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(12.dp))
+                            LinearProgressIndicator(
+                                progress = { progress.progressFraction },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(10.dp)
+                                    .clip(RoundedCornerShape(5.dp)),
+                                color = MaterialTheme.colorScheme.primary,
+                                trackColor = MaterialTheme.colorScheme.surfaceVariant
+                            )
+                        }
+                    }
+                }
+
+                // Cumulative KPIs Card
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Card(
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                Text(
+                                    text = strings.cumulativeAverageLabel,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "%.2f".format(progress.cumulativeWeightedAverage),
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = NeptunGreen
+                                )
+                            }
+                        }
+
+                        Card(
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                Text(
+                                    text = strings.cumulativeCreditIndexLabel,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "%.2f".format(progress.cumulativeCreditIndex),
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = NeptunPurple
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Category Breakdowns
+                item {
+                    Text(
+                        text = strings.details,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+
+                item {
+                    ProgressCategoryCard(
+                        title = strings.compulsoryCreditsLabel,
+                        completed = progress.compulsoryCompleted,
+                        total = progress.compulsoryTotal,
+                        accentColor = NeptunGreen
+                    )
+                }
+
+                item {
+                    ProgressCategoryCard(
+                        title = strings.compulsoryElectiveCreditsLabel,
+                        completed = progress.compulsoryElectiveCompleted,
+                        total = progress.compulsoryElectiveTotal,
+                        accentColor = NeptunBlue40
+                    )
+                }
+
+                item {
+                    ProgressCategoryCard(
+                        title = strings.freeElectiveCreditsLabel,
+                        completed = progress.freeElectiveCompleted,
+                        total = progress.freeElectiveTotal,
+                        accentColor = NeptunPurple
+                    )
+                }
+
+                item {
+                    ProgressCategoryCard(
+                        title = strings.thesisCreditsLabel,
+                        completed = progress.thesisCompleted,
+                        total = progress.thesisTotal,
+                        accentColor = NeptunGold
+                    )
+                }
+
+                item {
+                    ProgressCategoryCard(
+                        title = strings.criteriaLabel,
+                        completed = progress.criteriaPassedCount,
+                        total = progress.criteriaTotalCount,
+                        unit = "db",
+                        accentColor = NeptunCyan40
+                    )
+                }
+
+                item { Spacer(modifier = Modifier.height(20.dp)) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProgressCategoryCard(
+    title: String,
+    completed: Int,
+    total: Int,
+    unit: String = "kredit",
+    accentColor: Color
+) {
+    val fraction = if (total > 0) (completed.toFloat() / total.toFloat()).coerceIn(0f, 1f) else 0f
+    val pct = (fraction * 100).toInt()
+
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "$completed / $total $unit ($pct%)",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = accentColor
+                )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            LinearProgressIndicator(
+                progress = { fraction },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp)
+                    .clip(RoundedCornerShape(4.dp)),
+                color = accentColor,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant
             )
         }
     }

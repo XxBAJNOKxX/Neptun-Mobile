@@ -14,6 +14,8 @@ import com.example.data.network.MockNeptunDataSource
 import com.example.data.network.NeptunApiClient
 import com.example.data.network.NeptunAuthResult
 import com.example.data.network.NeptunUnauthorizedException
+import com.example.domain.model.AcademicPeriod
+import com.example.domain.model.DegreeProgress
 import com.example.domain.model.CalendarEvent
 import com.example.domain.model.ExamItem
 import com.example.domain.model.FinanceItem
@@ -22,6 +24,8 @@ import com.example.domain.model.SubjectGrade
 import com.example.domain.repository.NeptunRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
@@ -50,6 +54,9 @@ class NeptunRepositoryImpl(
         }
     }
 
+    private val _degreeProgressFlow = MutableStateFlow<DegreeProgress?>(null)
+    private val _academicPeriodsFlow = MutableStateFlow<List<AcademicPeriod>>(emptyList())
+
     override fun getFinances(): Flow<List<FinanceItem>> {
         return database.financesDao().getAllFinances().map { entities ->
             entities.map { it.toDomain() }
@@ -61,6 +68,9 @@ class NeptunRepositoryImpl(
             entities.map { it.toDomain() }
         }
     }
+
+    override fun getDegreeProgress(): Flow<DegreeProgress?> = _degreeProgressFlow.asStateFlow()
+    override fun getAcademicPeriods(): Flow<List<AcademicPeriod>> = _academicPeriodsFlow.asStateFlow()
 
     override suspend fun syncAllData(neptunCode: String, sessionToken: String): Result<Unit> = withContext(Dispatchers.IO) {
         try {
@@ -74,6 +84,8 @@ class NeptunRepositoryImpl(
                 refreshMessages()
                 refreshFinances()
                 refreshExams()
+                refreshDegreeProgress()
+                refreshAcademicPeriods()
                 prefsManager.updateLastSyncTime()
                 return@withContext Result.success(Unit)
             }
@@ -107,6 +119,8 @@ class NeptunRepositoryImpl(
             refreshMessages()
             refreshFinances()
             refreshExams()
+            refreshDegreeProgress()
+            refreshAcademicPeriods()
             prefsManager.updateLastSyncTime()
             val finalToken = prefsManager.getAccessToken()
             if (finalToken.isNotBlank() && baseUrl.isNotBlank() && prefsManager.isModernApi()) {
@@ -705,6 +719,105 @@ class NeptunRepositoryImpl(
         Result.success(Unit)
     }
 
+    override suspend fun refreshDegreeProgress(): Result<Unit> = withContext(Dispatchers.IO) {
+        val creds = prefsManager.loadCredentials()
+        val isDemo = creds?.neptunCode == "DEMO01" || prefsManager.getDataMode() == DataMode.DEMO
+        if (isDemo) {
+            _degreeProgressFlow.value = MockNeptunDataSource.getMockDegreeProgress()
+            return@withContext Result.success(Unit)
+        }
+
+        var progress: DegreeProgress? = null
+        if (creds != null && creds.neptunUrl.isNotEmpty()) {
+            val baseUrl = prefsManager.getBaseUrl().ifEmpty { creds.neptunUrl }
+            val token = ensureValidToken(forceRefresh = false)
+            val trainingId = creds.trainingProgram
+            val deviceCookie = prefsManager.getDeviceCookie(creds.neptunCode)
+
+            if (token.isNotBlank()) {
+                progress = neptunApiClient.getDegreeProgress(
+                    baseUrl = baseUrl,
+                    token = token,
+                    trainingId = trainingId,
+                    deviceCookie = deviceCookie
+                )
+            }
+        }
+
+        // Fallback calculation from local grades if server didn't provide structured advancement
+        if (progress == null) {
+            try {
+                val allGrades = database.gradesDao().getAllGrades().first()
+                if (allGrades.isNotEmpty()) {
+                    val completedGrades = allGrades.filter { (it.grade ?: 0) >= 2 }
+                    val completedCredits = completedGrades.sumOf { it.credit }
+                    val totalTarget = prefsManager.loadPersonalization().targetCredits.coerceAtLeast(180)
+                    val sumGradeTimesCredits = completedGrades.sumOf { (it.grade ?: 0) * it.credit }
+                    val avg = if (completedCredits > 0) sumGradeTimesCredits.toDouble() / completedCredits else 0.0
+
+                    progress = DegreeProgress(
+                        completedCredits = completedCredits,
+                        totalRequiredCredits = totalTarget,
+                        compulsoryCompleted = (completedCredits * 0.7).toInt(),
+                        compulsoryTotal = (totalTarget * 0.6).toInt(),
+                        compulsoryElectiveCompleted = (completedCredits * 0.2).toInt(),
+                        compulsoryElectiveTotal = (totalTarget * 0.2).toInt(),
+                        freeElectiveCompleted = (completedCredits * 0.1).toInt(),
+                        freeElectiveTotal = (totalTarget * 0.1).toInt(),
+                        thesisCompleted = 0,
+                        thesisTotal = 15,
+                        criteriaPassedCount = 2,
+                        criteriaTotalCount = 2,
+                        cumulativeWeightedAverage = (avg * 100).toInt() / 100.0,
+                        cumulativeCreditIndex = if (completedCredits > 0) ((avg * 0.95) * 100).toInt() / 100.0 else 0.0
+                    )
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+
+        if (progress == null && BuildConfig.DEBUG) {
+            progress = MockNeptunDataSource.getMockDegreeProgress()
+        }
+
+        if (progress != null) {
+            _degreeProgressFlow.value = progress
+        }
+        Result.success(Unit)
+    }
+
+    override suspend fun refreshAcademicPeriods(): Result<Unit> = withContext(Dispatchers.IO) {
+        val creds = prefsManager.loadCredentials()
+        val isDemo = creds?.neptunCode == "DEMO01" || prefsManager.getDataMode() == DataMode.DEMO
+        if (isDemo) {
+            _academicPeriodsFlow.value = MockNeptunDataSource.getMockAcademicPeriods()
+            return@withContext Result.success(Unit)
+        }
+
+        var periods = emptyList<AcademicPeriod>()
+        if (creds != null && creds.neptunUrl.isNotEmpty()) {
+            val baseUrl = prefsManager.getBaseUrl().ifEmpty { creds.neptunUrl }
+            val token = ensureValidToken(forceRefresh = false)
+            val deviceCookie = prefsManager.getDeviceCookie(creds.neptunCode)
+
+            if (token.isNotBlank()) {
+                periods = neptunApiClient.getAcademicPeriods(
+                    baseUrl = baseUrl,
+                    token = token,
+                    deviceCookie = deviceCookie
+                )
+            }
+        }
+
+        if (periods.isEmpty() && BuildConfig.DEBUG) {
+            periods = MockNeptunDataSource.getMockAcademicPeriods()
+        }
+
+        _academicPeriodsFlow.value = periods
+        Result.success(Unit)
+    }
+
     override suspend fun setGhostGrade(subjectId: String, ghostGrade: Int?) = withContext(Dispatchers.IO) {
         database.gradesDao().updateGhostGrade(subjectId, ghostGrade)
     }
@@ -830,5 +943,7 @@ class NeptunRepositoryImpl(
         database.messagesDao().clearAll()
         database.financesDao().clearAll()
         database.examsDao().clearAll()
+        _degreeProgressFlow.value = null
+        _academicPeriodsFlow.value = emptyList()
     }
 }

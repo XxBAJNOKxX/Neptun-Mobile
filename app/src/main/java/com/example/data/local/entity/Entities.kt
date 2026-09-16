@@ -167,7 +167,9 @@ data class ExamItemEntity(
     val room: String,
     val location: String,
     val examType: String,
-    val isSignedUp: Boolean
+    val isSignedUp: Boolean,
+    val teacherName: String = "",
+    val applicationDeadline: String = ""
 ) {
     fun toDomain(): ExamItem = ExamItem(
         id = id,
@@ -179,7 +181,9 @@ data class ExamItemEntity(
         room = room,
         location = location,
         examType = examType,
-        isSignedUp = isSignedUp
+        isSignedUp = isSignedUp,
+        teacherName = teacherName,
+        applicationDeadline = applicationDeadline
     )
 
     companion object {
@@ -193,7 +197,9 @@ data class ExamItemEntity(
             room = item.room,
             location = item.location,
             examType = item.examType,
-            isSignedUp = item.isSignedUp
+            isSignedUp = item.isSignedUp,
+            teacherName = item.teacherName,
+            applicationDeadline = item.applicationDeadline
         )
     }
 }

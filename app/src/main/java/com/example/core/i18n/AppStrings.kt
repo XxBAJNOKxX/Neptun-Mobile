@@ -391,6 +391,34 @@ interface AppStrings {
     val noExamsFound: String
     val examsNotAvailableNotice: String
 
+    // Killer Features: Exams, Degree Progress & Deadlines
+    val tabGrades: String
+    val tabExams: String
+    val tabProgress: String
+    val examCountdownToday: String
+    val examCountdownTomorrow: String
+    val examCountdownDays: (Long) -> String
+    val examFinished: String
+    val examFilterAll: String
+    val examFilterSignedUp: String
+    val examFilterUpcoming: String
+    val examinerLabel: String
+    val upcomingExamsDashboardTitle: String
+    val viewAllExams: String
+    val degreeProgressTitle: String
+    val compulsoryCreditsLabel: String
+    val compulsoryElectiveCreditsLabel: String
+    val freeElectiveCreditsLabel: String
+    val thesisCreditsLabel: String
+    val criteriaLabel: String
+    val cumulativeAverageLabel: String
+    val cumulativeCreditIndexLabel: String
+    val academicPeriodsTitle: String
+    val deadlineDaysRemaining: (Long) -> String
+    val deadlineEndingToday: String
+    val academicPeriodActiveBadge: String
+    val academicPeriodUpcomingBadge: String
+
     // Additional Messages strings
     val tapToViewFullMessage: String
     val noUnreadMessages: String
@@ -806,6 +834,34 @@ class HungarianStrings : AppStrings {
     override val expectedAverageWithGhost = "Várható átlag szellemjegyekkel"
     override val noExamsFound = "Nem található vizsgaadat."
     override val examsNotAvailableNotice = "A vizsgalista ezen az egyetemi szerveren nem elérhető, vagy nincs felvett vizsgád. (Kísérleti funkció)"
+
+    // Killer Features: Exams, Degree Progress & Deadlines
+    override val tabGrades = "Jegyek"
+    override val tabExams = "Vizsgák"
+    override val tabProgress = "Haladás"
+    override val examCountdownToday = "Ma"
+    override val examCountdownTomorrow = "Holnap"
+    override val examCountdownDays: (Long) -> String = { days -> "$days nap múlva" }
+    override val examFinished = "Lezárult"
+    override val examFilterAll = "Összes"
+    override val examFilterSignedUp = "Felvett vizsgák"
+    override val examFilterUpcoming = "Közelgő"
+    override val examinerLabel = "Oktató"
+    override val upcomingExamsDashboardTitle = "Közelgő vizsgák"
+    override val viewAllExams = "Összes vizsga"
+    override val degreeProgressTitle = "Tanulmányi előrehaladás"
+    override val compulsoryCreditsLabel = "Kötelező tárgyak"
+    override val compulsoryElectiveCreditsLabel = "Kötelezően választható"
+    override val freeElectiveCreditsLabel = "Szabadon választható"
+    override val thesisCreditsLabel = "Szakdolgozat / Diplomamunka"
+    override val criteriaLabel = "Kritériumkövetelmények"
+    override val cumulativeAverageLabel = "Halmozott súlyozott átlag"
+    override val cumulativeCreditIndexLabel = "Összesített kreditindex"
+    override val academicPeriodsTitle = "Aktuális féléves időszakok"
+    override val deadlineDaysRemaining: (Long) -> String = { days -> "Még $days nap van hátra" }
+    override val deadlineEndingToday = "Ma éjfélkor zárul!"
+    override val academicPeriodActiveBadge = "Folyamatban"
+    override val academicPeriodUpcomingBadge = "Közelgő"
 
     // Additional Messages strings
     override val tapToViewFullMessage = "Koppints a teljes üzenet megtekintéséhez..."
@@ -1223,6 +1279,34 @@ class EnglishStrings : AppStrings {
     override val noExamsFound = "No exam data found."
     override val examsNotAvailableNotice = "Exam list is either unavailable on this university server or you have no registered exams. (Experimental feature)"
 
+    // Killer Features: Exams, Degree Progress & Deadlines
+    override val tabGrades = "Grades"
+    override val tabExams = "Exams"
+    override val tabProgress = "Progress"
+    override val examCountdownToday = "Today"
+    override val examCountdownTomorrow = "Tomorrow"
+    override val examCountdownDays: (Long) -> String = { days -> "In $days days" }
+    override val examFinished = "Completed"
+    override val examFilterAll = "All"
+    override val examFilterSignedUp = "Registered"
+    override val examFilterUpcoming = "Upcoming"
+    override val examinerLabel = "Examiner"
+    override val upcomingExamsDashboardTitle = "Upcoming Exams"
+    override val viewAllExams = "All exams"
+    override val degreeProgressTitle = "Curriculum Progress"
+    override val compulsoryCreditsLabel = "Compulsory Subjects"
+    override val compulsoryElectiveCreditsLabel = "Compulsory Electives"
+    override val freeElectiveCreditsLabel = "Free Electives"
+    override val thesisCreditsLabel = "Thesis / Degree Project"
+    override val criteriaLabel = "Criterion Requirements"
+    override val cumulativeAverageLabel = "Cumulative Weighted GPA"
+    override val cumulativeCreditIndexLabel = "Cumulative Credit Index"
+    override val academicPeriodsTitle = "Current Academic Periods"
+    override val deadlineDaysRemaining: (Long) -> String = { days -> "$days days remaining" }
+    override val deadlineEndingToday = "Ends tonight at 23:59!"
+    override val academicPeriodActiveBadge = "Active"
+    override val academicPeriodUpcomingBadge = "Upcoming"
+
     // Additional Messages strings
     override val tapToViewFullMessage = "Tap to view full message..."
     override val noUnreadMessages = "No unread messages!"
@@ -1638,6 +1722,34 @@ class GermanStrings : AppStrings {
     override val expectedAverageWithGhost = "Voraussichtlicher Durchschnitt mit simulierten Noten"
     override val noExamsFound = "Keine Prüfungsdaten gefunden."
     override val examsNotAvailableNotice = "Die Prüfungsliste ist auf diesem Universitätsserver nicht verfügbar oder Sie haben keine Prüfungen angemeldet. (Experimentelle Funktion)"
+
+    // Killer Features: Exams, Degree Progress & Deadlines
+    override val tabGrades = "Noten"
+    override val tabExams = "Prüfungen"
+    override val tabProgress = "Fortschritt"
+    override val examCountdownToday = "Heute"
+    override val examCountdownTomorrow = "Morgen"
+    override val examCountdownDays: (Long) -> String = { days -> "In $days Tagen" }
+    override val examFinished = "Abgeschlossen"
+    override val examFilterAll = "Alle"
+    override val examFilterSignedUp = "Angemeldet"
+    override val examFilterUpcoming = "Bevorstehend"
+    override val examinerLabel = "Prüfer"
+    override val upcomingExamsDashboardTitle = "Bevorstehende Prüfungen"
+    override val viewAllExams = "Alle Prüfungen"
+    override val degreeProgressTitle = "Studienfortschritt"
+    override val compulsoryCreditsLabel = "Pflichtfächer"
+    override val compulsoryElectiveCreditsLabel = "Wahlpflichtfächer"
+    override val freeElectiveCreditsLabel = "Freie Wahlfächer"
+    override val thesisCreditsLabel = "Abschlussarbeit"
+    override val criteriaLabel = "Kriterienanforderungen"
+    override val cumulativeAverageLabel = "Kumulierter Notendurchschnitt"
+    override val cumulativeCreditIndexLabel = "Kumulierter Kreditindex"
+    override val academicPeriodsTitle = "Aktuelle Semesterfristen"
+    override val deadlineDaysRemaining: (Long) -> String = { days -> "Noch $days Tage verbleibend" }
+    override val deadlineEndingToday = "Endet heute um 23:59!"
+    override val academicPeriodActiveBadge = "Aktiv"
+    override val academicPeriodUpcomingBadge = "Bevorstehend"
 
     // Additional Messages strings
     override val tapToViewFullMessage = "Tippen Sie hier, um die vollständige Nachricht zu lesen..."

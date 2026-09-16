@@ -35,9 +35,12 @@ data class GradesUiState(
     val termStats: List<TermStat> = emptyList(),
     val totalCompletedCredits: Int = 0,
     val targetCredits: Int = 240,
-    val selectedTab: Int = 0, // 0 = Jegyek, 1 = Vizsgák
+    val selectedTab: Int = 0, // 0 = Jegyek, 1 = Vizsgák, 2 = Haladás
     val exams: List<ExamItem> = emptyList(),
-    val isRefreshingExams: Boolean = false
+    val isRefreshingExams: Boolean = false,
+    val examFilter: Int = 0, // 0 = Összes, 1 = Felvett, 2 = Közelgő
+    val degreeProgress: com.example.domain.model.DegreeProgress? = null,
+    val isRefreshingProgress: Boolean = false
 )
 
 class GradesViewModel(
@@ -54,9 +57,11 @@ class GradesViewModel(
     init {
         observeGrades()
         observeExams()
+        observeDegreeProgress()
         observeTargetCredits()
         refreshGrades()
         refreshExams()
+        refreshDegreeProgress()
     }
 
     private fun observeTargetCredits() {
@@ -97,6 +102,26 @@ class GradesViewModel(
             neptunRepository.getExams().collect { exams ->
                 _uiState.update { it.copy(exams = exams) }
             }
+        }
+    }
+
+    private fun observeDegreeProgress() {
+        viewModelScope.launch {
+            neptunRepository.getDegreeProgress().collect { progress ->
+                _uiState.update { it.copy(degreeProgress = progress) }
+            }
+        }
+    }
+
+    fun setExamFilter(filter: Int) {
+        _uiState.update { it.copy(examFilter = filter) }
+    }
+
+    fun refreshDegreeProgress() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isRefreshingProgress = true) }
+            neptunRepository.refreshDegreeProgress()
+            _uiState.update { it.copy(isRefreshingProgress = false) }
         }
     }
 

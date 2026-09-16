@@ -447,42 +447,110 @@ object MockNeptunDataSource {
         )
     )
 
-    fun getMockExams(): List<ExamItem> = listOf(
-        ExamItem(
-            id = "exam_1",
-            subjectName = "Mesterséges intelligencia",
-            subjectCode = "BMEVIIIM01",
-            courseCode = "V1",
-            examDate = "2027-01-15",
-            startTime = "08:00",
-            room = "IB028",
-            location = "I épület",
-            examType = "Írásbeli vizsga",
-            isSignedUp = true
-        ),
-        ExamItem(
-            id = "exam_2",
-            subjectName = "Algoritmusok és adatszerkezetek",
-            subjectCode = "BMETMTM04",
-            courseCode = "V2",
-            examDate = "2027-01-20",
-            startTime = "10:00",
-            room = "Q-II nagyelőadó",
-            location = "Q épület",
-            examType = "Írásbeli vizsga",
-            isSignedUp = true
-        ),
-        ExamItem(
-            id = "exam_3",
-            subjectName = "Adatbázisok elmélete",
-            subjectCode = "BMESZITM05",
-            courseCode = "V1",
-            examDate = "2027-01-27",
-            startTime = "14:00",
-            room = "IL102",
-            location = "I épület",
-            examType = "Szóbeli vizsga",
-            isSignedUp = false
+    fun getMockExams(): List<ExamItem> {
+        val today = java.time.LocalDate.now()
+        val d1 = today.plusDays(2).toString()
+        val d2 = today.plusDays(6).toString()
+        val d3 = today.plusDays(14).toString()
+
+        return listOf(
+            ExamItem(
+                id = "exam_1",
+                subjectName = "Mesterséges intelligencia",
+                subjectCode = "BMEVIIIM01",
+                courseCode = "V1",
+                examDate = d1,
+                startTime = "08:30",
+                room = "IB028",
+                location = "I épület",
+                examType = "Írásbeli kollokvium",
+                isSignedUp = true,
+                teacherName = "Dr. Szabó Péter",
+                applicationDeadline = today.plusDays(1).toString()
+            ),
+            ExamItem(
+                id = "exam_2",
+                subjectName = "Algoritmusok és adatszerkezetek",
+                subjectCode = "BMETMTM04",
+                courseCode = "V2",
+                examDate = d2,
+                startTime = "10:00",
+                room = "Q-II nagyelőadó",
+                location = "Q épület",
+                examType = "Írásbeli vizsga",
+                isSignedUp = true,
+                teacherName = "Dr. Németh Zoltán",
+                applicationDeadline = today.plusDays(5).toString()
+            ),
+            ExamItem(
+                id = "exam_3",
+                subjectName = "Adatbázisok elmélete",
+                subjectCode = "BMESZITM05",
+                courseCode = "V1",
+                examDate = d3,
+                startTime = "13:00",
+                room = "IL102",
+                location = "I épület",
+                examType = "Szóbeli kollokvium",
+                isSignedUp = false,
+                teacherName = "Tóth Gábor",
+                applicationDeadline = today.plusDays(13).toString()
+            )
         )
+    }
+
+    fun getMockDegreeProgress(): com.example.domain.model.DegreeProgress = com.example.domain.model.DegreeProgress(
+        completedCredits = 138,
+        totalRequiredCredits = 210,
+        compulsoryCompleted = 96,
+        compulsoryTotal = 120,
+        compulsoryElectiveCompleted = 24,
+        compulsoryElectiveTotal = 30,
+        freeElectiveCompleted = 10,
+        freeElectiveTotal = 10,
+        thesisCompleted = 0,
+        thesisTotal = 15,
+        criteriaPassedCount = 2,
+        criteriaTotalCount = 2,
+        cumulativeWeightedAverage = 4.38,
+        cumulativeCreditIndex = 4.22
     )
+
+    fun getMockAcademicPeriods(): List<com.example.domain.model.AcademicPeriod> {
+        val today = java.time.LocalDate.now()
+        return listOf(
+            com.example.domain.model.AcademicPeriod(
+                id = "per_1",
+                name = "Végleges kurzusjelentkezési időszak",
+                startDate = today.minusDays(5).toString(),
+                endDate = today.plusDays(3).toString(),
+                type = "COURSE_REG",
+                isActive = true
+            ),
+            com.example.domain.model.AcademicPeriod(
+                id = "per_2",
+                name = "Féléves bejelentkezési időszak",
+                startDate = today.minusDays(14).toString(),
+                endDate = today.plusDays(7).toString(),
+                type = "REGISTRATION",
+                isActive = true
+            ),
+            com.example.domain.model.AcademicPeriod(
+                id = "per_3",
+                name = "Térítési díjak befizetési határideje",
+                startDate = today.minusDays(10).toString(),
+                endDate = today.plusDays(12).toString(),
+                type = "FINANCE",
+                isActive = true
+            ),
+            com.example.domain.model.AcademicPeriod(
+                id = "per_4",
+                name = "Vizsgaidőszak",
+                startDate = today.plusDays(45).toString(),
+                endDate = today.plusDays(85).toString(),
+                type = "EXAM",
+                isActive = false
+            )
+        )
+    }
 }
