@@ -20,14 +20,18 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.Grading
 import androidx.compose.material.icons.filled.Mail
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Upcoming
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -41,12 +45,19 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.core.i18n.currentStrings
+import com.example.domain.model.AcademicPeriod
 import com.example.domain.model.CalendarEvent
+import com.example.domain.model.DegreeProgress
+import com.example.domain.model.ExamItem
 import com.example.presentation.navigation.NavigationItem
 import com.example.presentation.ui.components.CourseTypeBadge
 import com.example.presentation.ui.components.NeptunTopBar
 import com.example.presentation.viewmodel.DashboardUiState
+import com.example.ui.theme.NeptunBlue40
+import com.example.ui.theme.NeptunGold
 import com.example.ui.theme.NeptunGreen
+import com.example.ui.theme.NeptunPurple
+import com.example.ui.theme.NeptunRed
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
@@ -124,6 +135,25 @@ fun DashboardScreen(
                 }
             }
 
+            // Aktuális féléves időszakok & határidők
+            if (uiState.activePeriods.isNotEmpty()) {
+                item {
+                    AcademicPeriodsDashboardCard(
+                        periods = uiState.activePeriods
+                    )
+                }
+            }
+
+            // Közelgő felvett vizsga (ha van)
+            uiState.nextUpcomingExam?.let { exam ->
+                item {
+                    UpcomingExamDashboardCard(
+                        exam = exam,
+                        onOpenExams = { onNavigate(NavigationItem.GRADES) }
+                    )
+                }
+            }
+
             // Következő / zajló óra
             item {
                 NextClassCard(
@@ -162,6 +192,16 @@ fun DashboardScreen(
                         tint = if (uiState.pendingFinanceHuf > 0) MaterialTheme.colorScheme.error else NeptunGreen,
                         onClick = { onNavigate(NavigationItem.FINANCES) },
                         modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+
+            // Diploma haladás mini-kártya (ha elérhető)
+            uiState.degreeProgress?.let { progress ->
+                item {
+                    DegreeProgressMiniCard(
+                        progress = progress,
+                        onOpenProgress = { onNavigate(NavigationItem.GRADES) }
                     )
                 }
             }
@@ -436,7 +476,239 @@ private fun DashboardClassRow(event: CalendarEvent) {
 }
 
 private fun formatHuf(amount: Int): String {
-    return java.text.NumberFormat.getNumberInstance(Locale("hu", "HU")).format(amount)
+    return "%,d".format(Locale("hu"), amount).replace(',', ' ')
+}
+
+@Composable
+private fun AcademicPeriodsDashboardCard(
+    periods: List<AcademicPeriod>
+) {
+    val strings = currentStrings()
+    val activePeriod = periods.firstOrNull { it.isActive } ?: periods.firstOrNull() ?: return
+    val daysLeft = activePeriod.daysRemaining
+
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (daysLeft != null && daysLeft <= 2) {
+                MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.7f)
+            } else {
+                MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
+            }
+        ),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                shape = CircleShape,
+                color = if (daysLeft != null && daysLeft <= 2) NeptunRed.copy(alpha = 0.2f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                modifier = Modifier.size(38.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.DateRange,
+                        contentDescription = null,
+                        tint = if (daysLeft != null && daysLeft <= 2) NeptunRed else MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = if (activePeriod.isActive) NeptunGreen.copy(alpha = 0.2f) else NeptunBlue40.copy(alpha = 0.2f)
+                    ) {
+                        Text(
+                            text = if (activePeriod.isActive) strings.academicPeriodActiveBadge else strings.academicPeriodUpcomingBadge,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (activePeriod.isActive) NeptunGreen else NeptunBlue40,
+                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                        )
+                    }
+                    Text(
+                        text = strings.academicPeriodsTitle,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = activePeriod.name,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                )
+                Text(
+                    text = if (daysLeft != null && daysLeft == 0L) {
+                        strings.deadlineEndingToday
+                    } else if (daysLeft != null) {
+                        strings.deadlineDaysRemaining(daysLeft)
+                    } else {
+                        "${activePeriod.startDate} - ${activePeriod.endDate}"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (daysLeft != null && daysLeft <= 2) NeptunRed else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun UpcomingExamDashboardCard(
+    exam: ExamItem,
+    onOpenExams: () -> Unit
+) {
+    val strings = currentStrings()
+    val days = exam.daysUntilExam
+
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onOpenExams() }
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Event,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Text(
+                        text = strings.upcomingExamsDashboardTitle,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                if (days != null) {
+                    val (badgeBg, badgeFg, label) = when {
+                        days == 0L -> Triple(NeptunRed.copy(alpha = 0.15f), NeptunRed, strings.examCountdownToday)
+                        days == 1L -> Triple(NeptunGold.copy(alpha = 0.2f), NeptunGold, strings.examCountdownTomorrow)
+                        else -> Triple(NeptunBlue40.copy(alpha = 0.15f), NeptunBlue40, strings.examCountdownDays(days))
+                    }
+                    Surface(
+                        color = badgeBg,
+                        shape = RoundedCornerShape(6.dp)
+                    ) {
+                        Text(
+                            text = label,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = badgeFg,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = exam.subjectName,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            val details = listOfNotNull(
+                exam.fullDateTimeString.takeIf { it.isNotBlank() },
+                listOf(exam.room, exam.location).filter { it.isNotBlank() }.distinct().joinToString(", ").takeIf { it.isNotBlank() },
+                exam.examType.takeIf { it.isNotBlank() }
+            ).joinToString(" · ")
+
+            Text(
+                text = details,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun DegreeProgressMiniCard(
+    progress: DegreeProgress,
+    onOpenProgress: () -> Unit
+) {
+    val strings = currentStrings()
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onOpenProgress() }
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.School,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = strings.degreeProgressTitle,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+                Text(
+                    text = "${progress.completedCredits} / ${progress.totalRequiredCredits} kredit (${progress.progressPercentage}%)",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = NeptunGreen
+                )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            LinearProgressIndicator(
+                progress = { progress.progressFraction },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(6.dp)
+                    .clip(RoundedCornerShape(3.dp)),
+                color = NeptunGreen,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+        }
+    }
 }
 
 private fun formatShort(amount: Int): String {

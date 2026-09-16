@@ -192,7 +192,7 @@ enum class TwoFactorMethod(val displayName: String) {
     TOTP("Hitelesítő App (TOTP)")
 }
 
-/** Vizsgaelem a Neptun vizsgalista oldaláról (kísérleti támogatás). */
+/** Vizsgaelem a Neptun vizsgalista oldaláról. */
 data class ExamItem(
     val id: String,
     val subjectName: String,
@@ -203,8 +203,74 @@ data class ExamItem(
     val room: String = "",
     val location: String = "",
     val examType: String = "",
-    val isSignedUp: Boolean = true
-)
+    val isSignedUp: Boolean = true,
+    val teacherName: String = "",
+    val applicationDeadline: String = ""
+) {
+    val fullDateTimeString: String
+        get() = if (startTime.isNotBlank()) "$examDate $startTime" else examDate
+
+    val daysUntilExam: Long?
+        get() {
+            if (examDate.isBlank()) return null
+            return try {
+                val cleanDate = examDate.replace(".", "-").trim().take(10)
+                val parsed = java.time.LocalDate.parse(cleanDate)
+                java.time.temporal.ChronoUnit.DAYS.between(java.time.LocalDate.now(), parsed)
+            } catch (e: Exception) {
+                null
+            }
+        }
+}
+
+@kotlinx.serialization.Serializable
+data class DegreeProgress(
+    val completedCredits: Int = 0,
+    val totalRequiredCredits: Int = 210,
+    val compulsoryCompleted: Int = 0,
+    val compulsoryTotal: Int = 120,
+    val compulsoryElectiveCompleted: Int = 0,
+    val compulsoryElectiveTotal: Int = 30,
+    val freeElectiveCompleted: Int = 0,
+    val freeElectiveTotal: Int = 10,
+    val thesisCompleted: Int = 0,
+    val thesisTotal: Int = 15,
+    val criteriaPassedCount: Int = 0,
+    val criteriaTotalCount: Int = 2,
+    val cumulativeWeightedAverage: Double = 0.0,
+    val cumulativeCreditIndex: Double = 0.0
+) {
+    val progressFraction: Float
+        get() = if (totalRequiredCredits > 0) {
+            (completedCredits.toFloat() / totalRequiredCredits.toFloat()).coerceIn(0f, 1f)
+        } else 0f
+
+    val progressPercentage: Int
+        get() = (progressFraction * 100).toInt()
+}
+
+@kotlinx.serialization.Serializable
+data class AcademicPeriod(
+    val id: String,
+    val name: String,
+    val startDate: String,
+    val endDate: String,
+    val type: String = "", // e.g. "REGISTRATION", "COURSE_REG", "EXAM", "EDUCATION", "BREAK"
+    val isActive: Boolean = true
+) {
+    val daysRemaining: Long?
+        get() {
+            if (endDate.isBlank()) return null
+            return try {
+                val cleanDate = endDate.replace(".", "-").trim().take(10)
+                val parsed = java.time.LocalDate.parse(cleanDate)
+                val diff = java.time.temporal.ChronoUnit.DAYS.between(java.time.LocalDate.now(), parsed)
+                diff.coerceAtLeast(0)
+            } catch (e: Exception) {
+                null
+            }
+        }
+}
 
 data class FinanceItem(
     val id: String,
@@ -216,3 +282,4 @@ data class FinanceItem(
     val paymentDate: String? = null,
     val transactionId: String = ""
 )
+

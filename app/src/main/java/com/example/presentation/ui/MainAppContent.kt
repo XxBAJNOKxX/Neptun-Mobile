@@ -401,8 +401,10 @@ private fun MainDashboard(
                             onSetGhostGrade = gradesViewModel::setGhostGrade,
                             onResetAllGhostGrades = gradesViewModel::resetAllGhostGrades,
                             onTabSelect = gradesViewModel::selectTab,
+                            onExamFilterChange = gradesViewModel::setExamFilter,
                             onRefresh = gradesViewModel::refreshGrades,
-                            onRefreshExams = gradesViewModel::refreshExams
+                            onRefreshExams = gradesViewModel::refreshExams,
+                            onRefreshProgress = gradesViewModel::refreshDegreeProgress
                         )
 
                         NavigationItem.MESSAGES -> MessagesScreen(

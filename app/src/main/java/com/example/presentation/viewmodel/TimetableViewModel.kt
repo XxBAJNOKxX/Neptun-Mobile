@@ -165,7 +165,39 @@ class TimetableViewModel(
 
     private fun observeCalendar() {
         viewModelScope.launch {
-            neptunRepository.getCalendarEvents().collect { events ->
+            kotlinx.coroutines.flow.combine(
+                neptunRepository.getCalendarEvents(),
+                neptunRepository.getExams()
+            ) { classEvents, exams ->
+                val examEvents = exams.filter { it.isSignedUp && it.examDate.isNotBlank() }.mapNotNull { exam ->
+                    try {
+                        val cleanDate = exam.examDate.replace(".", "-").trim().take(10)
+                        val parsed = LocalDate.parse(cleanDate)
+                        val startParts = exam.startTime.split(":")
+                        val startH = startParts.getOrNull(0)?.toIntOrNull() ?: 8
+                        val startM = startParts.getOrNull(1)?.toIntOrNull() ?: 0
+                        CalendarEvent(
+                            id = "exam_event_${exam.id}",
+                            subjectName = exam.subjectName,
+                            subjectCode = exam.subjectCode,
+                            courseCode = exam.examType.ifEmpty { "Vizsga" },
+                            location = exam.location,
+                            room = exam.room,
+                            teacherName = exam.teacherName,
+                            startHour = startH,
+                            startMinute = startM,
+                            endHour = (startH + 2).coerceAtMost(23),
+                            endMinute = startM,
+                            dayOfWeek = parsed.dayOfWeek.value,
+                            courseType = com.example.domain.model.CourseType.EXAM,
+                            dateString = cleanDate
+                        )
+                    } catch (e: Exception) {
+                        null
+                    }
+                }
+                classEvents + examEvents
+            }.collect { events ->
                 updateOngoingAndUpcoming(events)
             }
         }

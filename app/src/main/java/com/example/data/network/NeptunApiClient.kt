@@ -2623,33 +2623,43 @@ class NeptunApiClient {
         }
 
         val modernPaths = listOf(
+            "/api/Exams/GetExamsOverviewData",
             "/api/Exam/GetExams",
             "/api/Student/GetExams",
-            "/api/Exams/GetExams"
+            "/api/Exams/GetExams",
+            "/api/Exams/GetExamTerms"
         )
-        for (path in modernPaths) {
-            try {
-                val reqBuilder = Request.Builder()
-                    .url("$baseUrl$path")
-                    .get()
-                    .addHeader("Authorization", "Bearer $token")
-                    .addHeader("Accept", "application/json, text/plain, */*")
-                    .addHeader("Content-Type", "application/json")
+        val candidateBaseUrls = if (baseUrl.contains("hallgato2_uj", ignoreCase = true)) {
+            listOf(baseUrl, baseUrl.replace("hallgato2_uj", "hallgato2_api", ignoreCase = true)).distinct()
+        } else {
+            listOf(baseUrl)
+        }
 
-                if (deviceCookie.isNotBlank()) {
-                    reqBuilder.addHeader("Cookie", deviceCookie)
-                }
+        for (base in candidateBaseUrls) {
+            for (path in modernPaths) {
+                try {
+                    val reqBuilder = Request.Builder()
+                        .url("$base$path")
+                        .get()
+                        .addHeader("Authorization", "Bearer $token")
+                        .addHeader("Accept", "application/json, text/plain, */*")
+                        .addHeader("Content-Type", "application/json")
 
-                val resp = okHttpClient.newCall(reqBuilder.build()).execute()
-                if (resp.code == 401 || resp.code == 403 || !resp.isSuccessful) {
-                    continue
+                    if (deviceCookie.isNotBlank()) {
+                        reqBuilder.addHeader("Cookie", deviceCookie)
+                    }
+
+                    val resp = okHttpClient.newCall(reqBuilder.build()).execute()
+                    if (resp.code == 401 || resp.code == 403 || !resp.isSuccessful) {
+                        continue
+                    }
+                    val body = resp.body?.string() ?: ""
+                    val parsed = safeParseJson(body) ?: continue
+                    val items = parseExamItems(parsed)
+                    if (items.isNotEmpty()) return@withContext items
+                } catch (e: Exception) {
+                    Log.e(tag, "Modern exams fetch error ($path): ${e.message}")
                 }
-                val body = resp.body?.string() ?: ""
-                val parsed = safeParseJson(body) ?: continue
-                val items = parseExamItems(parsed)
-                if (items.isNotEmpty()) return@withContext items
-            } catch (e: Exception) {
-                Log.e(tag, "Modern exams fetch error ($path): ${e.message}")
             }
         }
 
@@ -2719,6 +2729,14 @@ class NeptunApiClient {
                         obj,
                         "examType", "ExamType", "examTypeName", "vizsgaTipus", "VizsgaTipus", "type"
                     ) ?: ""
+                    val teacherName = firstNonBlank(
+                        obj,
+                        "teacherName", "TeacherName", "examiner", "Examiner", "oktato", "Oktato", "vizsgaztato", "Vizsgaztato", "lecturer"
+                    ) ?: ""
+                    val deadline = firstNonBlank(
+                        obj,
+                        "deadline", "Deadline", "applicationDeadline", "ApplicationDeadline", "lejarat", "jelentkezesHatarido"
+                    ) ?: ""
 
                     val (examDate, startTime) = normalizeExamDateTime(dateRaw, timeRaw)
                     val isSignedUp = obj["isSignedUp"]?.jsonPrimitive?.booleanOrNull
@@ -2737,7 +2755,9 @@ class NeptunApiClient {
                             room = room,
                             location = location,
                             examType = examType,
-                            isSignedUp = isSignedUp
+                            isSignedUp = isSignedUp,
+                            teacherName = teacherName,
+                            applicationDeadline = deadline
                         )
                     )
                 }
@@ -3116,5 +3136,215 @@ class NeptunApiClient {
             }
         }
         return trimmed
+    }
+
+    suspend fun getDegreeProgress(
+        baseUrl: String,
+        token: String,
+        trainingId: String? = null,
+        deviceCookie: String = ""
+    ): com.example.domain.model.DegreeProgress? = withContext(Dispatchers.IO) {
+        val candidateBaseUrls = if (baseUrl.contains("hallgato2_uj", ignoreCase = true)) {
+            listOf(baseUrl, baseUrl.replace("hallgato2_uj", "hallgato2_api", ignoreCase = true)).distinct()
+        } else {
+            listOf(baseUrl)
+        }
+
+        val paths = listOf(
+            "/api/Studies/GetAdvancementData",
+            "/api/Studies/GetCurriculumProgress",
+            "/api/Student/GetAdvancementData"
+        )
+
+        for (base in candidateBaseUrls) {
+            for (path in paths) {
+                try {
+                    val url = if (!trainingId.isNullOrBlank()) "$base$path?studentTrainingId=$trainingId" else "$base$path"
+                    val req = Request.Builder()
+                        .url(url)
+                        .get()
+                        .addHeader("Authorization", "Bearer $token")
+                        .addHeader("Accept", "application/json, text/plain, */*")
+                    if (deviceCookie.isNotBlank()) req.addHeader("Cookie", deviceCookie)
+
+                    val resp = okHttpClient.newCall(req.build()).execute()
+                    if (resp.isSuccessful) {
+                        val body = resp.body?.string() ?: ""
+                        val parsed = safeParseJson(body)
+                        if (parsed != null) {
+                            val progress = parseDegreeProgress(parsed)
+                            if (progress != null) return@withContext progress
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.d(tag, "getDegreeProgress error ($path): ${e.message}")
+                }
+            }
+        }
+        null
+    }
+
+    private fun parseDegreeProgress(root: JsonElement): com.example.domain.model.DegreeProgress? {
+        try {
+            val rootObj = (root as? JsonObject) ?: (root as? JsonArray)?.firstOrNull() as? JsonObject ?: return null
+            val dataObj = rootObj["data"]?.jsonObject ?: rootObj
+
+            var completed = 0
+            var total = 210
+            var compulsoryCompleted = 0
+            var compulsoryTotal = 120
+            var electiveCompleted = 0
+            var electiveTotal = 30
+            var freeCompleted = 0
+            var freeTotal = 10
+
+            dataObj["completedCredits"]?.jsonPrimitive?.intOrNull?.let { completed = it }
+            dataObj["totalRequiredCredits"]?.jsonPrimitive?.intOrNull?.let { total = it }
+
+            val modulesArray = dataObj["modules"]?.jsonArray
+                ?: dataObj["items"]?.jsonArray
+                ?: dataObj["advancementDetails"]?.jsonArray
+
+            modulesArray?.forEach { modElem ->
+                val mod = modElem as? JsonObject ?: return@forEach
+                val name = (mod["name"] ?: mod["title"] ?: mod["moduleName"])?.jsonPrimitive?.contentOrNull?.lowercase() ?: ""
+                val comp = mod["completedCredits"]?.jsonPrimitive?.intOrNull ?: 0
+                val req = mod["requiredCredits"]?.jsonPrimitive?.intOrNull ?: 0
+
+                when {
+                    name.contains("kötelező") && !name.contains("választható") -> {
+                        compulsoryCompleted = comp
+                        compulsoryTotal = if (req > 0) req else compulsoryTotal
+                    }
+                    name.contains("kötelezően") || name.contains("köt. vál") -> {
+                        electiveCompleted = comp
+                        electiveTotal = if (req > 0) req else electiveTotal
+                    }
+                    name.contains("szabad") -> {
+                        freeCompleted = comp
+                        freeTotal = if (req > 0) req else freeTotal
+                    }
+                }
+            }
+
+            if (completed == 0 && (compulsoryCompleted > 0 || electiveCompleted > 0 || freeCompleted > 0)) {
+                completed = compulsoryCompleted + electiveCompleted + freeCompleted
+            }
+
+            val cumAvg = dataObj["cumulativeWeightedAverage"]?.jsonPrimitive?.doubleOrNull
+                ?: dataObj["weightedAverage"]?.jsonPrimitive?.doubleOrNull ?: 0.0
+            val cumIndex = dataObj["cumulativeCreditIndex"]?.jsonPrimitive?.doubleOrNull
+                ?: dataObj["creditIndex"]?.jsonPrimitive?.doubleOrNull ?: 0.0
+
+            return com.example.domain.model.DegreeProgress(
+                completedCredits = completed,
+                totalRequiredCredits = if (total > 0) total else 210,
+                compulsoryCompleted = compulsoryCompleted,
+                compulsoryTotal = compulsoryTotal,
+                compulsoryElectiveCompleted = electiveCompleted,
+                compulsoryElectiveTotal = electiveTotal,
+                freeElectiveCompleted = freeCompleted,
+                freeElectiveTotal = freeTotal,
+                thesisCompleted = 0,
+                thesisTotal = 15,
+                criteriaPassedCount = 2,
+                criteriaTotalCount = 2,
+                cumulativeWeightedAverage = cumAvg,
+                cumulativeCreditIndex = cumIndex
+            )
+        } catch (e: Exception) {
+            Log.e(tag, "parseDegreeProgress error: ${e.message}")
+            return null
+        }
+    }
+
+    suspend fun getAcademicPeriods(
+        baseUrl: String,
+        token: String,
+        deviceCookie: String = ""
+    ): List<com.example.domain.model.AcademicPeriod> = withContext(Dispatchers.IO) {
+        val candidateBaseUrls = if (baseUrl.contains("hallgato2_uj", ignoreCase = true)) {
+            listOf(baseUrl, baseUrl.replace("hallgato2_uj", "hallgato2_api", ignoreCase = true)).distinct()
+        } else {
+            listOf(baseUrl)
+        }
+
+        val paths = listOf(
+            "/api/Informations/GetPeriodsGridData",
+            "/api/Information/GetPeriodsGridData",
+            "/api/Periods/GetPeriodsGridData"
+        )
+
+        for (base in candidateBaseUrls) {
+            for (path in paths) {
+                try {
+                    val req = Request.Builder()
+                        .url("$base$path")
+                        .get()
+                        .addHeader("Authorization", "Bearer $token")
+                        .addHeader("Accept", "application/json, text/plain, */*")
+                    if (deviceCookie.isNotBlank()) req.addHeader("Cookie", deviceCookie)
+
+                    val resp = okHttpClient.newCall(req.build()).execute()
+                    if (resp.isSuccessful) {
+                        val body = resp.body?.string() ?: ""
+                        val parsed = safeParseJson(body)
+                        if (parsed != null) {
+                            val list = parseAcademicPeriods(parsed)
+                            if (list.isNotEmpty()) return@withContext list
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.d(tag, "getAcademicPeriods error ($path): ${e.message}")
+                }
+            }
+        }
+        emptyList()
+    }
+
+    private fun parseAcademicPeriods(root: JsonElement): List<com.example.domain.model.AcademicPeriod> {
+        val results = mutableListOf<com.example.domain.model.AcademicPeriod>()
+        try {
+            val arraysToCheck = mutableListOf<JsonArray>()
+            collectArrays(root, arraysToCheck, depth = 0)
+            val today = java.time.LocalDate.now()
+
+            for (array in arraysToCheck) {
+                for (elem in array) {
+                    val obj = elem as? JsonObject ?: continue
+                    val name = firstNonBlank(obj, "periodName", "PeriodName", "name", "Name", "description", "title") ?: continue
+                    if (name.length < 3) continue
+
+                    val startRaw = firstNonBlank(obj, "startDate", "StartDate", "start", "kezdes", "from") ?: ""
+                    val endRaw = firstNonBlank(obj, "endDate", "EndDate", "end", "vege", "to") ?: ""
+                    val type = firstNonBlank(obj, "type", "Type", "periodType", "PeriodType", "kategoria") ?: ""
+
+                    val startClean = startRaw.take(10).replace(".", "-")
+                    val endClean = endRaw.take(10).replace(".", "-")
+
+                    val isActive = try {
+                        val start = java.time.LocalDate.parse(startClean)
+                        val end = java.time.LocalDate.parse(endClean)
+                        !today.isBefore(start) && !today.isAfter(end)
+                    } catch (e: Exception) {
+                        true
+                    }
+
+                    results.add(
+                        com.example.domain.model.AcademicPeriod(
+                            id = firstNonBlank(obj, "id", "Id", "periodId") ?: "period_${name.hashCode()}",
+                            name = name,
+                            startDate = startRaw,
+                            endDate = endRaw,
+                            type = type,
+                            isActive = isActive
+                        )
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "parseAcademicPeriods error: ${e.message}")
+        }
+        return results.distinctBy { it.id }
     }
 }

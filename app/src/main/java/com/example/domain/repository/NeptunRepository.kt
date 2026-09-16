@@ -13,6 +13,8 @@ interface NeptunRepository {
     fun getMessages(): Flow<List<NeptunMessage>>
     fun getFinances(): Flow<List<FinanceItem>>
     fun getExams(): Flow<List<ExamItem>>
+    fun getDegreeProgress(): Flow<com.example.domain.model.DegreeProgress?>
+    fun getAcademicPeriods(): Flow<List<com.example.domain.model.AcademicPeriod>>
 
     suspend fun syncAllData(neptunCode: String, sessionToken: String): Result<Unit>
     suspend fun refreshCalendar(): Result<Unit>
@@ -20,6 +22,8 @@ interface NeptunRepository {
     suspend fun refreshMessages(): Result<Unit>
     suspend fun refreshFinances(): Result<Unit>
     suspend fun refreshExams(): Result<Unit>
+    suspend fun refreshDegreeProgress(): Result<Unit>
+    suspend fun refreshAcademicPeriods(): Result<Unit>
 
     suspend fun setGhostGrade(subjectId: String, ghostGrade: Int?)
     suspend fun resetAllGhostGrades()

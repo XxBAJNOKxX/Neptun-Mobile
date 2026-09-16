@@ -3,7 +3,10 @@ package com.example.presentation.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.domain.model.AcademicPeriod
 import com.example.domain.model.CalendarEvent
+import com.example.domain.model.DegreeProgress
+import com.example.domain.model.ExamItem
 import com.example.domain.model.FinanceItem
 import com.example.domain.model.FinanceStatus
 import com.example.domain.model.NeptunMessage
@@ -30,7 +33,11 @@ data class DashboardUiState(
     val pendingFinanceHuf: Int = 0,
     val nextDueFinance: FinanceItem? = null,
     val isRefreshing: Boolean = false,
-    val greeting: String = ""
+    val greeting: String = "",
+    val upcomingExams: List<ExamItem> = emptyList(),
+    val nextUpcomingExam: ExamItem? = null,
+    val activePeriods: List<AcademicPeriod> = emptyList(),
+    val degreeProgress: DegreeProgress? = null
 )
 
 class DashboardViewModel(
@@ -84,6 +91,34 @@ class DashboardViewModel(
                         pendingFinanceHuf = pending.sumOf { item -> item.amountHuf },
                         nextDueFinance = pending.minByOrNull { item -> item.dueDate }
                     )
+                }
+            }
+        }
+        viewModelScope.launch {
+            neptunRepository.getExams().collect { exams ->
+                val upcoming = exams
+                    .filter { it.isSignedUp && (it.daysUntilExam ?: 0) >= 0 }
+                    .sortedBy { it.examDate + " " + it.startTime }
+                _uiState.update {
+                    it.copy(
+                        upcomingExams = upcoming,
+                        nextUpcomingExam = upcoming.firstOrNull()
+                    )
+                }
+            }
+        }
+        viewModelScope.launch {
+            neptunRepository.getAcademicPeriods().collect { periods ->
+                val activeOrUpcoming = periods.filter { it.isActive || (it.daysRemaining ?: -1) >= 0 }
+                _uiState.update {
+                    it.copy(activePeriods = activeOrUpcoming)
+                }
+            }
+        }
+        viewModelScope.launch {
+            neptunRepository.getDegreeProgress().collect { progress ->
+                _uiState.update {
+                    it.copy(degreeProgress = progress)
                 }
             }
         }
