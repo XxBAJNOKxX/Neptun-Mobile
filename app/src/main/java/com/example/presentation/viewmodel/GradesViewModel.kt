@@ -192,7 +192,7 @@ class GradesViewModel(
     }
 
     fun selectTab(tab: Int) {
-        _uiState.update { it.copy(selectedTab = tab.coerceIn(0, 1)) }
+        _uiState.update { it.copy(selectedTab = tab.coerceIn(0, 2)) }
     }
 
     fun openGhostMarkDialog(subject: SubjectGrade) {
