@@ -16,22 +16,26 @@ import javax.net.ssl.X509TrustManager
 /**
  * SSL/TLS segédosztály régebbi Android verziókhoz (pl. Android 11 és korábbiak).
  *
- * Sok magyar felsőoktatási intézmény (pl. ELTE, GEANT hálózat tagjai) a HARICA és GEANT
- * 2021-es és újabb kiadású gyökértanúsítványait (Root CA) használja.
+ * Sok magyar felsőoktatási intézmény (pl. ELTE, BME, Corvinus, Debrecen, Pécs, Szeged stb. - GEANT tagok)
+ * a HARICA és GEANT 2021-es és újabb kiadású gyökértanúsítványait (Root CA) használja.
  * Régebbi Android rendszereken (mint pl. a frissítéseket már nem kapó Xiaomi Redmi Note 8 Android 11-gyel)
  * ezek a modern CA tanúsítványok hiányoznak a beépített rendszer tanúsítványtárból, ami miatt
  * "Trust anchor for certification path not found" hiba keletkezik.
  *
- * Ez az osztály a rendszer alapértelmezett tanúsítványai mellé biztonságosan betölti
- * a hivatalos akadémiai (HARICA / GEANT) és egyéb modern gyökértanúsítványokat,
- * valamint kezeli a felhasználói tanúsítványokat is (pl. egyetemi VPN-ek esetén).
+ * Ez az osztály a rendszer alapértelmezett tanúsítványai mellé biztonságosan betölti:
+ *  - HARICA TLS RSA Root CA 2021 & HARICA TLS ECC Root CA 2021
+ *  - GEANT TLS RSA 1 & GEANT TLS ECC 1 (közbenső CA-k)
+ *  - e-Szignó OV TLS CA 2023 (link cert a 2009-es megbízható Microsec gyökérhez)
+ *  - Sectigo Public Server Authentication CA OV R36 (Semmelweis University)
+ *  - Let's Encrypt ISRG Root X1 & ISRG Root X2
+ * Valamint dedikáltan kezeli az Android felhasználói tanúsítványtárát (AndroidCAStore - pl. AdGuard, VPN-ek esetén).
  */
 object SslTrustHelper {
 
     private const val TAG = "SslTrustHelper"
 
     private val BUNDLED_CERTIFICATES = listOf(
-        // HARICA TLS RSA Root CA 2021
+        // 1. HARICA TLS RSA Root CA 2021 (ELTE, BME, Corvinus, Debreceni Egyetem, PTE, SZTE stb.)
         """
         -----BEGIN CERTIFICATE-----
         MIIFpDCCA4ygAwIBAgIQOcqTHO9D88aOk8f0ZIk4fjANBgkqhkiG9w0BAQsFADBs
@@ -68,7 +72,7 @@ object SslTrustHelper {
         -----END CERTIFICATE-----
         """.trimIndent(),
 
-        // HARICA TLS ECC Root CA 2021
+        // 2. HARICA TLS ECC Root CA 2021
         """
         -----BEGIN CERTIFICATE-----
         MIICVDCCAdugAwIBAgIQZ3SdjXfYO2rbIvT/WeK/zjAKBggqhkjOPQQDAzBsMQsw
@@ -87,7 +91,138 @@ object SslTrustHelper {
         -----END CERTIFICATE-----
         """.trimIndent(),
 
-        // ISRG Root X1 (Let's Encrypt Root)
+        // 3. GEANT TLS RSA 1 (közbenső CA az ELTE / GEANT intézményekhez)
+        """
+        -----BEGIN CERTIFICATE-----
+        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
+        3RfjV9IaUQGJ
+        -----END CERTIFICATE-----
+        """.trimIndent(),
+
+        // 4. GEANT TLS ECC 1 (közbenső ECC CA)
+        """
+        -----BEGIN CERTIFICATE-----
+        MIIDNzCCArygAwIBAgIQQv3c4SYWB+Gl5pNaQAFh3TAKBggqhkjOPQQDAzBsMQsw
+        CQYDVQQGEwJHUjE3MDUGA1UECgwuSGVsbGVuaWMgQWNhZGVtaWMgYW5kIFJlc2Vh
+        cmNoIEluc3RpdHV0aW9ucyBDQTEkMCIGA1UEAwwbSEFSSUNBIFRMUyBFQ0MgUm9v
+        dCBDQSAyMDIxMB4XDTI1MDEwMzExMTQyMVoXDTM5MTIzMTExMTQyMFowYDELMAkG
+        A1UEBhMCR1IxNzA1BgNVBAoMLkhlbGxlbmljIEFjYWRlbWljIGFuZCBSZXNlYXJj
+        aCBJbnN0aXR1dGlvbnMgQ0ExGDAWBgNVBAMMD0dFQU5UIFRMUyBFQ0MgMTB2MBAG
+        ByqGSM49AgEGBSuBBAAiA2IABANPWLwh0Za2UqtbLV7/qNRm78zsttgSuvhn73bU
+        GtxETsVOEZeMUfMjgHw8EwrsSJI9oj0CgZQFFSEY1NJfcxA/NJiOYJUKPsFbpOrY
+        dr0q4g+aBZsXWeh7bMCzx24g/aOCAS0wggEpMBIGA1UdEwEB/wQIMAYBAf8CAQAw
+        HwYDVR0jBBgwFoAUyRtTgRL+BNUW0aq8mm+3oJUZbsowTQYIKwYBBQUHAQEEQTA/
+        MD0GCCsGAQUFBzAChjFodHRwOi8vY3J0LmhhcmljYS5nci9IQVJJQ0EtVExTLVJv
+        b3QtMjAyMS1FQ0MuY2VyMBEGA1UdIAQKMAgwBgYEVR0gADAdBgNVHSUEFjAUBggr
+        BgEFBQcDAgYIKwYBBQUHAwEwQgYDVR0fBDswOTA3oDWgM4YxaHR0cDovL2NybC5o
+        YXJpY2EuZ3IvSEFSSUNBLVRMUy1Sb290LTIwMjEtRUNDLmNybDAdBgNVHQ4EFgQU
+        6ZkGjRcfq/uWGlrIW15dXuzanI8wDgYDVR0PAQH/BAQDAgGGMAoGCCqGSM49BAMD
+        A2kAMGYCMQD2M1caaY2OwmthgmANUQg3LBLI0/2LiCdxa2zNq0G59wVzbjEk0cR/
+        px52OegIwRACMQCk+iTmBlR6Xfv6igiiaFiPYfN2HfbcYLWbot5DZ2H1b4JVJV+V
+        rga7uu50SDG9hf4=
+        -----END CERTIFICATE-----
+        """.trimIndent(),
+
+        // 5. e-Szigno OV TLS CA 2023 (link cert a megbízható 2009-es gyökérhez: Milton Friedman, Szent Atanáz stb.)
+        """
+        -----BEGIN CERTIFICATE-----
+        MIID8zCCAtugAwIBAgINASJg+EN4eqPPomYxCjANBgkqhkiG9w0BAQsFADCBgjEL
+        MAkGA1UEBhMCSFUxETAPBgNVBAcMCEJ1ZGFwZXN0MRYwFAYDVQQKDA1NaWNyb3Nl
+        YyBMdGQuMScwJQYDVQQDDB5NaWNyb3NlYyBlLVN6aWdubyBSb290IENBIDIwMDkx
+        HzAdBgkqhkiG9w0BCQEWEGluZm9AZS1zemlnbm8uaHUwHhcNMjUwMjEyMTEwMDAw
+        WhcNMjgwMjEyMTA1OTU5WjBzMQswCQYDVQQGEwJIVTERMA8GA1UEBwwIQnVkYXBl
+        c3QxFjAUBgNVBAoMDU1pY3Jvc2VjIEx0ZC4xFzAVBgNVBGEMDlZBVEhVLTIzNTg0
+        NDk3MSAwHgYDVQQDDBdlLVN6aWdubyBPViBUTFMgQ0EgMjAyMzBZMBMGByqGSM49
+        AgEGCCqGSM49AwEHA0IABDObs48j6qr+cBX/mjgF9SY9touVURYdTGHti3k3YFK2
+        qoqGD8KwnWo5e86ZOPQ+h90Q7gw+pkG3DolPx7kBnoCjggE/MIIBOzAPBgNVHRMB
+        Af8EBTADAQH/MA4GA1UdDwEB/wQEAwIBBjAdBgNVHSUEFjAUBggrBgEFBQcDAQYI
+        KwYBBQUHAwIwEQYDVR0gBAowCDAGBgRVHSAAMB0GA1UdDgQWBBSpRZ7VE5qyYBmh
+        mYRElgCXFduBADAfBgNVHSMEGDAWgBTLD8bfQkPMPcu1SCOhGnqmKrs0aDA2BgNV
+        HR8ELzAtMCugKaAnhiVodHRwOi8vY3JsLmUtc3ppZ25vLmh1L3Jvb3RjYTIwMDku
+        Y3JsMG4GCCsGAQUFBwEBBGIwYDArBggrBgEFBQcwAYYfaHR0cDovL3Jvb3RvY3Nw
+MjAwOS5lLXN6aWduby5odTAxBggrBgEFBQcwAoYlaHR0cDovL3d3dy5lLXN6aWdu
+        by5odS9yb290Y2EyMDA5LmNydDANBgkqhkiG9w0BAQsFAAOCAQEAqRCti4sBtsfg
+        208/VH+n1acVdCSniN9pkZWaiHsQZtp/lEsdrLX/53RVv2GtrFybVC28boznNiOd
+        NSgNwQ9SBpgMn94uWcZCiSaK5DzajULn07Wd9/oeAdrp9etH0Q6e6mwtrDD+povu
+        kNz2V4Cij55LX35twOoV/r5o273EBbj6K+kmz+EIk/5ojx0QZT5fGGHVLkAwIGu5
+        5IVsMGAP7V+mLFiXUQd7QwiC1MkMDrYquKKeC7RxnUwFpD6NdUQx8+VhS0MkzyR9
+        KfC2AIgXlWeSQ1YtmW2xSw2tVij6omObtM2/S3D82735ANlfGuywbV4vKXx5lWFz
+        67cJ5ns5UQ==
+        -----END CERTIFICATE-----
+        """.trimIndent(),
+
+        // 6. Sectigo Public Server Authentication CA OV R36 (Semmelweis University)
+        """
+        -----BEGIN CERTIFICATE-----
+        MIIGTDCCBDSgAwIBAgIQLBo8dulD3d3/GRsxiQrtcTANBgkqhkiG9w0BAQwFADBf
+        MQswCQYDVQQGEwJHQjEYMBYGA1UEChMPU2VjdGlnbyBMaW1pdGVkMTYwNAYDVQQD
+        Ey1TZWN0aWdvIFB1YmxpYyBTZXJ2ZXIgQXV0aGVudGljYXRpb24gUm9vdCBSNDYw
+        HhcNMjEwMzIyMDAwMDAwWhcNMzYwMzIxMjM1OTU5WjBgMQswCQYDVQQGEwJHQjEY
+        MBYGA1UEChMPU2VjdGlnbyBMaW1pdGVkMTcwNQYDVQQDEy5TZWN0aWdvIFB1Ymxp
+        YyBTZXJ2ZXIgQXV0aGVudGljYXRpb24gQ0EgT1YgUjM2MIIBojANBgkqhkiG9w0B
+        AQEFAAOCAY8AMIIBigKCAYEApkMtJ3R06jo0fceI0M52B7K+TyMeGcv2BQ5AVc3j
+        lYt76TvHIu/nNe22W/RJXX9rWUD/2GE6GF5x0V4bsY7K3IeJ8E7+KzG/TGboySfD
+        u+F52jqQBbY62ofhYjMeiAbLI02+FqwHeM8uIrUtcX8b2RCxF358TB0NHVccAXZc
+        FYgZndZCeXxjuca7pJJ20LLUnXtgXcjAE1vY4WvbReW0W6mkeZyNGdmpTcFs5Y+s
+        yy6LtE5Zocji9J9NlNnReox2RWVyEXpA1ChZ4gqN+ZpVSIQ0HBorVFbBKyhdZyEX
+        gZgNSNtBRwxqwIzJePJhYd4ZUhO1vk+/uP3nwDk0p95q/j7naXNCSvESnrHPypaB
+        WRK066nKfPRPi9m9kIOhMdYfS8giFRTcdgL24Ycilj7ecAK9Trh0VbjwouJ4WH+x
+        bt47u68ZFCD/ac55I0DNHkCpaPruj6e9Rmr7K46wZDAYXuEAqB7tGG/jd6JAA+H2
+        O44CV98NRsU213f1kScIZntNAgMBAAGjggGBMIIBfTAfBgNVHSMEGDAWgBRWc1hk
+        lfmSGrASKgRieaFAFYghSTAdBgNVHQ4EFgQU42Z0u3BojSxdTg6mSo+bNyKcgpIw
+        DgYDVR0PAQH/BAQDAgGGMBIGA1UdEwEB/wQIMAYBAf8CAQAwHQYDVR0lBBYwFAYI
+        KwYBBQUHAwEGCCsGAQUFBwMCMBsGA1UdIAQUMBIwBgYEVR0gADAIBgZngQwBAgIw
+        VAYDVR0fBE0wSzBJoEegRYZDaHR0cDovL2NybC5zZWN0aWdvLmNvbS9TZWN0aWdv
+        UHVibGljU2VydmVyQXV0aGVudGljYXRpb25Sb290UjQ2LmNybDCBhAYIKwYBBQUH
+        AQEEeDB2ME8GCCsGAQUFBzAChkNodHRwOi8vY3J0LnNlY3RpZ28uY29tL1NlY3Rp
+        Z29QdWJsaWNTZXJ2ZXJBdXRoZW50aWNhdGlvblJvb3RSNDYucDdjMCMGCCsGAQUF
+        BzABhhdodHRwOi8vb2NzcC5zZWN0aWdvLmNvbTANBgkqhkiG9w0BAQwFAAOCAgEA
+        BZXWDHWC3cubb/e1I1kzi8lPFiK/ZUoH09ufmVOrc5ObYH/XKkWUexSPqRkwKFKr
+        7r8OuG+p7VNB8rifX6uopqKAgsvZtZsq7iAFw04To6vNcxeBt1Eush3cQ4b8nbQR
+        MQLChgEAqwhuXp9P48T4QEBSksYav7+aFjNySsLYlPzNqVM3RNwvBdvp6vgDtGwc
+        xlKQZVuuNVIaoYyls8swhxDeSHKpRdxRauTLZ+pl+wGvy0pnrLEJGSz9mOEmfbod
+        e/XopR2NGqaHJ6bIjyxPu6UtyQGI26En7UAEozACrHz06Nx2jTAY9E6NeB6XuobE
+        wLK025ZRmvglcURG1BrV24tGHHTgxCe8M3oGlpUSMTKQ2dkgljZVYt+gKdFtWELZ
+        MuRdi+X3XsrR8LFz+aLUiDRfQqhmw3RxjIyVKvvu9UPYY1nsvxYmFnUSeM+2q1z/
+        iPUry+xDY9MC6+IhleKT094VKdFVp7LXH42+wvU+17lRolQ2mK2N/nBLVBwaIhib
+        QXw4VYKwB86Bc6eS6iqsc94KEgD/U4VsjmgfhK+Xp4NM+VYzTTa3QeV3p8xOM0cw
+        q1p8oZFA+OBcz3FYWpDIe5j0NWKlw9hXsTyPY/HeZUV59akskSOSRSmDfe8wJDPX
+        58uB9/7lud0G3x0pxQAcffP0ayKavNwDTw4UfJ34cEw=
+        -----END CERTIFICATE-----
+        """.trimIndent(),
+
+        // 7. ISRG Root X1 (Let's Encrypt Root)
         """
         -----BEGIN CERTIFICATE-----
         MIIFazCCA1OgAwIBAgIRAIIQz7DSQONZRGPgu2OCiwAwDQYJKoZIhvcNAQELBQAw
@@ -119,6 +254,24 @@ object SslTrustHelper {
         4RgqsahDYVvTH9w7jXbyLeiNdd8XM2w9U/t7y0Ff/9yi0GE44Za4rF2LN9d11TPA
         mRGunUHBcnWEvgJBQl9nJEiU0Zsnvgc/ubhPgXRR4Xq37Z0j4r7g1SgEEzwxA57d
         emyPxgcYxn/eR44/KJ4EBs+lVDR3veyJm+kXQ99b21/+jh5Xos1AnX5iItreGCc=
+        -----END CERTIFICATE-----
+        """.trimIndent(),
+
+        // 8. ISRG Root X2 (Let's Encrypt ECDSA Root - Testnevelési Egyetem, Veszprémi Érseki Főiskola stb.)
+        """
+        -----BEGIN CERTIFICATE-----
+        MIICGzCCAaGgAwIBAgIQQdKd0XLq7qeAwSxs6S+HUjAKBggqhkjOPQQDAzBPMQsw
+        CQYDVQQGEwJVUzEpMCcGA1UEChMgSW50ZXJuZXQgU2VjdXJpdHkgUmVzZWFyY2gg
+        R3JvdXAxFTATBgNVBAMTDElTUkcgUm9vdCBYMjAeFw0yMDA5MDQwMDAwMDBaFw00
+        MDA5MTcxNjAwMDBaME8xCzAJBgNVBAYTAlVTMSkwJwYDVQQKEyBJbnRlcm5ldCBT
+        ZWN1cml0eSBSZXNlYXJjaCBHcm91cDEVMBMGA1UEAxMMSVNSRyBSb290IFgyMHYw
+        EAYHKoZIzj0CAQYFK4EEACIDYgAEzZvVn4CDCuwJSvMWSj5cz3es3mcFDR0HttwW
+        +1qLFNvicWDEukWVEYmO6gbf9yoWHKS5xcUy4APgHoIYOIvXRdgKam7mAHf7AlF9
+        ItgKbppbd9/w+kHsOdx1ymgHDB/qo0IwQDAOBgNVHQ8BAf8EBAMCAQYwDwYDVR0T
+        AQH/BAUwAwEB/zAdBgNVHQ4EFgQUfEKWrt5LSDv6kviejM9ti6lyN5UwCgYIKoZI
+        zj0EAwMDaAAwZQIwe3lORlCEwkSHRhtFcP9Ymd70/aTSVaYgLXTWNLxBo1BfASdW
+        tL4ndQavEi51mI38AjEAi/V3bNTIZargCyzuFJ0nN6T5U6VR5CmD1/iQMVtCnwr1
+        /q4AaOeMSQ+2b1tbFfLn
         -----END CERTIFICATE-----
         """.trimIndent()
     )
@@ -155,95 +308,119 @@ object SslTrustHelper {
     }
 
     private fun createCompositeTrustManager(): X509TrustManager {
-        // 1. Get default platform TrustManager
-        val defaultTmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
-        defaultTmf.init(null as KeyStore?)
-        val defaultTm = defaultTmf.trustManagers.firstOrNull { it is X509TrustManager } as? X509TrustManager
+        // 1. Alapértelmezett platform TrustManager (Android rendszer beépített gyökértára)
+        val defaultTm = try {
+            val defaultTmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
+            defaultTmf.init(null as KeyStore?)
+            defaultTmf.trustManagers.firstOrNull { it is X509TrustManager } as? X509TrustManager
+        } catch (e: Throwable) {
+            logW("Could not initialize default platform TrustManager: ${e.message}")
+            null
+        }
 
-        // 2. Build custom keystore with bundled institutional / GEANT CAs and user CA store
-        val keyStore = KeyStore.getInstance(KeyStore.getDefaultType())
-        keyStore.load(null, null)
+        // 2. Beágyazott egyetemi / intézményi TrustManager (HARICA, GEANT, e-Szignó, ISRG)
+        val bundledTm = try {
+            val keyStore = KeyStore.getInstance(KeyStore.getDefaultType())
+            keyStore.load(null, null)
+            val certFactory = CertificateFactory.getInstance("X.509")
 
-        // Add AndroidCAStore (system + user-installed certificates, e.g. for VPNs or proxies)
-        try {
-            val caStore = KeyStore.getInstance("AndroidCAStore")
-            caStore.load(null, null)
-            val aliases = caStore.aliases()
-            var count = 0
-            while (aliases.hasMoreElements()) {
-                val alias = aliases.nextElement()
-                val cert = caStore.getCertificate(alias)
-                if (cert is X509Certificate) {
-                    keyStore.setCertificateEntry("android_ca_${count++}", cert)
+            BUNDLED_CERTIFICATES.forEachIndexed { index, pem ->
+                try {
+                    val cert = certFactory.generateCertificate(
+                        ByteArrayInputStream(pem.trim().toByteArray(Charsets.UTF_8))
+                    ) as X509Certificate
+                    val alias = "bundled_cert_$index"
+                    keyStore.setCertificateEntry(alias, cert)
+                    logD("Loaded bundled certificate #$index: ${cert.subjectDN.name}")
+                } catch (e: Throwable) {
+                    logW("Could not load bundled certificate #$index: ${e.message}")
                 }
             }
-            logD("Loaded $count certificates from AndroidCAStore")
+
+            val bundledTmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
+            bundledTmf.init(keyStore)
+            bundledTmf.trustManagers.firstOrNull { it is X509TrustManager } as? X509TrustManager
         } catch (e: Throwable) {
-            logW("Could not load AndroidCAStore: ${e.message}")
+            logE("Failed to build bundled TrustManager: ${e.message}", e)
+            null
         }
 
-        // Add bundled root certificates
-        val certFactory = CertificateFactory.getInstance("X.509")
-        BUNDLED_CERTIFICATES.forEachIndexed { index, pem ->
-            try {
-                val cleanBase64 = pem
-                    .lines()
-                    .filterNot { it.startsWith("-----") || it.isBlank() }
-                    .joinToString("")
-                    .trim()
-                val derBytes = android.util.Base64.decode(cleanBase64, android.util.Base64.DEFAULT)
-                val cert = certFactory.generateCertificate(ByteArrayInputStream(derBytes)) as X509Certificate
-                val alias = "bundled_cert_$index"
-                keyStore.setCertificateEntry(alias, cert)
-                logD("Loaded bundled certificate #$index: ${cert.subjectDN.name}")
-            } catch (e: Throwable) {
-                logW("Could not load bundled certificate #$index: ${e.message}")
-            }
+        // 3. AndroidCAStore TrustManager (felhasználói tanúsítványok, pl. AdGuard, egyetemi VPN-ek esetén)
+        val userTm = try {
+            val caStore = KeyStore.getInstance("AndroidCAStore")
+            caStore.load(null, null)
+            val caTmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
+            caTmf.init(caStore)
+            caTmf.trustManagers.firstOrNull { it is X509TrustManager } as? X509TrustManager
+        } catch (e: Throwable) {
+            logD("AndroidCAStore not accessible or not supported in this environment: ${e.message}")
+            null
         }
 
-        val bundledTmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
-        bundledTmf.init(keyStore)
-        val bundledTm = bundledTmf.trustManagers.firstOrNull { it is X509TrustManager } as? X509TrustManager
-
-        return if (defaultTm != null && bundledTm != null) {
-            CompositeX509TrustManager(defaultTm, bundledTm)
-        } else {
-            bundledTm ?: defaultTm ?: throw IllegalStateException("No X509TrustManager could be created")
+        val managers = listOfNotNull(defaultTm, bundledTm, userTm)
+        if (managers.isEmpty()) {
+            throw IllegalStateException("No X509TrustManager could be created")
         }
+
+        return CompositeX509TrustManager(managers)
     }
 
     private class CompositeX509TrustManager(
-        private val defaultTm: X509TrustManager,
-        private val bundledTm: X509TrustManager
+        private val trustManagers: List<X509TrustManager>
     ) : X509TrustManager {
 
         override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {
-            try {
-                defaultTm.checkClientTrusted(chain, authType)
-            } catch (e: Exception) {
-                bundledTm.checkClientTrusted(chain, authType)
+            var lastException: CertificateException? = null
+            for (tm in trustManagers) {
+                try {
+                    tm.checkClientTrusted(chain, authType)
+                    return
+                } catch (e: CertificateException) {
+                    lastException = e
+                }
             }
+            throw lastException ?: CertificateException("Client certificate validation failed")
         }
 
         override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {
-            try {
-                defaultTm.checkServerTrusted(chain, authType)
-            } catch (defaultException: Exception) {
-                logW("Default TrustManager rejected server certificate (${defaultException.message}), attempting verification via bundled academic CAs...")
+            // Conscrypt passes "GENERIC" for TLS 1.3 handshakes, which standard JSSE TrustManagers reject.
+            // Normalize to the public key algorithm (e.g. RSA, EC) if "GENERIC" or blank.
+            val normalizedAuthType = if (authType.equals("GENERIC", ignoreCase = true) || authType.isNullOrBlank()) {
+                val algo = chain?.firstOrNull()?.publicKey?.algorithm ?: "RSA"
+                if (algo.equals("EC", ignoreCase = true)) "ECDSA" else algo
+            } else {
+                authType
+            }
+
+            var lastException: Exception? = null
+            for ((index, tm) in trustManagers.withIndex()) {
                 try {
-                    bundledTm.checkServerTrusted(chain, authType)
-                    logI("Server certificate successfully validated via bundled academic trust anchor.")
-                } catch (fallbackException: Exception) {
-                    logE("Server certificate rejected by both default and bundled trust stores", fallbackException)
-                    throw defaultException
+                    tm.checkServerTrusted(chain, normalizedAuthType)
+                    if (index > 0) {
+                        logI("Server certificate validated via secondary trust manager (#$index)")
+                    }
+                    return
+                } catch (e: Exception) {
+                    lastException = e
                 }
+            }
+            logE("Server certificate rejected by all trust managers (${trustManagers.size})", lastException)
+            if (lastException is CertificateException) {
+                throw lastException
+            } else {
+                throw CertificateException("Server certificate rejected: ${lastException?.message}", lastException)
             }
         }
 
         override fun getAcceptedIssuers(): Array<X509Certificate> {
-            val defaultIssuers = defaultTm.acceptedIssuers ?: emptyArray()
-            val bundledIssuers = bundledTm.acceptedIssuers ?: emptyArray()
-            return defaultIssuers + bundledIssuers
+            val issuers = mutableListOf<X509Certificate>()
+            for (tm in trustManagers) {
+                val acc = tm.acceptedIssuers
+                if (acc != null) {
+                    issuers.addAll(acc)
+                }
+            }
+            return issuers.toTypedArray()
         }
     }
 }

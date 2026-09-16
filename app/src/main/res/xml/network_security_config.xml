@@ -12,6 +12,9 @@
             <certificates src="@raw/geant_tls_rsa_1" />
             <certificates src="@raw/geant_tls_ecc_1" />
             <certificates src="@raw/isrg_root_x1" />
+            <certificates src="@raw/isrg_root_x2" />
+            <certificates src="@raw/eovtlsca2023_link" />
+            <certificates src="@raw/sectigo_ov_r36" />
         </trust-anchors>
     </base-config>
 </network-security-config>
