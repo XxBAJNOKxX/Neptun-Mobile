@@ -418,6 +418,13 @@ interface AppStrings {
     val deadlineEndingToday: String
     val academicPeriodActiveBadge: String
     val academicPeriodUpcomingBadge: String
+    val tabTimetable: String
+    val tabPeriods: String
+    val periodFilterAll: String
+    val periodFilterActive: String
+    val periodFilterUpcoming: String
+    val noAcademicPeriods: String
+    val periodStartsInDays: (Long) -> String
 
     // Additional Messages strings
     val tapToViewFullMessage: String
@@ -862,6 +869,13 @@ class HungarianStrings : AppStrings {
     override val deadlineEndingToday = "Ma éjfélkor zárul!"
     override val academicPeriodActiveBadge = "Folyamatban"
     override val academicPeriodUpcomingBadge = "Közelgő"
+    override val tabTimetable = "Órarend"
+    override val tabPeriods = "Időszakok"
+    override val periodFilterAll = "Összes"
+    override val periodFilterActive = "Aktív"
+    override val periodFilterUpcoming = "Közelgő"
+    override val noAcademicPeriods = "Nincsenek elérhető féléves időszakok."
+    override val periodStartsInDays: (Long) -> String = { days -> "$days nap múlva kezdődik" }
 
     // Additional Messages strings
     override val tapToViewFullMessage = "Koppints a teljes üzenet megtekintéséhez..."
@@ -1306,6 +1320,13 @@ class EnglishStrings : AppStrings {
     override val deadlineEndingToday = "Ends tonight at 23:59!"
     override val academicPeriodActiveBadge = "Active"
     override val academicPeriodUpcomingBadge = "Upcoming"
+    override val tabTimetable = "Timetable"
+    override val tabPeriods = "Periods"
+    override val periodFilterAll = "All"
+    override val periodFilterActive = "Active"
+    override val periodFilterUpcoming = "Upcoming"
+    override val noAcademicPeriods = "No academic periods available."
+    override val periodStartsInDays: (Long) -> String = { days -> "Starts in $days days" }
 
     // Additional Messages strings
     override val tapToViewFullMessage = "Tap to view full message..."
@@ -1750,6 +1771,13 @@ class GermanStrings : AppStrings {
     override val deadlineEndingToday = "Endet heute um 23:59!"
     override val academicPeriodActiveBadge = "Aktiv"
     override val academicPeriodUpcomingBadge = "Bevorstehend"
+    override val tabTimetable = "Stundenplan"
+    override val tabPeriods = "Fristen"
+    override val periodFilterAll = "Alle"
+    override val periodFilterActive = "Aktiv"
+    override val periodFilterUpcoming = "Bevorstehend"
+    override val noAcademicPeriods = "Keine Semesterfristen verfügbar."
+    override val periodStartsInDays: (Long) -> String = { days -> "Beginnt in $days Tagen" }
 
     // Additional Messages strings
     override val tapToViewFullMessage = "Tippen Sie hier, um die vollständige Nachricht zu lesen..."

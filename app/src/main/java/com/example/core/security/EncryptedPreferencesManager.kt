@@ -273,6 +273,14 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
         _personalizationFlow.value = loadPersonalization()
     }
 
+    fun setShouldAutoSetTargetCredits(shouldAutoSet: Boolean) {
+        prefs.edit().putBoolean(KEY_AUTO_SET_TARGET_CREDITS, shouldAutoSet).apply()
+    }
+
+    fun getShouldAutoSetTargetCredits(): Boolean {
+        return prefs.getBoolean(KEY_AUTO_SET_TARGET_CREDITS, true)
+    }
+
     fun setBiometricLockEnabled(enabled: Boolean) {
         prefs.edit().putBoolean(KEY_BIOMETRIC_LOCK, enabled).apply()
         _personalizationFlow.value = loadPersonalization()
@@ -666,6 +674,7 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
         private const val KEY_START_SCREEN = "key_start_screen"
         private const val KEY_SHOW_WEEKEND = "key_show_weekend"
         private const val KEY_TARGET_CREDITS = "key_target_credits"
+        private const val KEY_AUTO_SET_TARGET_CREDITS = "key_auto_set_target_credits"
         private const val KEY_BIOMETRIC_LOCK = "key_biometric_lock"
         private const val KEY_HIDDEN_PAGES = "key_hidden_pages"
         private const val KEY_DATA_MODE = "key_data_mode"
