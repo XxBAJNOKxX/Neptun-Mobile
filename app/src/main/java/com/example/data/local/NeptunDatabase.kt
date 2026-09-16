@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.data.local.dao.CalendarDao
 import com.example.data.local.dao.ExamsDao
 import com.example.data.local.dao.FinancesDao
@@ -23,7 +25,7 @@ import com.example.data.local.entity.SubjectGradeEntity
         FinanceItemEntity::class,
         ExamItemEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class NeptunDatabase : RoomDatabase() {
@@ -38,6 +40,13 @@ abstract class NeptunDatabase : RoomDatabase() {
         @Volatile
         private var INSTANCE: NeptunDatabase? = null
 
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE exam_items ADD COLUMN teacherName TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE exam_items ADD COLUMN applicationDeadline TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
         fun getInstance(context: Context): NeptunDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -45,6 +54,7 @@ abstract class NeptunDatabase : RoomDatabase() {
                     NeptunDatabase::class.java,
                     "neptun_mobile.db"
                 )
+                    .addMigrations(MIGRATION_2_3)
                     // A szerveradatok gyorsítótárból újratölthetők, így a sémaváltásnál
                     // a destruktív migráció elfogadható (a helyi jegy- szellemjegyek elveszhetnek).
                     .fallbackToDestructiveMigration()
