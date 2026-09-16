@@ -73,6 +73,7 @@ fun DashboardScreen(
     onNavigate: (NavigationItem) -> Unit,
     onOpenExams: () -> Unit = { onNavigate(NavigationItem.GRADES) },
     onOpenProgress: () -> Unit = { onNavigate(NavigationItem.GRADES) },
+    onOpenPeriods: () -> Unit = { onNavigate(NavigationItem.TIMETABLE) },
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -114,16 +115,6 @@ fun DashboardScreen(
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
-                    val academicInfo = listOf(trainingProgram, universityName).filter { it.isNotBlank() }.joinToString(" • ")
-                    if (academicInfo.isNotBlank()) {
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = academicInfo,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
                     if (isDemoData) {
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
@@ -134,15 +125,6 @@ fun DashboardScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                }
-            }
-
-            // Aktuális féléves időszakok & határidők
-            if (uiState.activePeriods.isNotEmpty()) {
-                item {
-                    AcademicPeriodsDashboardCard(
-                        periods = uiState.activePeriods
-                    )
                 }
             }
 
@@ -163,6 +145,16 @@ fun DashboardScreen(
                     next = uiState.nextEvent,
                     onOpenTimetable = { onNavigate(NavigationItem.TIMETABLE) }
                 )
+            }
+
+            // Aktuális féléves időszakok & határidők (következő óra alatt)
+            if (uiState.activePeriods.isNotEmpty()) {
+                item {
+                    AcademicPeriodsDashboardCard(
+                        periods = uiState.activePeriods,
+                        onOpenPeriods = onOpenPeriods
+                    )
+                }
             }
 
             // Gyors statisztikák
@@ -483,7 +475,8 @@ private fun formatHuf(amount: Int): String {
 
 @Composable
 private fun AcademicPeriodsDashboardCard(
-    periods: List<AcademicPeriod>
+    periods: List<AcademicPeriod>,
+    onOpenPeriods: () -> Unit = {}
 ) {
     val strings = currentStrings()
     val activePeriod = periods.firstOrNull { it.isActive } ?: periods.firstOrNull() ?: return
@@ -498,7 +491,9 @@ private fun AcademicPeriodsDashboardCard(
                 MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
             }
         ),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onOpenPeriods)
     ) {
         Row(
             modifier = Modifier.padding(14.dp),
@@ -566,6 +561,14 @@ private fun AcademicPeriodsDashboardCard(
                     color = if (daysLeft != null && daysLeft <= 2) NeptunRed else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+
+            Spacer(modifier = Modifier.width(8.dp))
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                modifier = Modifier.size(18.dp)
+            )
         }
     }
 }

@@ -84,6 +84,7 @@ class AuthRepositoryImpl(
             prefsManager.setIsModernApi(true)
             prefsManager.setDataMode(DataMode.DEMO)
             prefsManager.clearSessionExpired()
+            prefsManager.setShouldAutoSetTargetCredits(true)
 
             val creds = prefsManager.loadCredentials() ?: StudentCredentials(
                 neptunCode = trimmedCode,
@@ -138,6 +139,7 @@ class AuthRepositoryImpl(
                 prefsManager.setBaseUrl(authResult.normalizedBaseUrl)
                 prefsManager.setDataMode(DataMode.REAL)
                 prefsManager.clearSessionExpired()
+                prefsManager.setShouldAutoSetTargetCredits(true)
 
                 val creds = prefsManager.loadCredentials() ?: StudentCredentials(
                     neptunCode = trimmedCode,
@@ -200,6 +202,7 @@ class AuthRepositoryImpl(
                 prefsManager.setBaseUrl(authResult.normalizedBaseUrl)
                 prefsManager.setDataMode(DataMode.REAL)
                 prefsManager.clearSessionExpired()
+                prefsManager.setShouldAutoSetTargetCredits(true)
 
                 val creds = prefsManager.loadCredentials() ?: StudentCredentials(
                     neptunCode = session.neptunCode,

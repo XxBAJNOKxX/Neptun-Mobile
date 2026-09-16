@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayCircle
@@ -45,6 +46,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ScrollableTabRow
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
@@ -64,6 +68,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.core.i18n.currentStrings
+import com.example.domain.model.AcademicPeriod
 import com.example.domain.model.CalendarEvent
 import com.example.presentation.ui.components.CourseTypeBadge
 import com.example.presentation.ui.components.NeptunTopBar
@@ -71,6 +76,7 @@ import com.example.presentation.viewmodel.TimetableUiState
 import com.example.ui.theme.NeptunBlue40
 import com.example.ui.theme.NeptunCyan40
 import com.example.ui.theme.NeptunGreen
+import com.example.ui.theme.NeptunRed
 import kotlinx.coroutines.launch
 
 @Composable
@@ -84,6 +90,9 @@ fun TimetableScreen(
     onToggleWeekView: () -> Unit,
     onRefresh: () -> Unit,
     onScheduleReminder: (CalendarEvent) -> Unit,
+    onTabSelect: (Int) -> Unit = {},
+    onPeriodFilterChange: (Int) -> Unit = {},
+    onRefreshPeriods: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val strings = currentStrings()
@@ -132,12 +141,46 @@ fun TimetableScreen(
             .background(MaterialTheme.colorScheme.background)
     ) {
         NeptunTopBar(
-            title = strings.timetableTitle,
-            subtitle = if (uiState.isWeekView) (if (strings.languageCode == "hu") "Heti összesített nézet" else if (strings.languageCode == "de") "Wochenübersicht" else "Weekly Overview")
+            title = if (uiState.selectedTab == 1) strings.academicPeriodsTitle else strings.timetableTitle,
+            subtitle = if (uiState.selectedTab == 1) (if (strings.languageCode == "hu") "Féléves határidők és fontos időpontok" else if (strings.languageCode == "de") "Wichtige Termine und Fristen" else "Deadlines and important dates")
+                       else if (uiState.isWeekView) (if (strings.languageCode == "hu") "Heti összesített nézet" else if (strings.languageCode == "de") "Wochenübersicht" else "Weekly Overview")
                        else (if (strings.languageCode == "hu") "Napi bontás" else if (strings.languageCode == "de") "Tagesansicht" else "Daily View"),
-            isRefreshing = uiState.isRefreshing,
-            onRefresh = onRefresh
+            isRefreshing = if (uiState.selectedTab == 1) uiState.isRefreshingPeriods else uiState.isRefreshing,
+            onRefresh = if (uiState.selectedTab == 1) onRefreshPeriods else onRefresh
         )
+
+        // Órarend / Időszakok fülválasztó (2 fül)
+        SingleChoiceSegmentedButtonRow(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+        ) {
+            SegmentedButton(
+                selected = uiState.selectedTab == 0,
+                onClick = { onTabSelect(0) },
+                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+            ) {
+                Text(strings.tabTimetable)
+            }
+            SegmentedButton(
+                selected = uiState.selectedTab == 1,
+                onClick = { onTabSelect(1) },
+                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
+            ) {
+                Text(strings.tabPeriods)
+            }
+        }
+
+        if (uiState.selectedTab == 1) {
+            AcademicPeriodsTabContent(
+                periods = uiState.academicPeriods,
+                filter = uiState.periodFilter,
+                onFilterChange = onPeriodFilterChange,
+                isRefreshing = uiState.isRefreshingPeriods,
+                onRefresh = onRefreshPeriods
+            )
+            return@Column
+        }
 
         // Week Navigation Bar (Switch weeks forward/backward)
         Surface(
@@ -732,6 +775,214 @@ private fun EmptyDayNotice(message: String) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
+        }
+    }
+}
+
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+private fun AcademicPeriodsTabContent(
+    periods: List<AcademicPeriod>,
+    filter: Int,
+    onFilterChange: (Int) -> Unit,
+    isRefreshing: Boolean,
+    onRefresh: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val strings = currentStrings()
+
+    val filteredPeriods = when (filter) {
+        1 -> periods.filter { it.isActive }
+        2 -> periods.filter { !it.isActive }
+        else -> periods
+    }
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
+        // Szűrő chipek
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            FilterChip(
+                selected = filter == 0,
+                onClick = { onFilterChange(0) },
+                label = { Text(strings.periodFilterAll) }
+            )
+            FilterChip(
+                selected = filter == 1,
+                onClick = { onFilterChange(1) },
+                label = { Text(strings.periodFilterActive) }
+            )
+            FilterChip(
+                selected = filter == 2,
+                onClick = { onFilterChange(2) },
+                label = { Text(strings.periodFilterUpcoming) }
+            )
+        }
+
+        PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = onRefresh,
+            modifier = Modifier.fillMaxSize()
+        ) {
+            if (filteredPeriods.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.DateRange,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier.size(48.dp)
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = strings.noAcademicPeriods,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                    }
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    item { Spacer(modifier = Modifier.height(4.dp)) }
+
+                    items(filteredPeriods, key = { it.id }) { period ->
+                        AcademicPeriodCard(period = period)
+                    }
+
+                    item { Spacer(modifier = Modifier.height(24.dp)) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AcademicPeriodCard(period: AcademicPeriod) {
+    val strings = currentStrings()
+    val daysLeft = period.daysRemaining
+
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (period.isActive && daysLeft != null && daysLeft <= 2) {
+                MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.45f)
+            } else if (period.isActive) {
+                MaterialTheme.colorScheme.surface
+            } else {
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+            }
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (period.isActive) 2.dp else 0.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = when {
+                        period.isActive -> NeptunGreen.copy(alpha = 0.15f)
+                        else -> NeptunBlue40.copy(alpha = 0.15f)
+                    }
+                ) {
+                    Text(
+                        text = if (period.isActive) strings.academicPeriodActiveBadge else strings.academicPeriodUpcomingBadge,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (period.isActive) NeptunGreen else NeptunBlue40,
+                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+                    )
+                }
+
+                if (period.isActive) {
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = if (daysLeft != null && daysLeft <= 2) NeptunRed.copy(alpha = 0.15f) else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
+                    ) {
+                        Text(
+                            text = if (daysLeft != null && daysLeft == 0L) {
+                                strings.deadlineEndingToday
+                            } else if (daysLeft != null) {
+                                strings.deadlineDaysRemaining(daysLeft)
+                            } else {
+                                strings.academicPeriodActiveBadge
+                            },
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (daysLeft != null && daysLeft <= 2) NeptunRed else MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+                        )
+                    }
+                } else if (daysLeft != null && daysLeft > 0) {
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant
+                    ) {
+                        Text(
+                            text = strings.periodStartsInDays(daysLeft),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Text(
+                text = period.name,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.DateRange,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "${period.startDate} – ${period.endDate}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.Medium
+                )
+            }
         }
     }
 }

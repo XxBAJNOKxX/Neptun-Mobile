@@ -391,6 +391,12 @@ private fun MainDashboard(
                                     currentDestination = NavigationItem.GRADES
                                 }
                             },
+                            onOpenPeriods = {
+                                timetableViewModel.selectTab(1)
+                                if (NavigationItem.TIMETABLE in visibleItems) {
+                                    currentDestination = NavigationItem.TIMETABLE
+                                }
+                            },
                             onRefresh = dashboardViewModel::refresh
                         )
 
@@ -402,7 +408,10 @@ private fun MainDashboard(
                             onCurrentWeek = timetableViewModel::currentWeek,
                             onToggleWeekView = timetableViewModel::toggleWeekView,
                             onRefresh = timetableViewModel::refreshCalendar,
-                            onScheduleReminder = timetableViewModel::scheduleClassReminder
+                            onScheduleReminder = timetableViewModel::scheduleClassReminder,
+                            onTabSelect = timetableViewModel::selectTab,
+                            onPeriodFilterChange = timetableViewModel::setPeriodFilter,
+                            onRefreshPeriods = timetableViewModel::refreshAcademicPeriods
                         )
 
                         NavigationItem.GRADES -> GradesScreen(

@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.core.notification.AlarmScheduler
 import com.example.core.security.EncryptedPreferencesManager
+import com.example.domain.model.AcademicPeriod
 import com.example.domain.model.CalendarEvent
 import com.example.domain.repository.NeptunRepository
 import com.example.domain.usecase.GetTodayClassesUseCase
@@ -39,7 +40,11 @@ data class TimetableUiState(
     val nextUpcomingEvent: CalendarEvent? = null,
     val isRefreshing: Boolean = false,
     val notificationScheduledId: String? = null,
-    val showWeekend: Boolean = false
+    val showWeekend: Boolean = false,
+    val selectedTab: Int = 0, // 0 = Órarend, 1 = Időszakok
+    val academicPeriods: List<AcademicPeriod> = emptyList(),
+    val periodFilter: Int = 0, // 0 = Mind, 1 = Aktív, 2 = Közelgő
+    val isRefreshingPeriods: Boolean = false
 )
 
 private fun currentOrNextSchoolDay(): Int {
@@ -67,8 +72,10 @@ class TimetableViewModel(
 
     init {
         observeCalendar()
+        observeAcademicPeriods()
         observePreferences()
         refreshCalendar()
+        refreshAcademicPeriods()
     }
 
     private fun buildInitialUiState(): TimetableUiState {
@@ -301,6 +308,30 @@ class TimetableViewModel(
         val reminderMins = prefsManager?.loadNotificationPreferences()?.reminderMinutesBefore ?: 15
         alarmScheduler.scheduleClassAlarm(event, reminderMins)
         _uiState.update { it.copy(notificationScheduledId = event.id) }
+    }
+
+    private fun observeAcademicPeriods() {
+        viewModelScope.launch {
+            neptunRepository.getAcademicPeriods().collect { periods ->
+                _uiState.update { it.copy(academicPeriods = periods) }
+            }
+        }
+    }
+
+    fun selectTab(tab: Int) {
+        _uiState.update { it.copy(selectedTab = tab.coerceIn(0, 1)) }
+    }
+
+    fun setPeriodFilter(filter: Int) {
+        _uiState.update { it.copy(periodFilter = filter) }
+    }
+
+    fun refreshAcademicPeriods() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isRefreshingPeriods = true) }
+            neptunRepository.refreshAcademicPeriods()
+            _uiState.update { it.copy(isRefreshingPeriods = false) }
+        }
     }
 
     companion object {

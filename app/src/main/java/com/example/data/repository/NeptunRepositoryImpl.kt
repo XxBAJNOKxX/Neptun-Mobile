@@ -783,6 +783,10 @@ class NeptunRepositoryImpl(
 
         if (progress != null) {
             _degreeProgressFlow.value = progress
+            if (prefsManager.getShouldAutoSetTargetCredits() && progress.totalRequiredCredits in 30..400) {
+                prefsManager.setTargetCredits(progress.totalRequiredCredits)
+                prefsManager.setShouldAutoSetTargetCredits(false)
+            }
         }
         Result.success(Unit)
     }
