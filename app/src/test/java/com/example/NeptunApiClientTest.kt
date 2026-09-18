@@ -114,5 +114,65 @@ class NeptunApiClientTest {
         assertEquals("dark", merged["pref"])
         assertEquals("123", merged["extra"])
     }
+
+    @Test
+    fun testMultiFormParsingWithThemeAndLanguageForms() {
+        val elteHtml = """
+            <!DOCTYPE html>
+            <html>
+            <body>
+                <form id="selectLanguageForm" action="/Home/SetLanguage" method="post">
+                    <input type="hidden" name="returnUrl" value="/Account/Login" />
+                    <input type="hidden" name="culture" value="en" />
+                    <input type="hidden" name="__RequestVerificationToken" value="token_lang_111" />
+                </form>
+                <form id="selectThemeForm" action="/Home/SetTheme" method="post">
+                    <input type="hidden" name="returnUrl" value="/Account/Login" />
+                    <input type="hidden" name="theme" value="dark" />
+                    <input type="hidden" name="__RequestVerificationToken" value="token_theme_222" />
+                </form>
+                <form action="/Account/Login" method="post">
+                    <input type="text" name="LoginName" value="" />
+                    <input type="password" name="Password" value="" />
+                    <input type="hidden" name="ReturnUrl" value="" />
+                    <input type="hidden" name="__RequestVerificationToken" value="token_real_login_333" />
+                </form>
+            </body>
+            </html>
+        """.trimIndent()
+
+        // When specifying "Login" target, it should isolate the actual login form
+        val loginInputs = client.parseFormInputs(elteHtml, "Login")
+        assertEquals("token_real_login_333", loginInputs["__RequestVerificationToken"])
+        assertEquals("", loginInputs["ReturnUrl"])
+        assertTrue(!loginInputs.containsKey("theme"))
+        assertTrue(!loginInputs.containsKey("culture"))
+
+        // Even without specifying target, the auto-fallback should prioritize the Login form over theme/language switchers
+        val autoInputs = client.parseFormInputs(elteHtml)
+        assertEquals("token_real_login_333", autoInputs["__RequestVerificationToken"])
+        assertEquals("", autoInputs["ReturnUrl"])
+        assertTrue(!autoInputs.containsKey("theme"))
+    }
+
+    @Test
+    fun testExtractValidationErrorsWithElteAlerts() {
+        val elteAlertHtml = """
+            <div class="alert alert-danger alert-dismissible fade show PotlapHTMLMessageEntry" role="alert">
+                <span style="white-space: pre-line">Nemrég küldtünk e-mailt belépéshez. Amennyiben nem érkezik meg, néhány perc múlva próbálhatja újra.</span>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            <div class="form-group">
+                <span class="field-validation-error">Az e-mail kód kötőjel utáni része csak számjegyekből állhat!</span>
+            </div>
+        """.trimIndent()
+
+        val errors = client.extractValidationErrors(elteAlertHtml)
+        assertEquals(2, errors.size)
+        assertTrue(errors[0].contains("Nemrég küldtünk e-mailt belépéshez"))
+        assertTrue(!errors[0].contains("Close"))
+        assertTrue(!errors[0].contains("button"))
+        assertEquals("Az e-mail kód kötőjel utáni része csak számjegyekből állhat!", errors[1])
+    }
 }
 

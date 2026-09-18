@@ -727,11 +727,21 @@ fun LoginScreen(
                                             modifier = Modifier.size(18.dp)
                                         )
                                         Spacer(modifier = Modifier.width(8.dp))
-                                        Text(
-                                            text = strings.twoFactorEmailPrompt,
-                                            style = MaterialTheme.typography.bodySmall,
-                                            fontWeight = FontWeight.Medium
-                                        )
+                                        Column {
+                                            Text(
+                                                text = strings.twoFactorEmailPrompt,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                            if (uiState.twoFactorSession?.hasTotp == false) {
+                                                Spacer(modifier = Modifier.height(4.dp))
+                                                Text(
+                                                    text = strings.twoFactorNoTotpNote,
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = MaterialTheme.colorScheme.primary
+                                                )
+                                            }
+                                        }
                                     }
                                 }
                             }

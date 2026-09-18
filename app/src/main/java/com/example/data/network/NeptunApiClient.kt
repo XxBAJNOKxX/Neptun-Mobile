@@ -335,13 +335,43 @@ class NeptunApiClient {
             .joinToString("; ") { "${it.key}=${it.value}" }
     }
 
-    fun parseFormInputs(formHtml: String): Map<String, String> {
+    fun parseFormInputs(
+        formHtml: String,
+        formActionOrId: String? = null
+    ): Map<String, String> {
+        val targetHtml: String = if (!formActionOrId.isNullOrBlank()) {
+            val formRegex = Regex("""<form\b([^>]*)>([\s\S]*?)<\/form>""", RegexOption.IGNORE_CASE)
+            val matchingForm = formRegex.findAll(formHtml).firstOrNull { match ->
+                val openingAttrs = match.groupValues[1]
+                openingAttrs.contains(formActionOrId, ignoreCase = true)
+            }
+            matchingForm?.groupValues?.get(2) ?: formHtml
+        } else {
+            // If no specific formActionOrId is specified, but the HTML contains <form>,
+            // check if there's a primary login / 2FA / bridge form, so we don't accidentally
+            // take inputs from theme/language switchers.
+            val formRegex = Regex("""<form\b([^>]*)>([\s\S]*?)<\/form>""", RegexOption.IGNORE_CASE)
+            val forms = formRegex.findAll(formHtml).toList()
+            if (forms.isNotEmpty()) {
+                val primaryForm = forms.firstOrNull { match ->
+                    val attrs = match.groupValues[1]
+                    attrs.contains("Login", ignoreCase = true) ||
+                            attrs.contains("TwoFactor", ignoreCase = true) ||
+                            attrs.contains("FormToNeptun", ignoreCase = true) ||
+                            attrs.contains("ToNeptun", ignoreCase = true)
+                } ?: forms.last()
+                primaryForm.groupValues[2]
+            } else {
+                formHtml
+            }
+        }
+
         val inputs = mutableMapOf<String, String>()
         val inputTagRegex = Regex("""<input\b([^>]*)>""", RegexOption.IGNORE_CASE)
         val nameRegex = Regex("""\bname\s*=\s*["']?([^"' >]+)["']?""", RegexOption.IGNORE_CASE)
         val valueRegex = Regex("""\bvalue\s*=\s*["']([^"']*)["']|\bvalue\s*=\s*([^\s>]+)""", RegexOption.IGNORE_CASE)
 
-        for (match in inputTagRegex.findAll(formHtml)) {
+        for (match in inputTagRegex.findAll(targetHtml)) {
             val attrs = match.groupValues[1]
             val nameMatch = nameRegex.find(attrs)
             if (nameMatch != null) {
@@ -368,6 +398,7 @@ class NeptunApiClient {
     fun extractValidationErrors(html: String): List<String> {
         val errors = mutableListOf<String>()
 
+        // 1. ASP.NET validation summary: <div class="...validation-summary-errors...">...</div>
         val summaryRegex = Regex("""class="[^"]*validation-summary-errors[^"]*"[^>]*>([\s\S]*?)<\/div>""", RegexOption.IGNORE_CASE)
         val summaryMatch = summaryRegex.find(html)
         if (summaryMatch != null) {
@@ -380,6 +411,29 @@ class NeptunApiClient {
             }
         }
 
+        // 2. ELTE & Bootstrap alerts: <div class="alert alert-danger ... PotlapHTMLMessageEntry" role="alert">...</div>
+        val alertRegex = Regex("""<div\b[^>]*class="[^"]*(?:alert-danger|PotlapHTMLMessageEntry)[^"]*"[^>]*>([\s\S]*?)<\/div>""", RegexOption.IGNORE_CASE)
+        for (match in alertRegex.findAll(html)) {
+            val content = match.groupValues[1]
+                .replace(Regex("""<button\b[\s\S]*?<\/button>""", RegexOption.IGNORE_CASE), "")
+                .replace(Regex("""<[^>]+>"""), " ")
+                .replace(Regex("""\s+"""), " ")
+                .trim()
+            if (content.isNotBlank() && !errors.contains(content)) {
+                errors.add(content)
+            }
+        }
+
+        // 3. ASP.NET field validation errors: <span class="...field-validation-error...">...</span>
+        val fieldErrorRegex = Regex("""class="[^"]*field-validation-error[^"]*"[^>]*>([\s\S]*?)<\/span>""", RegexOption.IGNORE_CASE)
+        for (match in fieldErrorRegex.findAll(html)) {
+            val clean = match.groupValues[1].replace(Regex("""<[^>]+>"""), "").trim()
+            if (clean.isNotBlank() && !errors.contains(clean)) {
+                errors.add(clean)
+            }
+        }
+
+        // 4. Other text-danger classes
         val dangerRegex = Regex("""class="[^"]*text-danger[^"]*"[^>]*>([\s\S]*?)<\/(?:span|div|p|h\d)>""", RegexOption.IGNORE_CASE)
         for (match in dangerRegex.findAll(html)) {
             val clean = match.groupValues[1].replace(Regex("""<[^>]+>"""), "").trim()
@@ -420,7 +474,7 @@ class NeptunApiClient {
         cookieMap = mergeCookies(cookieMap, parseCookiesFromHeaders(getCookies)).toMutableMap()
         val getHtml = getResp.body?.string() ?: ""
 
-        val formInputs = parseFormInputs(getHtml)
+        val formInputs = parseFormInputs(getHtml, "Login")
         val token = formInputs["__RequestVerificationToken"] ?: ""
 
         // 2. POST /Account/Login with credentials and token
@@ -487,7 +541,7 @@ class NeptunApiClient {
                 cookieMap = mergeCookies(cookieMap, parseCookiesFromHeaders(res2FaCookies)).toMutableMap()
                 val html2Fa = res2Fa.body?.string() ?: ""
 
-                val inputs2Fa = parseFormInputs(html2Fa)
+                val inputs2Fa = parseFormInputs(html2Fa, "Login2FA")
 
                 val uriKey = try {
                     val uri = java.net.URI(redirectUrl)
@@ -567,7 +621,7 @@ class NeptunApiClient {
                 return@withContext Result.failure(Exception(errors.joinToString(" | ")))
             }
 
-            val inputs = parseFormInputs(html)
+            val inputs = parseFormInputs(html, "Login2FA")
 
             val updatedSession = session.copy(
                 phase = inputs["Phase"] ?: "RequestEmailCode",
@@ -686,16 +740,26 @@ class NeptunApiClient {
                 if (outerLoginMatch != null) {
                     locationHeader = outerLoginMatch.groupValues[1]
                 } else {
-                    val inputs = parseFormInputs(html)
+                    val inputs = parseFormInputs(html, "FormToNeptun")
                     if (inputs.isNotEmpty()) {
                         val formBuilder = FormBody.Builder()
+                            .add("NeptunWebType", inputs["NeptunWebType"] ?: "HWeb")
+                            .add("NeptunWebIndex", inputs["NeptunWebIndex"] ?: "")
+                        val vToken = inputs["__RequestVerificationToken"] ?: ""
+                        if (vToken.isNotEmpty()) {
+                            formBuilder.add("__RequestVerificationToken", vToken)
+                        }
                         for ((k, v) in inputs) {
-                            formBuilder.add(k, v)
+                            if (k != "NeptunWebType" && k != "NeptunWebIndex" && k != "__RequestVerificationToken") {
+                                formBuilder.add(k, v)
+                            }
                         }
                         val formReq = Request.Builder()
                             .url(bridgeUrl)
                             .post(formBuilder.build())
                             .addHeader("User-Agent", DEFAULT_USER_AGENT)
+                            .addHeader("Referer", bridgeUrl)
+                            .addHeader("Origin", cleanBase)
                             .addHeader("Cookie", cookieHeaderString(modernCookieMap))
                             .build()
                         val formResp = noRedirectClient.newCall(formReq).execute()
@@ -906,7 +970,7 @@ class NeptunApiClient {
                 if (m != null) {
                     outerLoginUrl = m.groupValues[1]
                 } else {
-                    val formInputs = parseFormInputs(bridgeHtml)
+                    val formInputs = parseFormInputs(bridgeHtml, "FormToNeptun")
                     val verificationToken = formInputs["__RequestVerificationToken"] ?: ""
 
                     if (verificationToken.isEmpty() && !bridgeHtml.contains("FormToNeptun", ignoreCase = true)) {

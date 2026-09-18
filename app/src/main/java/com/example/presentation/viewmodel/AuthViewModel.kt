@@ -194,8 +194,18 @@ class AuthViewModel(
     }
 
     fun onTwoFactorCodeChange(code: String) {
-        if (code.length <= 6) {
-            _uiState.update { it.copy(twoFactorCode = code, twoFactorErrorMessage = null) }
+        val state = _uiState.value
+        val prefix = state.codePrefix
+        // If user pastes full code like "736-188829" or "736 - 188829", clean it automatically
+        var cleaned = code.trim()
+        if (prefix.isNotEmpty() && cleaned.startsWith("$prefix-", ignoreCase = true)) {
+            cleaned = cleaned.substringAfter("-").trim()
+        } else if (cleaned.contains("-")) {
+            cleaned = cleaned.substringAfter("-").trim()
+        }
+        val digitsOnly = cleaned.filter { it.isDigit() }
+        if (digitsOnly.length <= 6) {
+            _uiState.update { it.copy(twoFactorCode = digitsOnly, twoFactorErrorMessage = null) }
         }
     }
 
@@ -259,10 +269,15 @@ class AuthViewModel(
                     }
                 },
                 onFailure = { error ->
+                    val msg = error.message ?: "Nem sikerült elküldeni az e-mail kódot."
+                    val isRecentEmail = msg.contains("Nemrég küldtünk", ignoreCase = true) ||
+                            msg.contains("néhány perc múlva", ignoreCase = true)
                     _uiState.update {
                         it.copy(
                             isTwoFactorLoading = false,
-                            twoFactorErrorMessage = error.message ?: "Nem sikerült elküldeni az e-mail kódot."
+                            isEmailCodeRequested = if (isRecentEmail) true else it.isEmailCodeRequested,
+                            twoFactorSuccessMessage = if (isRecentEmail) msg else it.twoFactorSuccessMessage,
+                            twoFactorErrorMessage = if (isRecentEmail) null else msg
                         )
                     }
                 }
@@ -315,7 +330,7 @@ class AuthViewModel(
                     when (error) {
                         is TwoFactorSessionRequiredException -> {
                             val session = error.session
-                            val defaultMethod = if (session.hasEmail) TwoFactorMethod.EMAIL else TwoFactorMethod.TOTP
+                            val defaultMethod = if (!session.hasTotp || session.hasEmail) TwoFactorMethod.EMAIL else TwoFactorMethod.TOTP
                             val isEmailReq = session.codePrefix.isNotEmpty() || session.phase.equals("RequestEmailCode", ignoreCase = true)
                             _uiState.update {
                                 it.copy(
@@ -361,16 +376,27 @@ class AuthViewModel(
         val session = state.twoFactorSession
 
         if (session != null) {
-            val code = state.twoFactorCode.trim()
-            if (code.isEmpty()) {
+            val rawCode = state.twoFactorCode.trim()
+            if (rawCode.isEmpty()) {
                 _uiState.update { it.copy(twoFactorErrorMessage = "Kérjük, add meg a 6 számjegyű kódot!") }
+                return
+            }
+
+            val cleanedCode = if (rawCode.contains("-")) {
+                rawCode.substringAfter("-").trim().filter { it.isDigit() }
+            } else {
+                rawCode.filter { it.isDigit() }
+            }
+
+            if (cleanedCode.isEmpty()) {
+                _uiState.update { it.copy(twoFactorErrorMessage = "Kérjük, csak számjegyeket adj meg!") }
                 return
             }
 
             viewModelScope.launch {
                 _uiState.update { it.copy(isTwoFactorLoading = true, twoFactorErrorMessage = null) }
                 val isTotp = state.twoFactorMethod == TwoFactorMethod.TOTP
-                val result = authRepository.verify2FACode(session, code, isTotp)
+                val result = authRepository.verify2FACode(session, cleanedCode, isTotp)
 
                 result.fold(
                     onSuccess = { creds ->
