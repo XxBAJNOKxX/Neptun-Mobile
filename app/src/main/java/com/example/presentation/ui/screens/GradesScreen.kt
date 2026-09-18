@@ -1337,63 +1337,258 @@ private fun DegreeProgressTabContent(
                     }
                 }
 
-                // Category Breakdowns
-                item {
-                    Text(
-                        text = strings.details,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
+                // Completed Curriculums Summary
+                if (progress.totalCurriculums > 0 || progress.completedCurriculums > 0) {
+                    item {
+                        Card(
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text(
+                                        text = strings.completedCurriculumsLabel,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = "${progress.completedCurriculums} / ${progress.totalCurriculums} db teljesítve",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Surface(
+                                    color = NeptunGreen.copy(alpha = 0.15f),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Text(
+                                        text = "${progress.completedCurriculums} / ${progress.totalCurriculums}",
+                                        color = NeptunGreen,
+                                        fontWeight = FontWeight.Bold,
+                                        style = MaterialTheme.typography.labelLarge,
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
 
-                item {
-                    ProgressCategoryCard(
-                        title = strings.compulsoryCreditsLabel,
-                        completed = progress.compulsoryCompleted,
-                        total = progress.compulsoryTotal,
-                        accentColor = NeptunGreen
-                    )
+                // Curriculum Templates List
+                if (progress.templates.isNotEmpty()) {
+                    item {
+                        Text(
+                            text = strings.curriculumTemplatesTitle,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+
+                    items(progress.templates) { template ->
+                        CurriculumTemplateCard(template = template)
+                    }
                 }
 
-                item {
-                    ProgressCategoryCard(
-                        title = strings.compulsoryElectiveCreditsLabel,
-                        completed = progress.compulsoryElectiveCompleted,
-                        total = progress.compulsoryElectiveTotal,
-                        accentColor = NeptunBlue40
-                    )
-                }
+                // Category Breakdowns (Only rendered if real requirements are defined)
+                val hasCategoryTotals = progress.compulsoryTotal > 0 ||
+                        progress.compulsoryElectiveTotal > 0 ||
+                        progress.freeElectiveTotal > 0 ||
+                        progress.thesisTotal > 0 ||
+                        progress.criteriaTotalCount > 0
 
-                item {
-                    ProgressCategoryCard(
-                        title = strings.freeElectiveCreditsLabel,
-                        completed = progress.freeElectiveCompleted,
-                        total = progress.freeElectiveTotal,
-                        accentColor = NeptunPurple
-                    )
-                }
+                if (hasCategoryTotals) {
+                    item {
+                        Text(
+                            text = strings.details,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
 
-                item {
-                    ProgressCategoryCard(
-                        title = strings.thesisCreditsLabel,
-                        completed = progress.thesisCompleted,
-                        total = progress.thesisTotal,
-                        accentColor = NeptunGold
-                    )
-                }
+                    if (progress.compulsoryTotal > 0) {
+                        item {
+                            ProgressCategoryCard(
+                                title = strings.compulsoryCreditsLabel,
+                                completed = progress.compulsoryCompleted,
+                                total = progress.compulsoryTotal,
+                                accentColor = NeptunGreen
+                            )
+                        }
+                    }
 
-                item {
-                    ProgressCategoryCard(
-                        title = strings.criteriaLabel,
-                        completed = progress.criteriaPassedCount,
-                        total = progress.criteriaTotalCount,
-                        unit = "db",
-                        accentColor = NeptunCyan40
-                    )
+                    if (progress.compulsoryElectiveTotal > 0) {
+                        item {
+                            ProgressCategoryCard(
+                                title = strings.compulsoryElectiveCreditsLabel,
+                                completed = progress.compulsoryElectiveCompleted,
+                                total = progress.compulsoryElectiveTotal,
+                                accentColor = NeptunBlue40
+                            )
+                        }
+                    }
+
+                    if (progress.freeElectiveTotal > 0) {
+                        item {
+                            ProgressCategoryCard(
+                                title = strings.freeElectiveCreditsLabel,
+                                completed = progress.freeElectiveCompleted,
+                                total = progress.freeElectiveTotal,
+                                accentColor = NeptunPurple
+                            )
+                        }
+                    }
+
+                    if (progress.thesisTotal > 0) {
+                        item {
+                            ProgressCategoryCard(
+                                title = strings.thesisCreditsLabel,
+                                completed = progress.thesisCompleted,
+                                total = progress.thesisTotal,
+                                accentColor = NeptunGold
+                            )
+                        }
+                    }
+
+                    if (progress.criteriaTotalCount > 0) {
+                        item {
+                            ProgressCategoryCard(
+                                title = strings.criteriaLabel,
+                                completed = progress.criteriaPassedCount,
+                                total = progress.criteriaTotalCount,
+                                unit = "db",
+                                accentColor = NeptunCyan40
+                            )
+                        }
+                    }
                 }
 
                 item { Spacer(modifier = Modifier.height(20.dp)) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CurriculumTemplateCard(
+    template: com.example.domain.model.CurriculumTemplateItem
+) {
+    val strings = currentStrings()
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = template.name,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f)
+                )
+                if (template.isCompleted) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Surface(
+                        color = NeptunGreen.copy(alpha = 0.15f),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = null,
+                                tint = NeptunGreen,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = strings.completedBadge,
+                                color = NeptunGreen,
+                                fontWeight = FontWeight.SemiBold,
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (template.totalSubjects > 0) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = strings.compulsoryCreditsLabel,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = strings.subjectsCompletedFormat(template.completedSubjects, template.totalSubjects),
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+                val subjFraction = (template.completedSubjects.toFloat() / template.totalSubjects.toFloat()).coerceIn(0f, 1f)
+                LinearProgressIndicator(
+                    progress = { subjFraction },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(6.dp)
+                        .clip(RoundedCornerShape(3.dp)),
+                    color = if (template.isCompleted) NeptunGreen else MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            }
+
+            if (template.totalCredits > 0) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = strings.targetCreditsLabel,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = strings.creditsCompletedFormat(template.completedCredits, template.totalCredits),
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+                val credFraction = (template.completedCredits.toFloat() / template.totalCredits.toFloat()).coerceIn(0f, 1f)
+                LinearProgressIndicator(
+                    progress = { credFraction },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(6.dp)
+                        .clip(RoundedCornerShape(3.dp)),
+                    color = if (template.isCompleted) NeptunGreen else NeptunPurple,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant
+                )
             }
         }
     }

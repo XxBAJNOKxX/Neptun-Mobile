@@ -502,6 +502,8 @@ object MockNeptunDataSource {
     fun getMockDegreeProgress(): com.example.domain.model.DegreeProgress = com.example.domain.model.DegreeProgress(
         completedCredits = 138,
         totalRequiredCredits = 210,
+        completedCurriculums = 2,
+        totalCurriculums = 5,
         compulsoryCompleted = 96,
         compulsoryTotal = 120,
         compulsoryElectiveCompleted = 24,
@@ -513,7 +515,41 @@ object MockNeptunDataSource {
         criteriaPassedCount = 2,
         criteriaTotalCount = 2,
         cumulativeWeightedAverage = 4.38,
-        cumulativeCreditIndex = 4.22
+        cumulativeCreditIndex = 4.22,
+        templates = listOf(
+            com.example.domain.model.CurriculumTemplateItem(
+                id = "tmpl_1",
+                name = "MI-BSc 2026",
+                code = "IANI-MI-26",
+                completedSubjects = 28,
+                totalSubjects = 38,
+                completedCredits = 96,
+                totalCredits = 120,
+                isCompleted = false
+            ),
+            com.example.domain.model.CurriculumTemplateItem(
+                id = "tmpl_2",
+                name = "BSc szabadon választható tárgyak 2026",
+                code = "IANI-MI-26-SZABVAL",
+                completedSubjects = 3,
+                totalSubjects = 3,
+                completedCredits = 10,
+                totalCredits = 10,
+                status = "Teljesített",
+                isCompleted = true
+            ),
+            com.example.domain.model.CurriculumTemplateItem(
+                id = "tmpl_3",
+                name = "Egyéb szabadon választható tárgyak",
+                code = "IANI-MI-EGYEB",
+                completedSubjects = 2,
+                totalSubjects = 2,
+                completedCredits = 6,
+                totalCredits = 6,
+                status = "Teljesített",
+                isCompleted = true
+            )
+        )
     )
 
     fun getMockAcademicPeriods(): List<com.example.domain.model.AcademicPeriod> {

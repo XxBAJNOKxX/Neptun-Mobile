@@ -224,21 +224,37 @@ data class ExamItem(
 }
 
 @kotlinx.serialization.Serializable
+data class CurriculumTemplateItem(
+    val id: String,
+    val name: String,
+    val code: String = "",
+    val status: String = "", // e.g. "Teljesített"
+    val completedSubjects: Int = 0,
+    val totalSubjects: Int = 0,
+    val completedCredits: Int = 0,
+    val totalCredits: Int = 0,
+    val isCompleted: Boolean = false
+)
+
+@kotlinx.serialization.Serializable
 data class DegreeProgress(
     val completedCredits: Int = 0,
     val totalRequiredCredits: Int = 210,
+    val completedCurriculums: Int = 0,
+    val totalCurriculums: Int = 0,
     val compulsoryCompleted: Int = 0,
-    val compulsoryTotal: Int = 120,
+    val compulsoryTotal: Int = 0,
     val compulsoryElectiveCompleted: Int = 0,
-    val compulsoryElectiveTotal: Int = 30,
+    val compulsoryElectiveTotal: Int = 0,
     val freeElectiveCompleted: Int = 0,
-    val freeElectiveTotal: Int = 10,
+    val freeElectiveTotal: Int = 0,
     val thesisCompleted: Int = 0,
-    val thesisTotal: Int = 15,
+    val thesisTotal: Int = 0,
     val criteriaPassedCount: Int = 0,
-    val criteriaTotalCount: Int = 2,
+    val criteriaTotalCount: Int = 0,
     val cumulativeWeightedAverage: Double = 0.0,
-    val cumulativeCreditIndex: Double = 0.0
+    val cumulativeCreditIndex: Double = 0.0,
+    val templates: List<CurriculumTemplateItem> = emptyList()
 ) {
     val progressFraction: Float
         get() = if (totalRequiredCredits > 0) {

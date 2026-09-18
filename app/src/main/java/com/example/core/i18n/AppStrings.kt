@@ -413,6 +413,11 @@ interface AppStrings {
     val criteriaLabel: String
     val cumulativeAverageLabel: String
     val cumulativeCreditIndexLabel: String
+    val curriculumTemplatesTitle: String
+    val completedCurriculumsLabel: String
+    val completedBadge: String
+    val subjectsCompletedFormat: (Int, Int) -> String
+    val creditsCompletedFormat: (Int, Int) -> String
     val academicPeriodsTitle: String
     val deadlineDaysRemaining: (Long) -> String
     val deadlineEndingToday: String
@@ -864,6 +869,11 @@ class HungarianStrings : AppStrings {
     override val criteriaLabel = "Kritériumkövetelmények"
     override val cumulativeAverageLabel = "Halmozott súlyozott átlag"
     override val cumulativeCreditIndexLabel = "Összesített kreditindex"
+    override val curriculumTemplatesTitle = "Mintatantervek"
+    override val completedCurriculumsLabel = "Teljesített mintatanterv"
+    override val completedBadge = "Teljesített"
+    override val subjectsCompletedFormat: (Int, Int) -> String = { c, t -> "$c / $t tárgy teljesítve" }
+    override val creditsCompletedFormat: (Int, Int) -> String = { c, t -> "$c / $t kredit" }
     override val academicPeriodsTitle = "Aktuális féléves időszakok"
     override val deadlineDaysRemaining: (Long) -> String = { days -> "Még $days nap van hátra" }
     override val deadlineEndingToday = "Ma éjfélkor zárul!"
@@ -1315,6 +1325,11 @@ class EnglishStrings : AppStrings {
     override val criteriaLabel = "Criterion Requirements"
     override val cumulativeAverageLabel = "Cumulative Weighted GPA"
     override val cumulativeCreditIndexLabel = "Cumulative Credit Index"
+    override val curriculumTemplatesTitle = "Curriculum Templates"
+    override val completedCurriculumsLabel = "Completed Curriculums"
+    override val completedBadge = "Completed"
+    override val subjectsCompletedFormat: (Int, Int) -> String = { c, t -> "$c / $t subjects completed" }
+    override val creditsCompletedFormat: (Int, Int) -> String = { c, t -> "$c / $t credits" }
     override val academicPeriodsTitle = "Current Academic Periods"
     override val deadlineDaysRemaining: (Long) -> String = { days -> "$days days remaining" }
     override val deadlineEndingToday = "Ends tonight at 23:59!"
@@ -1766,6 +1781,11 @@ class GermanStrings : AppStrings {
     override val criteriaLabel = "Kriterienanforderungen"
     override val cumulativeAverageLabel = "Kumulierter Notendurchschnitt"
     override val cumulativeCreditIndexLabel = "Kumulierter Kreditindex"
+    override val curriculumTemplatesTitle = "Musterstudienpläne"
+    override val completedCurriculumsLabel = "Abgeschlossene Studienpläne"
+    override val completedBadge = "Abgeschlossen"
+    override val subjectsCompletedFormat: (Int, Int) -> String = { c, t -> "$c / $t Fächer abgeschlossen" }
+    override val creditsCompletedFormat: (Int, Int) -> String = { c, t -> "$c / $t Credits" }
     override val academicPeriodsTitle = "Aktuelle Semesterfristen"
     override val deadlineDaysRemaining: (Long) -> String = { days -> "Noch $days Tage verbleibend" }
     override val deadlineEndingToday = "Endet heute um 23:59!"

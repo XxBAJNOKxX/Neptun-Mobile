@@ -3392,120 +3392,296 @@ class NeptunApiClient {
         trainingId: String? = null,
         deviceCookie: String = ""
     ): com.example.domain.model.DegreeProgress? = withContext(Dispatchers.IO) {
-        val candidateBaseUrls = if (baseUrl.contains("hallgato2_uj", ignoreCase = true)) {
-            listOf(baseUrl, baseUrl.replace("hallgato2_uj", "hallgato2_api", ignoreCase = true)).distinct()
-        } else if (baseUrl.contains("elte.hu", ignoreCase = true) && !baseUrl.contains("hallgato", ignoreCase = true)) {
+        val cleanBase = resolveApiBaseUrl(baseUrl)
+        val candidateBaseUrls = if (cleanBase.contains("hallgato2_uj", ignoreCase = true)) {
+            listOf(cleanBase, cleanBase.replace("hallgato2_uj", "hallgato2_api", ignoreCase = true)).distinct()
+        } else if (cleanBase.contains("elte.hu", ignoreCase = true) && !cleanBase.contains("hallgato", ignoreCase = true)) {
             listOf("https://hallgato1.neptun.elte.hu")
         } else {
-            listOf(baseUrl)
+            listOf(cleanBase)
         }
 
-        val paths = listOf(
-            "/api/Studies/GetAdvancementData",
-            "/api/Studies/GetCurriculumProgress",
-            "/api/Student/GetAdvancementData"
+        val creditProgressPaths = listOf(
+            "/api/dashboard/creditprogress",
+            "/api/advancement/creditprogress",
+            "/dashboard/creditprogress",
+            "/advancement/creditprogress"
         )
 
+        var parsedProgress: com.example.domain.model.DegreeProgress? = null
+
         for (base in candidateBaseUrls) {
-            for (path in paths) {
+            for (path in creditProgressPaths) {
                 try {
-                    val url = if (!trainingId.isNullOrBlank()) "$base$path?studentTrainingId=$trainingId" else "$base$path"
+                    val urlWithTraining = if (!trainingId.isNullOrBlank()) "$base$path?studentTrainingId=$trainingId" else "$base$path"
                     val req = Request.Builder()
-                        .url(url)
+                        .url(urlWithTraining)
                         .get()
                         .addHeader("Authorization", "Bearer $token")
                         .addHeader("Accept", "application/json, text/plain, */*")
                     if (deviceCookie.isNotBlank()) req.addHeader("Cookie", deviceCookie)
 
-                    val resp = okHttpClient.newCall(req.build()).execute()
-                    if (resp.isSuccessful) {
-                        val body = resp.body?.string() ?: ""
-                        val parsed = safeParseJson(body)
-                        if (parsed != null) {
-                            val progress = parseDegreeProgress(parsed)
-                            if (progress != null) return@withContext progress
+                    okHttpClient.newCall(req.build()).execute().use { resp ->
+                        if (resp.isSuccessful) {
+                            val body = resp.body?.string().orEmpty()
+                            val parsed = safeParseJson(body)
+                            if (parsed != null) {
+                                parsedProgress = parseCreditProgressJson(parsed)
+                            }
                         }
                     }
+                    if (parsedProgress != null) break
                 } catch (e: Exception) {
                     Log.d(tag, "getDegreeProgress error ($path): ${e.message}")
                 }
             }
+            if (parsedProgress != null) break
         }
-        null
+
+        // Ha a creditprogress sikerült vagy ha van érvényes alap, kérjük le a mintatanterveket és átlagokat is
+        for (base in candidateBaseUrls) {
+            try {
+                val templates = fetchCurriculumTemplates(base, token, deviceCookie)
+                val averages = fetchTermAverages(base, token, deviceCookie)
+
+                if (parsedProgress != null) {
+                    val finalAvg = if (averages.first > 0.0) averages.first else parsedProgress.cumulativeWeightedAverage
+                    val finalIndex = if (averages.second > 0.0) averages.second else parsedProgress.cumulativeCreditIndex
+                    val finalCompletedCurriculums = if (parsedProgress.completedCurriculums > 0) {
+                        parsedProgress.completedCurriculums
+                    } else {
+                        templates.count { it.isCompleted }
+                    }
+                    val finalTotalCurriculums = if (parsedProgress.totalCurriculums > 0) {
+                        parsedProgress.totalCurriculums
+                    } else {
+                        templates.size
+                    }
+
+                    return@withContext parsedProgress.copy(
+                        completedCurriculums = finalCompletedCurriculums,
+                        totalCurriculums = finalTotalCurriculums,
+                        cumulativeWeightedAverage = finalAvg,
+                        cumulativeCreditIndex = finalIndex,
+                        templates = templates
+                    )
+                } else if (templates.isNotEmpty()) {
+                    // Ha a creditprogress nem volt elérhető, de a mintatanterveket sikerült lekérni
+                    val trainingData = fetchGeneralTrainingData(base, token, deviceCookie)
+                    val requiredCredits = trainingData?.let { (it["trainingMaxTermNumber"]?.jsonPrimitive?.intOrNull ?: 7) * 30 } ?: 210
+                    return@withContext com.example.domain.model.DegreeProgress(
+                        completedCredits = templates.sumOf { it.completedCredits },
+                        totalRequiredCredits = requiredCredits,
+                        completedCurriculums = templates.count { it.isCompleted },
+                        totalCurriculums = templates.size,
+                        cumulativeWeightedAverage = averages.first,
+                        cumulativeCreditIndex = averages.second,
+                        templates = templates
+                    )
+                }
+            } catch (e: Exception) {
+                Log.d(tag, "fetchCurriculumDetails error: ${e.message}")
+            }
+        }
+
+        parsedProgress
     }
 
-    private fun parseDegreeProgress(root: JsonElement): com.example.domain.model.DegreeProgress? {
+    private fun parseCreditProgressJson(root: JsonElement): com.example.domain.model.DegreeProgress? {
         try {
             val rootObj = (root as? JsonObject) ?: (root as? JsonArray)?.firstOrNull() as? JsonObject ?: return null
             val dataObj = rootObj["data"]?.jsonObject ?: rootObj
 
-            var completed = 0
-            var total = 210
-            var compulsoryCompleted = 0
-            var compulsoryTotal = 120
-            var electiveCompleted = 0
-            var electiveTotal = 30
-            var freeCompleted = 0
-            var freeTotal = 10
+            val reqCredit = dataObj["requiredCredit"]?.jsonPrimitive?.intOrNull
+                ?: dataObj["totalRequiredCredits"]?.jsonPrimitive?.intOrNull
+                ?: dataObj["requiredCredits"]?.jsonPrimitive?.intOrNull
+                ?: 210
 
-            dataObj["completedCredits"]?.jsonPrimitive?.intOrNull?.let { completed = it }
-            dataObj["totalRequiredCredits"]?.jsonPrimitive?.intOrNull?.let { total = it }
+            val compCredit = dataObj["completedCredit"]?.jsonPrimitive?.intOrNull
+                ?: dataObj["completedCredits"]?.jsonPrimitive?.intOrNull
+                ?: 0
 
-            val modulesArray = dataObj["modules"]?.jsonArray
-                ?: dataObj["items"]?.jsonArray
-                ?: dataObj["advancementDetails"]?.jsonArray
+            val completedCurriculums = dataObj["completedCurriculumCount"]?.jsonPrimitive?.intOrNull ?: 0
+            val allCurriculums = dataObj["allCurriculumCount"]?.jsonPrimitive?.intOrNull ?: 0
 
-            modulesArray?.forEach { modElem ->
-                val mod = modElem as? JsonObject ?: return@forEach
-                val name = (mod["name"] ?: mod["title"] ?: mod["moduleName"])?.jsonPrimitive?.contentOrNull?.lowercase() ?: ""
-                val comp = mod["completedCredits"]?.jsonPrimitive?.intOrNull ?: 0
-                val req = mod["requiredCredits"]?.jsonPrimitive?.intOrNull ?: 0
+            val compReq = dataObj["completedRequiredSubjectCredit"]?.jsonPrimitive?.intOrNull ?: 0
+            val sumReq = dataObj["sumRequiredSubjectCredit"]?.jsonPrimitive?.intOrNull ?: 0
 
-                when {
-                    name.contains("kötelező") && !name.contains("választható") -> {
-                        compulsoryCompleted = comp
-                        compulsoryTotal = if (req > 0) req else compulsoryTotal
-                    }
-                    name.contains("kötelezően") || name.contains("köt. vál") -> {
-                        electiveCompleted = comp
-                        electiveTotal = if (req > 0) req else electiveTotal
-                    }
-                    name.contains("szabad") -> {
-                        freeCompleted = comp
-                        freeTotal = if (req > 0) req else freeTotal
-                    }
-                }
-            }
+            val compElective = dataObj["completedRequiredOptionalSubjectCredit"]?.jsonPrimitive?.intOrNull ?: 0
+            val sumElective = dataObj["sumRequiredOptionalSubjectCredit"]?.jsonPrimitive?.intOrNull ?: 0
 
-            if (completed == 0 && (compulsoryCompleted > 0 || electiveCompleted > 0 || freeCompleted > 0)) {
-                completed = compulsoryCompleted + electiveCompleted + freeCompleted
-            }
-
-            val cumAvg = dataObj["cumulativeWeightedAverage"]?.jsonPrimitive?.doubleOrNull
-                ?: dataObj["weightedAverage"]?.jsonPrimitive?.doubleOrNull ?: 0.0
-            val cumIndex = dataObj["cumulativeCreditIndex"]?.jsonPrimitive?.doubleOrNull
-                ?: dataObj["creditIndex"]?.jsonPrimitive?.doubleOrNull ?: 0.0
+            val compFree = dataObj["completedOptionalSubjectCredit"]?.jsonPrimitive?.intOrNull ?: 0
+            val sumFree = dataObj["sumOptionalSubjectCredit"]?.jsonPrimitive?.intOrNull ?: 0
 
             return com.example.domain.model.DegreeProgress(
-                completedCredits = completed,
-                totalRequiredCredits = if (total > 0) total else 210,
-                compulsoryCompleted = compulsoryCompleted,
-                compulsoryTotal = compulsoryTotal,
-                compulsoryElectiveCompleted = electiveCompleted,
-                compulsoryElectiveTotal = electiveTotal,
-                freeElectiveCompleted = freeCompleted,
-                freeElectiveTotal = freeTotal,
+                completedCredits = compCredit,
+                totalRequiredCredits = reqCredit,
+                completedCurriculums = completedCurriculums,
+                totalCurriculums = allCurriculums,
+                compulsoryCompleted = compReq,
+                compulsoryTotal = sumReq,
+                compulsoryElectiveCompleted = compElective,
+                compulsoryElectiveTotal = sumElective,
+                freeElectiveCompleted = compFree,
+                freeElectiveTotal = sumFree,
                 thesisCompleted = 0,
-                thesisTotal = 15,
-                criteriaPassedCount = 2,
-                criteriaTotalCount = 2,
-                cumulativeWeightedAverage = cumAvg,
-                cumulativeCreditIndex = cumIndex
+                thesisTotal = 0,
+                criteriaPassedCount = 0,
+                criteriaTotalCount = 0,
+                cumulativeWeightedAverage = 0.0,
+                cumulativeCreditIndex = 0.0,
+                templates = emptyList()
             )
         } catch (e: Exception) {
-            Log.e(tag, "parseDegreeProgress error: ${e.message}")
+            Log.e(tag, "parseCreditProgressJson error: ${e.message}")
             return null
         }
+    }
+
+    private fun fetchCurriculumTemplates(
+        base: String,
+        token: String,
+        deviceCookie: String
+    ): List<com.example.domain.model.CurriculumTemplateItem> {
+        val paths = listOf(
+            "/api/Curriculum/GetStudentCurriculumTemplates",
+            "/Curriculum/GetStudentCurriculumTemplates"
+        )
+        for (path in paths) {
+            try {
+                val req = Request.Builder()
+                    .url("$base$path")
+                    .get()
+                    .addHeader("Authorization", "Bearer $token")
+                    .addHeader("Accept", "application/json, text/plain, */*")
+                if (deviceCookie.isNotBlank()) req.addHeader("Cookie", deviceCookie)
+
+                okHttpClient.newCall(req.build()).execute().use { resp ->
+                    if (resp.isSuccessful) {
+                        val body = resp.body?.string().orEmpty()
+                        val parsed = safeParseJson(body)
+                        val arr = (parsed as? JsonObject)?.get("data")?.jsonArray
+                            ?: (parsed as? JsonArray)
+                        if (arr != null && arr.isNotEmpty()) {
+                            val list = mutableListOf<com.example.domain.model.CurriculumTemplateItem>()
+                            arr.forEach { elem ->
+                                val obj = elem as? JsonObject ?: return@forEach
+                                val name = firstNonBlank(obj, "curriculumTemplateName", "name", "title") ?: ""
+                                if (name.isBlank()) return@forEach
+                                val id = firstNonBlank(obj, "advancementRowId", "curriculumTemplateId", "id") ?: name
+                                val code = firstNonBlank(obj, "curriculumTemplateCode", "code") ?: ""
+                                val status = firstNonBlank(obj, "status", "Status") ?: ""
+                                val compSubj = obj["actualRequiredSubjectCompletedNumber"]?.jsonPrimitive?.intOrNull ?: 0
+                                val reqSubj = obj["requiredSubjectNumber"]?.jsonPrimitive?.intOrNull ?: 0
+                                val compCred = obj["actualCreditsCompletedNumber"]?.jsonPrimitive?.intOrNull ?: 0
+                                val reqCred = obj["creditsRequiredNumber"]?.jsonPrimitive?.intOrNull ?: 0
+                                val isCompleted = status.contains("teljesített", ignoreCase = true) ||
+                                        (reqSubj > 0 && compSubj >= reqSubj) ||
+                                        (reqCred > 0 && compCred >= reqCred)
+                                list.add(
+                                    com.example.domain.model.CurriculumTemplateItem(
+                                        id = id,
+                                        name = name,
+                                        code = code,
+                                        status = status,
+                                        completedSubjects = compSubj,
+                                        totalSubjects = reqSubj,
+                                        completedCredits = compCred,
+                                        totalCredits = reqCred,
+                                        isCompleted = isCompleted
+                                    )
+                                )
+                            }
+                            return list
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.d(tag, "fetchCurriculumTemplates error ($path): ${e.message}")
+            }
+        }
+        return emptyList()
+    }
+
+    private fun fetchTermAverages(
+        base: String,
+        token: String,
+        deviceCookie: String
+    ): Pair<Double, Double> {
+        val paths = listOf(
+            "/api/Advancement/GetTermAveragesByTraining",
+            "/Advancement/GetTermAveragesByTraining"
+        )
+        for (path in paths) {
+            try {
+                val req = Request.Builder()
+                    .url("$base$path")
+                    .get()
+                    .addHeader("Authorization", "Bearer $token")
+                    .addHeader("Accept", "application/json, text/plain, */*")
+                if (deviceCookie.isNotBlank()) req.addHeader("Cookie", deviceCookie)
+
+                okHttpClient.newCall(req.build()).execute().use { resp ->
+                    if (resp.isSuccessful) {
+                        val body = resp.body?.string().orEmpty()
+                        val parsed = safeParseJsonObject(body)
+                        val dataObj = parsed?.get("data")?.jsonObject ?: parsed
+                        val averagesArr = dataObj?.get("termAveragesByTrainings")?.jsonArray
+                        if (averagesArr != null) {
+                            var bestAvg = 0.0
+                            var bestIndex = 0.0
+                            averagesArr.forEach { elem ->
+                                val obj = elem as? JsonObject ?: return@forEach
+                                val sumAvg = obj["sumAverage"]?.jsonPrimitive?.doubleOrNull
+                                    ?: obj["average"]?.jsonPrimitive?.doubleOrNull ?: 0.0
+                                val crIndex = obj["creditIndex"]?.jsonPrimitive?.doubleOrNull ?: 0.0
+                                if (sumAvg > 0.0) bestAvg = sumAvg
+                                if (crIndex > 0.0) bestIndex = crIndex
+                            }
+                            if (bestAvg > 0.0 || bestIndex > 0.0) {
+                                return Pair(bestAvg, bestIndex)
+                            }
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.d(tag, "fetchTermAverages error ($path): ${e.message}")
+            }
+        }
+        return Pair(0.0, 0.0)
+    }
+
+    private fun fetchGeneralTrainingData(
+        base: String,
+        token: String,
+        deviceCookie: String
+    ): JsonObject? {
+        val paths = listOf(
+            "/api/RegistrySheet/GetGeneralTrainingData",
+            "/RegistrySheet/GetGeneralTrainingData"
+        )
+        for (path in paths) {
+            try {
+                val req = Request.Builder()
+                    .url("$base$path")
+                    .get()
+                    .addHeader("Authorization", "Bearer $token")
+                    .addHeader("Accept", "application/json, text/plain, */*")
+                if (deviceCookie.isNotBlank()) req.addHeader("Cookie", deviceCookie)
+
+                okHttpClient.newCall(req.build()).execute().use { resp ->
+                    if (resp.isSuccessful) {
+                        val body = resp.body?.string().orEmpty()
+                        val parsed = safeParseJsonObject(body)
+                        val dataObj = parsed?.get("data")?.jsonObject ?: parsed
+                        if (dataObj != null) return dataObj
+                    }
+                }
+            } catch (e: Exception) {
+                Log.d(tag, "fetchGeneralTrainingData error ($path): ${e.message}")
+            }
+        }
+        return null
     }
 
     suspend fun getAcademicPeriods(

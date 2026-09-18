@@ -744,50 +744,61 @@ class NeptunRepositoryImpl(
             }
         }
 
-        // Fallback calculation from local grades if server didn't provide structured advancement
-        if (progress == null) {
+        if (progress != null) {
+            val allGrades = try { database.gradesDao().getAllGrades().first() } catch (_: Exception) { emptyList() }
+            val completedGrades = allGrades.filter { (it.grade ?: 0) >= 2 }
+            val dbCompletedCredits = completedGrades.sumOf { it.credit }
+            val sumGradeTimesCredits = completedGrades.sumOf { (it.grade ?: 0) * it.credit }
+            val dbAvg = if (dbCompletedCredits > 0) sumGradeTimesCredits.toDouble() / dbCompletedCredits else 0.0
+
+            val effectiveCompleted = if (progress.completedCredits > 0) progress.completedCredits else dbCompletedCredits
+            val effectiveAvg = if (progress.cumulativeWeightedAverage > 0.0) progress.cumulativeWeightedAverage else ((dbAvg * 100).toInt() / 100.0)
+            val effectiveIndex = if (progress.cumulativeCreditIndex > 0.0) progress.cumulativeCreditIndex else (if (dbCompletedCredits > 0) ((dbAvg * 0.95) * 100).toInt() / 100.0 else 0.0)
+
+            progress = progress.copy(
+                completedCredits = effectiveCompleted,
+                cumulativeWeightedAverage = effectiveAvg,
+                cumulativeCreditIndex = effectiveIndex
+            )
+
+            _degreeProgressFlow.value = progress
+            if (progress.totalRequiredCredits in 30..400) {
+                prefsManager.setTargetCredits(progress.totalRequiredCredits)
+                prefsManager.setShouldAutoSetTargetCredits(false)
+            }
+        } else {
+            // Fallback calculation from local grades if server didn't provide structured advancement
             try {
                 val allGrades = database.gradesDao().getAllGrades().first()
-                if (allGrades.isNotEmpty()) {
-                    val completedGrades = allGrades.filter { (it.grade ?: 0) >= 2 }
-                    val completedCredits = completedGrades.sumOf { it.credit }
-                    val totalTarget = prefsManager.loadPersonalization().targetCredits.coerceAtLeast(180)
-                    val sumGradeTimesCredits = completedGrades.sumOf { (it.grade ?: 0) * it.credit }
-                    val avg = if (completedCredits > 0) sumGradeTimesCredits.toDouble() / completedCredits else 0.0
+                val completedGrades = allGrades.filter { (it.grade ?: 0) >= 2 }
+                val completedCredits = completedGrades.sumOf { it.credit }
+                val totalTarget = prefsManager.loadPersonalization().targetCredits.coerceIn(30, 400)
+                val sumGradeTimesCredits = completedGrades.sumOf { (it.grade ?: 0) * it.credit }
+                val avg = if (completedCredits > 0) sumGradeTimesCredits.toDouble() / completedCredits else 0.0
 
-                    progress = DegreeProgress(
-                        completedCredits = completedCredits,
-                        totalRequiredCredits = totalTarget,
-                        compulsoryCompleted = (completedCredits * 0.7).toInt(),
-                        compulsoryTotal = (totalTarget * 0.6).toInt(),
-                        compulsoryElectiveCompleted = (completedCredits * 0.2).toInt(),
-                        compulsoryElectiveTotal = (totalTarget * 0.2).toInt(),
-                        freeElectiveCompleted = (completedCredits * 0.1).toInt(),
-                        freeElectiveTotal = (totalTarget * 0.1).toInt(),
-                        thesisCompleted = 0,
-                        thesisTotal = 15,
-                        criteriaPassedCount = 2,
-                        criteriaTotalCount = 2,
-                        cumulativeWeightedAverage = (avg * 100).toInt() / 100.0,
-                        cumulativeCreditIndex = if (completedCredits > 0) ((avg * 0.95) * 100).toInt() / 100.0 else 0.0
-                    )
-                }
+                progress = DegreeProgress(
+                    completedCredits = completedCredits,
+                    totalRequiredCredits = totalTarget,
+                    compulsoryCompleted = 0,
+                    compulsoryTotal = 0,
+                    compulsoryElectiveCompleted = 0,
+                    compulsoryElectiveTotal = 0,
+                    freeElectiveCompleted = 0,
+                    freeElectiveTotal = 0,
+                    thesisCompleted = 0,
+                    thesisTotal = 0,
+                    criteriaPassedCount = 0,
+                    criteriaTotalCount = 0,
+                    cumulativeWeightedAverage = (avg * 100).toInt() / 100.0,
+                    cumulativeCreditIndex = if (completedCredits > 0) ((avg * 0.95) * 100).toInt() / 100.0 else 0.0,
+                    templates = emptyList()
+                )
+                _degreeProgressFlow.value = progress
             } catch (e: Exception) {
                 e.printStackTrace()
             }
         }
 
-        if (progress == null && BuildConfig.DEBUG) {
-            progress = MockNeptunDataSource.getMockDegreeProgress()
-        }
-
-        if (progress != null) {
-            _degreeProgressFlow.value = progress
-            if (prefsManager.getShouldAutoSetTargetCredits() && progress.totalRequiredCredits in 30..400) {
-                prefsManager.setTargetCredits(progress.totalRequiredCredits)
-                prefsManager.setShouldAutoSetTargetCredits(false)
-            }
-        }
         Result.success(Unit)
     }
 
