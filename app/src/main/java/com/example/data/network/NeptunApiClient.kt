@@ -133,10 +133,21 @@ class NeptunApiClient {
         return url
     }
 
+    fun resolveApiBaseUrl(baseUrl: String): String {
+        val clean = normalizeBaseUrl(baseUrl)
+        if (clean.contains("elte.hu", ignoreCase = true) && !clean.contains("hallgato", ignoreCase = true)) {
+            return "https://hallgato1.neptun.elte.hu"
+        }
+        return clean
+    }
+
     fun getLegacyBaseUrl(baseUrl: String): String {
         var clean = baseUrl.trim()
         while (clean.endsWith("/")) {
             clean = clean.substring(0, clean.length - 1)
+        }
+        if (clean.contains("elte.hu", ignoreCase = true) && !clean.contains("hallgato", ignoreCase = true)) {
+            clean = "https://hallgato1.neptun.elte.hu"
         }
         return if (clean.endsWith("/MobileService.svc", ignoreCase = true)) {
             clean
@@ -176,11 +187,36 @@ class NeptunApiClient {
         if (rawUrl.isBlank()) return@withContext com.example.domain.model.NeptunLanguage.DEFAULT_LANGUAGES
 
         val cleanBase = normalizeBaseUrl(rawUrl)
-        val endpoints = listOf(
-            "$cleanBase/api/General/EnvironmentData",
-            "$cleanBase/General/EnvironmentData",
-            "$cleanBase/api/EnvironmentData"
-        )
+
+        // ELTE esetén a bejelentkező portál (neptun.elte.hu) nem szolgál ki EnvironmentData végpontot;
+        // a modern API kiszolgáló a hallgato1.neptun.elte.hu címen érhető el.
+        val apiBase = if (cleanBase.contains("elte.hu", ignoreCase = true)) {
+            "https://hallgato1.neptun.elte.hu"
+        } else {
+            cleanBase
+        }
+
+        // Hagyományos ASPX portálok nem rendelkeznek EnvironmentData API-val
+        if (cleanBase.contains(".aspx", ignoreCase = true) || cleanBase.contains("MobileService.svc", ignoreCase = true)) {
+            return@withContext com.example.domain.model.NeptunLanguage.DEFAULT_LANGUAGES
+        }
+
+        val endpoints = if (cleanBase.contains("elte.hu", ignoreCase = true)) {
+            listOf("$apiBase/api/General/EnvironmentData")
+        } else {
+            listOf(
+                "$apiBase/api/General/EnvironmentData",
+                "$apiBase/General/EnvironmentData"
+            )
+        }
+
+        // Kifejezetten rövid (3 másodperces) timeoutot használunk a nyelvek felderítésére,
+        // így soha nem akasztja meg az appot és nem terheli túl / nem triggereli a tűzfalakat
+        val quickClient = okHttpClient.newBuilder()
+            .connectTimeout(3, TimeUnit.SECONDS)
+            .readTimeout(3, TimeUnit.SECONDS)
+            .writeTimeout(3, TimeUnit.SECONDS)
+            .build()
 
         for (endpoint in endpoints) {
             try {
@@ -191,7 +227,7 @@ class NeptunApiClient {
                     .header("User-Agent", DEFAULT_USER_AGENT)
                     .build()
 
-                okHttpClient.newCall(req).execute().use { response ->
+                quickClient.newCall(req).execute().use { response ->
                     if (response.isSuccessful) {
                         val body = response.body?.string() ?: ""
                         val rootObj = safeParseJsonObject(body)
@@ -243,14 +279,27 @@ class NeptunApiClient {
         if (rawUrl.isBlank()) return@withContext false
 
         val cleanBase = normalizeBaseUrl(rawUrl)
+        val apiBase = if (cleanBase.contains("elte.hu", ignoreCase = true)) {
+            "https://hallgato1.neptun.elte.hu"
+        } else {
+            cleanBase
+        }
+
+        if (cleanBase.contains(".aspx", ignoreCase = true) || cleanBase.contains("MobileService.svc", ignoreCase = true)) {
+            return@withContext false
+        }
+
         val endpoints = listOf(
-            "$cleanBase/api/General/SetLanguage",
-            "$cleanBase/General/SetLanguage",
-            "$cleanBase/api/SetLanguage",
-            "$cleanBase/SetLanguage"
+            "$apiBase/api/General/SetLanguage",
+            "$apiBase/General/SetLanguage"
         )
 
         val jsonBody = """{"lcid":$lcid}""".toRequestBody("application/json; charset=utf-8".toMediaType())
+        val quickClient = okHttpClient.newBuilder()
+            .connectTimeout(4, TimeUnit.SECONDS)
+            .readTimeout(4, TimeUnit.SECONDS)
+            .writeTimeout(4, TimeUnit.SECONDS)
+            .build()
 
         for (endpoint in endpoints) {
             try {
@@ -264,7 +313,7 @@ class NeptunApiClient {
                     reqBuilder.header("Authorization", "Bearer $sessionToken")
                 }
 
-                okHttpClient.newCall(reqBuilder.build()).execute().use { response ->
+                quickClient.newCall(reqBuilder.build()).execute().use { response ->
                     if (response.isSuccessful || response.code in 200..299) {
                         Log.d(tag, "Successfully updated language on Neptun server (lcid: $lcid) via $endpoint")
                         return@withContext true
@@ -458,21 +507,26 @@ class NeptunApiClient {
         val getReq = Request.Builder()
             .url(loginPageUrl)
             .get()
-            .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36")
+            .addHeader("User-Agent", DEFAULT_USER_AGENT)
             .addHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
             .addHeader("Accept-Language", "hu-HU,hu;q=0.9,en-US;q=0.8,en;q=0.7")
             .build()
 
-        val getResp: okhttp3.Response
+        var getHtml = ""
+        var getCookies: List<String> = emptyList()
         try {
-            getResp = okHttpClient.newBuilder().followRedirects(false).build().newCall(getReq).execute()
+            Log.i(tag, "authenticateAspDotNet: Starting GET $loginPageUrl with UA=$DEFAULT_USER_AGENT")
+            okHttpClient.newBuilder().followRedirects(false).build().newCall(getReq).execute().use { resp ->
+                Log.i(tag, "authenticateAspDotNet: GET $loginPageUrl returned code=${resp.code}, protocol=${resp.protocol}")
+                getCookies = resp.headers("Set-Cookie")
+                getHtml = resp.body?.string().orEmpty()
+            }
         } catch (e: Exception) {
+            Log.e(tag, "authenticateAspDotNet: GET $loginPageUrl FAILED with exception: ${e.javaClass.name}: ${e.message}", e)
             return@withContext NeptunAuthResult.Failure("Nem sikerült elérni a Neptun bejelentkezési oldalt (${e.localizedMessage})")
         }
 
-        val getCookies = getResp.headers("Set-Cookie")
         cookieMap = mergeCookies(cookieMap, parseCookiesFromHeaders(getCookies)).toMutableMap()
-        val getHtml = getResp.body?.string() ?: ""
 
         val formInputs = parseFormInputs(getHtml, "Login")
         val token = formInputs["__RequestVerificationToken"] ?: ""
@@ -496,25 +550,38 @@ class NeptunApiClient {
         val postReq = Request.Builder()
             .url(loginPageUrl)
             .post(postParams.build())
-            .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36")
+            .addHeader("User-Agent", DEFAULT_USER_AGENT)
             .addHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
             .addHeader("Accept-Language", "hu-HU,hu;q=0.9,en-US;q=0.8,en;q=0.7")
             .addHeader("Referer", loginPageUrl)
             .addHeader("Origin", cleanBase)
+            .addHeader("Upgrade-Insecure-Requests", "1")
+            .addHeader("Sec-Fetch-Dest", "document")
+            .addHeader("Sec-Fetch-Mode", "navigate")
+            .addHeader("Sec-Fetch-Site", "same-origin")
+            .addHeader("Sec-Fetch-User", "?1")
             .addHeader("Cookie", cookieHeaderString(cookieMap))
             .build()
 
-        val postResp = try {
-            okHttpClient.newBuilder().followRedirects(false).build().newCall(postReq).execute()
+        var statusCode = 0
+        var locationHeader = ""
+        var postCookies: List<String> = emptyList()
+        var postBody = ""
+        try {
+            Log.i(tag, "authenticateAspDotNet: Executing POST $loginPageUrl")
+            okHttpClient.newBuilder().followRedirects(false).build().newCall(postReq).execute().use { resp ->
+                statusCode = resp.code
+                locationHeader = resp.header("Location").orEmpty()
+                postCookies = resp.headers("Set-Cookie")
+                postBody = resp.body?.string().orEmpty()
+                Log.i(tag, "authenticateAspDotNet: POST returned code=$statusCode, location=$locationHeader")
+            }
         } catch (e: Exception) {
+            Log.e(tag, "authenticateAspDotNet: POST $loginPageUrl FAILED with exception: ${e.javaClass.name}: ${e.message}", e)
             return@withContext NeptunAuthResult.Failure("Hiba a hitelesítési adatok elküldésekor: ${e.localizedMessage}")
         }
 
-        val postCookies = postResp.headers("Set-Cookie")
         cookieMap = mergeCookies(cookieMap, parseCookiesFromHeaders(postCookies)).toMutableMap()
-
-        val locationHeader = postResp.header("Location") ?: ""
-        val statusCode = postResp.code
 
         if ((statusCode in 300..399) && locationHeader.isNotEmpty()) {
             val redirectUrl = if (locationHeader.startsWith("http")) locationHeader else "$cleanBase${if (locationHeader.startsWith("/")) "" else "/"}$locationHeader"
@@ -524,22 +591,30 @@ class NeptunApiClient {
                 val get2FaReq = Request.Builder()
                     .url(redirectUrl)
                     .get()
-                    .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36")
+                    .addHeader("User-Agent", DEFAULT_USER_AGENT)
                     .addHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
                     .addHeader("Accept-Language", "hu-HU,hu;q=0.9,en-US;q=0.8,en;q=0.7")
                     .addHeader("Referer", loginPageUrl)
+                    .addHeader("Upgrade-Insecure-Requests", "1")
+                    .addHeader("Sec-Fetch-Dest", "document")
+                    .addHeader("Sec-Fetch-Mode", "navigate")
+                    .addHeader("Sec-Fetch-Site", "same-origin")
+                    .addHeader("Sec-Fetch-User", "?1")
                     .addHeader("Cookie", cookieHeaderString(cookieMap))
                     .build()
 
-                val res2Fa = try {
-                    okHttpClient.newBuilder().followRedirects(false).build().newCall(get2FaReq).execute()
+                var res2FaCookies: List<String> = emptyList()
+                var html2Fa = ""
+                try {
+                    okHttpClient.newBuilder().followRedirects(false).build().newCall(get2FaReq).execute().use { resp ->
+                        res2FaCookies = resp.headers("Set-Cookie")
+                        html2Fa = resp.body?.string().orEmpty()
+                    }
                 } catch (e: Exception) {
                     return@withContext NeptunAuthResult.Failure("Hiba a 2FA oldal betöltésekor: ${e.localizedMessage}")
                 }
 
-                val res2FaCookies = res2Fa.headers("Set-Cookie")
                 cookieMap = mergeCookies(cookieMap, parseCookiesFromHeaders(res2FaCookies)).toMutableMap()
-                val html2Fa = res2Fa.body?.string() ?: ""
 
                 val inputs2Fa = parseFormInputs(html2Fa, "Login2FA")
 
@@ -570,7 +645,6 @@ class NeptunApiClient {
             }
         }
 
-        val postBody = postResp.body?.string() ?: ""
         val errors = extractValidationErrors(postBody)
         val errorMsg = if (errors.isNotEmpty()) {
             errors.joinToString(" | ")
@@ -603,19 +677,27 @@ class NeptunApiClient {
             val req = Request.Builder()
                 .url(postUrl)
                 .post(formBuilder.build())
-                .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36")
+                .addHeader("User-Agent", DEFAULT_USER_AGENT)
                 .addHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
                 .addHeader("Accept-Language", "hu-HU,hu;q=0.9,en-US;q=0.8,en;q=0.7")
                 .addHeader("Referer", "$postUrl?NeptunCode=${session.neptunCode}&Key=${session.key}")
                 .addHeader("Origin", session.baseUrl)
+                .addHeader("Upgrade-Insecure-Requests", "1")
+                .addHeader("Sec-Fetch-Dest", "document")
+                .addHeader("Sec-Fetch-Mode", "navigate")
+                .addHeader("Sec-Fetch-Site", "same-origin")
+                .addHeader("Sec-Fetch-User", "?1")
                 .addHeader("Cookie", cookieHeaderString(cookieMap))
                 .build()
 
-            val resp = okHttpClient.newBuilder().followRedirects(false).build().newCall(req).execute()
-            val newCookies = resp.headers("Set-Cookie")
+            var newCookies: List<String> = emptyList()
+            var html = ""
+            okHttpClient.newBuilder().followRedirects(false).build().newCall(req).execute().use { resp ->
+                newCookies = resp.headers("Set-Cookie")
+                html = resp.body?.string().orEmpty()
+            }
             cookieMap = mergeCookies(cookieMap, parseCookiesFromHeaders(newCookies)).toMutableMap()
 
-            val html = resp.body?.string() ?: ""
             val errors = extractValidationErrors(html)
             if (errors.isNotEmpty()) {
                 return@withContext Result.failure(Exception(errors.joinToString(" | ")))
@@ -669,28 +751,39 @@ class NeptunApiClient {
             val req = Request.Builder()
                 .url(postUrl)
                 .post(formBuilder.build())
-                .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36")
+                .addHeader("User-Agent", DEFAULT_USER_AGENT)
                 .addHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
                 .addHeader("Accept-Language", "hu-HU,hu;q=0.9,en-US;q=0.8,en;q=0.7")
                 .addHeader("Referer", "$postUrl?NeptunCode=${session.neptunCode}&Key=${session.key}")
                 .addHeader("Origin", session.baseUrl)
+                .addHeader("Upgrade-Insecure-Requests", "1")
+                .addHeader("Sec-Fetch-Dest", "document")
+                .addHeader("Sec-Fetch-Mode", "navigate")
+                .addHeader("Sec-Fetch-Site", "same-origin")
+                .addHeader("Sec-Fetch-User", "?1")
                 .addHeader("Cookie", cookieHeaderString(cookieMap))
                 .build()
 
-            val resp = okHttpClient.newBuilder().followRedirects(false).build().newCall(req).execute()
-            val newCookies = resp.headers("Set-Cookie")
+            var statusCode = 0
+            var locationHeader = ""
+            var newCookies: List<String> = emptyList()
+            var html = ""
+            var isSuccessful = false
+            okHttpClient.newBuilder().followRedirects(false).build().newCall(req).execute().use { resp ->
+                statusCode = resp.code
+                locationHeader = resp.header("Location").orEmpty()
+                newCookies = resp.headers("Set-Cookie")
+                html = resp.body?.string().orEmpty()
+                isSuccessful = resp.isSuccessful
+            }
             cookieMap = mergeCookies(cookieMap, parseCookiesFromHeaders(newCookies)).toMutableMap()
-
-            val statusCode = resp.code
-            val locationHeader = resp.header("Location") ?: ""
 
             if (statusCode in 300..399) {
                 return@withContext exchangeAspSessionToModernToken(session.baseUrl, cookieMap, session.neptunCode)
             }
 
-            val html = resp.body?.string() ?: ""
             val errors = extractValidationErrors(html)
-            if (errors.isEmpty() && (html.contains("ToNeptunWeb", ignoreCase = true) || html.contains("Kijelentkezés", ignoreCase = true) || locationHeader.isNotEmpty() || resp.isSuccessful)) {
+            if (errors.isEmpty() && (html.contains("ToNeptunWeb", ignoreCase = true) || html.contains("Kijelentkezés", ignoreCase = true) || locationHeader.isNotEmpty() || isSuccessful)) {
                 return@withContext exchangeAspSessionToModernToken(session.baseUrl, cookieMap, session.neptunCode)
             }
 
@@ -728,19 +821,29 @@ class NeptunApiClient {
                 .build()
 
             val noRedirectClient = okHttpClient.newBuilder().followRedirects(false).followSslRedirects(false).build()
-            val bridgeResp = noRedirectClient.newCall(bridgeReq).execute()
-            var locationHeader = bridgeResp.header("Location") ?: ""
-            var modernCookies = bridgeResp.headers("Set-Cookie")
-            var modernCookieMap = mergeCookies(cookies, parseCookiesFromHeaders(modernCookies)).toMutableMap()
+            var locationHeader = ""
+            var bridgeHtml = ""
+            var modernCookieMap = cookies.toMutableMap()
+            noRedirectClient.newCall(bridgeReq).execute().use { bridgeResp ->
+                locationHeader = bridgeResp.header("Location") ?: ""
+                val modernCookies = bridgeResp.headers("Set-Cookie")
+                modernCookieMap = mergeCookies(cookies, parseCookiesFromHeaders(modernCookies)).toMutableMap()
+                if (locationHeader.isEmpty() && bridgeResp.code == 200) {
+                    bridgeHtml = bridgeResp.body?.string().orEmpty()
+                }
+            }
+
+            if (locationHeader.contains("Account/Login", ignoreCase = true)) {
+                locationHeader = ""
+            }
 
             // If it returned 200 instead of 302, inspect HTML or form submission
-            if (locationHeader.isEmpty() && bridgeResp.code == 200) {
-                val html = bridgeResp.body?.string() ?: ""
-                val outerLoginMatch = Regex("""(https?://[^\s"'<>]*/outerlogin[^\s"'<>]*)""", RegexOption.IGNORE_CASE).find(html)
+            if (locationHeader.isEmpty() && bridgeHtml.isNotEmpty()) {
+                val outerLoginMatch = Regex("""(https?://[^\s"'<>]*/outerlogin[^\s"'<>]*)""", RegexOption.IGNORE_CASE).find(bridgeHtml)
                 if (outerLoginMatch != null) {
                     locationHeader = outerLoginMatch.groupValues[1]
                 } else {
-                    val inputs = parseFormInputs(html, "FormToNeptun")
+                    val inputs = parseFormInputs(bridgeHtml, "FormToNeptun")
                     if (inputs.isNotEmpty()) {
                         val formBuilder = FormBody.Builder()
                             .add("NeptunWebType", inputs["NeptunWebType"] ?: "HWeb")
@@ -760,36 +863,90 @@ class NeptunApiClient {
                             .addHeader("User-Agent", DEFAULT_USER_AGENT)
                             .addHeader("Referer", bridgeUrl)
                             .addHeader("Origin", cleanBase)
+                            .addHeader("Upgrade-Insecure-Requests", "1")
+                            .addHeader("Sec-Fetch-Dest", "document")
+                            .addHeader("Sec-Fetch-Mode", "navigate")
+                            .addHeader("Sec-Fetch-Site", "same-origin")
+                            .addHeader("Sec-Fetch-User", "?1")
                             .addHeader("Cookie", cookieHeaderString(modernCookieMap))
                             .build()
-                        val formResp = noRedirectClient.newCall(formReq).execute()
-                        locationHeader = formResp.header("Location") ?: ""
-                        modernCookieMap = mergeCookies(modernCookieMap, parseCookiesFromHeaders(formResp.headers("Set-Cookie"))).toMutableMap()
+                        noRedirectClient.newCall(formReq).execute().use { formResp ->
+                            val postLoc = formResp.header("Location") ?: ""
+                            if (!postLoc.contains("Account/Login", ignoreCase = true)) {
+                                locationHeader = postLoc
+                            }
+                            modernCookieMap = mergeCookies(modernCookieMap, parseCookiesFromHeaders(formResp.headers("Set-Cookie"))).toMutableMap()
+                        }
                     }
                 }
             }
 
-            if (locationHeader.isEmpty()) {
+            if (locationHeader.isEmpty() || locationHeader.contains("Account/Login", ignoreCase = true)) {
                 val homeReq = Request.Builder()
                     .url("$cleanBase/")
                     .get()
+                    .addHeader("User-Agent", DEFAULT_USER_AGENT)
                     .addHeader("Cookie", cookieHeaderString(modernCookieMap))
                     .build()
-                val homeResp = okHttpClient.newCall(homeReq).execute()
-                val homeHtml = homeResp.body?.string() ?: ""
+                val homeHtml = okHttpClient.newCall(homeReq).execute().use { homeResp ->
+                    modernCookieMap = mergeCookies(modernCookieMap, parseCookiesFromHeaders(homeResp.headers("Set-Cookie"))).toMutableMap()
+                    homeResp.body?.string().orEmpty()
+                }
                 val m = Regex("""(https?://[^\s"'<>]*/outerlogin[^\s"'<>]*)""", RegexOption.IGNORE_CASE).find(homeHtml)
                 if (m != null) {
                     locationHeader = m.groupValues[1]
+                } else {
+                    val homeInputs = parseFormInputs(homeHtml, "FormToNeptun")
+                    if (homeInputs.isNotEmpty()) {
+                        val formBuilder = FormBody.Builder()
+                            .add("NeptunWebType", homeInputs["NeptunWebType"] ?: "HWeb")
+                            .add("NeptunWebIndex", homeInputs["NeptunWebIndex"] ?: "")
+                        val vToken = homeInputs["__RequestVerificationToken"] ?: ""
+                        if (vToken.isNotEmpty()) {
+                            formBuilder.add("__RequestVerificationToken", vToken)
+                        }
+                        for ((k, v) in homeInputs) {
+                            if (k != "NeptunWebType" && k != "NeptunWebIndex" && k != "__RequestVerificationToken") {
+                                formBuilder.add(k, v)
+                            }
+                        }
+                        val formReq = Request.Builder()
+                            .url(bridgeUrl)
+                            .post(formBuilder.build())
+                            .addHeader("User-Agent", DEFAULT_USER_AGENT)
+                            .addHeader("Referer", "$cleanBase/")
+                            .addHeader("Origin", cleanBase)
+                            .addHeader("Upgrade-Insecure-Requests", "1")
+                            .addHeader("Sec-Fetch-Dest", "document")
+                            .addHeader("Sec-Fetch-Mode", "navigate")
+                            .addHeader("Sec-Fetch-Site", "same-origin")
+                            .addHeader("Sec-Fetch-User", "?1")
+                            .addHeader("Cookie", cookieHeaderString(modernCookieMap))
+                            .build()
+                        noRedirectClient.newCall(formReq).execute().use { formResp ->
+                            val postLoc = formResp.header("Location") ?: ""
+                            if (!postLoc.contains("Account/Login", ignoreCase = true)) {
+                                locationHeader = postLoc
+                            }
+                            modernCookieMap = mergeCookies(modernCookieMap, parseCookiesFromHeaders(formResp.headers("Set-Cookie"))).toMutableMap()
+                        }
+                    }
                 }
             }
 
             Log.d(tag, "exchangeAspSessionToModernToken locationHeader: $locationHeader")
 
-            if (locationHeader.isNotEmpty()) {
+            if (locationHeader.isNotEmpty() && !locationHeader.contains("Account/Login", ignoreCase = true)) {
                 val outerResult = followOuterLoginAndGetToken(locationHeader, modernCookieMap, username)
                 if (outerResult is NeptunAuthResult.Success) {
                     return@withContext outerResult
                 }
+            }
+
+            val effectiveBaseUrl = if (cleanBase.contains("elte.hu", ignoreCase = true) && !cleanBase.contains("hallgato", ignoreCase = true)) {
+                "https://hallgato1.neptun.elte.hu"
+            } else {
+                cleanBase
             }
 
             return@withContext NeptunAuthResult.Success(
@@ -799,10 +956,15 @@ class NeptunApiClient {
                 studentName = "Hallgató ($username)",
                 trainingProgram = "Egyetemi képzés",
                 isModernApi = false,
-                normalizedBaseUrl = cleanBase
+                normalizedBaseUrl = effectiveBaseUrl
             )
         } catch (e: Exception) {
             Log.e(tag, "exchangeAspSessionToModernToken error: ${e.message}")
+            val effectiveBaseUrl = if (aspBaseUrl.contains("elte.hu", ignoreCase = true) && !aspBaseUrl.contains("hallgato", ignoreCase = true)) {
+                "https://hallgato1.neptun.elte.hu"
+            } else {
+                aspBaseUrl
+            }
             return@withContext NeptunAuthResult.Success(
                 accessToken = "aspnet-session-$username",
                 refreshToken = null,
@@ -810,7 +972,7 @@ class NeptunApiClient {
                 studentName = "Hallgató ($username)",
                 trainingProgram = "Egyetemi képzés",
                 isModernApi = false,
-                normalizedBaseUrl = aspBaseUrl
+                normalizedBaseUrl = effectiveBaseUrl
             )
         }
     }
@@ -949,23 +1111,29 @@ class NeptunApiClient {
                 .addHeader("Cookie", cookieHeaderString(cookieMap))
                 .build()
 
-            val bridgeGetResp = noRedirectClient.newCall(bridgeReq).execute()
-            val getSetCookies = bridgeGetResp.headers("Set-Cookie")
-            if (getSetCookies.isNotEmpty()) {
-                cookieMap = mergeCookies(cookieMap, parseCookiesFromHeaders(getSetCookies))
+            var getLocation = ""
+            var bridgeHtml = ""
+            val getCode = noRedirectClient.newCall(bridgeReq).execute().use { bridgeGetResp ->
+                val getSetCookies = bridgeGetResp.headers("Set-Cookie")
+                if (getSetCookies.isNotEmpty()) {
+                    cookieMap = mergeCookies(cookieMap, parseCookiesFromHeaders(getSetCookies))
+                }
+                getLocation = bridgeGetResp.header("Location") ?: ""
+                if (getLocation.isEmpty() && bridgeGetResp.code == 200) {
+                    bridgeHtml = bridgeGetResp.body?.string().orEmpty()
+                }
+                bridgeGetResp.code
             }
 
-            val getLocation = bridgeGetResp.header("Location") ?: ""
             // Ha a Login oldalra irányít át, a szerveroldali munkamenet valóban lejárt
             if (getLocation.contains("Account/Login", ignoreCase = true)) {
                 return@withContext NeptunAuthResult.Failure("ASP.NET munkamenet lejárt – újra be kell lépni.")
             }
 
             var outerLoginUrl = ""
-            if (bridgeGetResp.code in 300..399 && getLocation.contains("outerlogin", ignoreCase = true)) {
+            if (getCode in 300..399 && getLocation.contains("outerlogin", ignoreCase = true)) {
                 outerLoginUrl = getLocation
             } else {
-                val bridgeHtml = bridgeGetResp.body?.string() ?: ""
                 val m = Regex("""(https?://[^\s"'<>]*/outerlogin[^\s"'<>]*)""", RegexOption.IGNORE_CASE).find(bridgeHtml)
                 if (m != null) {
                     outerLoginUrl = m.groupValues[1]
@@ -991,15 +1159,26 @@ class NeptunApiClient {
                         .addHeader("Accept-Language", "hu-HU,hu;q=0.9,en-US;q=0.8,en;q=0.7")
                         .addHeader("Referer", bridgeUrl)
                         .addHeader("Origin", cleanBase)
+                        .addHeader("Upgrade-Insecure-Requests", "1")
+                        .addHeader("Sec-Fetch-Dest", "document")
+                        .addHeader("Sec-Fetch-Mode", "navigate")
+                        .addHeader("Sec-Fetch-Site", "same-origin")
+                        .addHeader("Sec-Fetch-User", "?1")
                         .addHeader("Cookie", cookieHeaderString(cookieMap))
                         .build()
 
-                    val bridgePostResp = noRedirectClient.newCall(bridgePostReq).execute()
-                    val postSetCookies = bridgePostResp.headers("Set-Cookie")
-                    if (postSetCookies.isNotEmpty()) {
-                        cookieMap = mergeCookies(cookieMap, parseCookiesFromHeaders(postSetCookies))
+                    var postLocation = ""
+                    var postHtml = ""
+                    noRedirectClient.newCall(bridgePostReq).execute().use { bridgePostResp ->
+                        val postSetCookies = bridgePostResp.headers("Set-Cookie")
+                        if (postSetCookies.isNotEmpty()) {
+                            cookieMap = mergeCookies(cookieMap, parseCookiesFromHeaders(postSetCookies))
+                        }
+                        postLocation = bridgePostResp.header("Location") ?: ""
+                        if (postLocation.isEmpty()) {
+                            postHtml = bridgePostResp.body?.string().orEmpty()
+                        }
                     }
-                    val postLocation = bridgePostResp.header("Location") ?: ""
 
                     if (postLocation.contains("Account/Login", ignoreCase = true)) {
                         return@withContext NeptunAuthResult.Failure("ASP.NET munkamenet lejárt – újra be kell lépni.")
@@ -1008,7 +1187,6 @@ class NeptunApiClient {
                     if (postLocation.contains("outerlogin", ignoreCase = true)) {
                         outerLoginUrl = postLocation
                     } else {
-                        val postHtml = bridgePostResp.body?.string() ?: ""
                         val postM = Regex("""(https?://[^\s"'<>]*/outerlogin[^\s"'<>]*)""", RegexOption.IGNORE_CASE).find(postHtml)
                         if (postM != null) {
                             outerLoginUrl = postM.groupValues[1]
@@ -1327,6 +1505,7 @@ class NeptunApiClient {
     }
 
     private suspend fun tryLegacyLogin(baseUrl: String, username: String, password: String): Boolean = withContext(Dispatchers.IO) {
+        if (baseUrl.contains("elte.hu", ignoreCase = true)) return@withContext false
         try {
             val url = getLegacyServiceUrl(baseUrl, "GetTrainings")
             val payload = buildJsonObject {
@@ -1765,6 +1944,7 @@ class NeptunApiClient {
     }
 
     private suspend fun getLegacyCalendarEvents(baseUrl: String, user: String, pass: String): List<CalendarEvent> = withContext(Dispatchers.IO) {
+        if (baseUrl.contains("elte.hu", ignoreCase = true)) return@withContext emptyList()
         try {
             val now = System.currentTimeMillis()
             val startEpoch = now - 7 * 86400000L
@@ -2116,6 +2296,7 @@ class NeptunApiClient {
     }
 
     private suspend fun getLegacyGrades(baseUrl: String, user: String, pass: String): List<SubjectGrade> = withContext(Dispatchers.IO) {
+        if (baseUrl.contains("elte.hu", ignoreCase = true)) return@withContext emptyList()
         try {
             val body = """{"UserLogin":"$user","Password":"$pass","CurrentPage":1,"filter":{"TermID":0},"TotalRowCount":-1}"""
             val url = getLegacyServiceUrl(baseUrl, "GetMarkbookData")
@@ -2400,7 +2581,7 @@ class NeptunApiClient {
         }
 
         // If legacy or modern failed, try legacy /GetMessages with message ID
-        if (username.isNotBlank() && password.isNotBlank()) {
+        if (username.isNotBlank() && password.isNotBlank() && !baseUrl.contains("elte.hu", ignoreCase = true)) {
             try {
                 val numId = messageId.toLongOrNull() ?: 0L
                 val body = """{"UserLogin":"$username","Password":"$password","CurrentPage":0,"TotalRowCount":-1,"MessageID":$numId,"MessageSortEnum":0}"""
@@ -2438,6 +2619,7 @@ class NeptunApiClient {
     }
 
     private suspend fun getLegacyMessages(baseUrl: String, user: String, pass: String, page: Int): List<NeptunMessage> = withContext(Dispatchers.IO) {
+        if (baseUrl.contains("elte.hu", ignoreCase = true)) return@withContext emptyList()
         try {
             val body = """{"UserLogin":"$user","Password":"$pass","CurrentPage":$page,"TotalRowCount":-1,"MessageID":0,"MessageSortEnum":0}"""
             val url = getLegacyServiceUrl(baseUrl, "GetMessages")
@@ -2734,6 +2916,7 @@ class NeptunApiClient {
     }
 
     private suspend fun getLegacyExams(baseUrl: String, user: String, pass: String): List<ExamItem> = withContext(Dispatchers.IO) {
+        if (baseUrl.contains("elte.hu", ignoreCase = true)) return@withContext emptyList()
         try {
             val body = """
                 {
@@ -3117,6 +3300,7 @@ class NeptunApiClient {
     }
 
     private suspend fun getLegacyFinances(baseUrl: String, user: String, pass: String): List<FinanceItem> = withContext(Dispatchers.IO) {
+        if (baseUrl.contains("elte.hu", ignoreCase = true)) return@withContext emptyList()
         try {
             val body = """{"UserLogin":"$user","Password":"$pass","TotalRowCount":-1}"""
             val url = getLegacyServiceUrl(baseUrl, "GetCashinData")
@@ -3210,6 +3394,8 @@ class NeptunApiClient {
     ): com.example.domain.model.DegreeProgress? = withContext(Dispatchers.IO) {
         val candidateBaseUrls = if (baseUrl.contains("hallgato2_uj", ignoreCase = true)) {
             listOf(baseUrl, baseUrl.replace("hallgato2_uj", "hallgato2_api", ignoreCase = true)).distinct()
+        } else if (baseUrl.contains("elte.hu", ignoreCase = true) && !baseUrl.contains("hallgato", ignoreCase = true)) {
+            listOf("https://hallgato1.neptun.elte.hu")
         } else {
             listOf(baseUrl)
         }
@@ -3329,6 +3515,8 @@ class NeptunApiClient {
     ): List<com.example.domain.model.AcademicPeriod> = withContext(Dispatchers.IO) {
         val candidateBaseUrls = if (baseUrl.contains("hallgato2_uj", ignoreCase = true)) {
             listOf(baseUrl, baseUrl.replace("hallgato2_uj", "hallgato2_api", ignoreCase = true)).distinct()
+        } else if (baseUrl.contains("elte.hu", ignoreCase = true) && !baseUrl.contains("hallgato", ignoreCase = true)) {
+            listOf("https://hallgato1.neptun.elte.hu")
         } else {
             listOf(baseUrl)
         }

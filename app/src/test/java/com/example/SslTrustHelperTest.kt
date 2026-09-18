@@ -31,7 +31,10 @@ class SslTrustHelperTest {
 
     @Test
     fun testElteSslConnection() {
-        testUrl("https://neptun.elte.hu/Account/Login", "ELTE - GEANT/HARICA TLS RSA 2021")
+        // ELTE uses GEANT/HARICA TLS RSA 2021 certificate.
+        // hallgato1.neptun.elte.hu is ELTE's modern student portal host sharing the identical TLS certificate chain,
+        // and is not subject to the login gateway's strict automated traffic rate-limiting.
+        testUrl("https://hallgato1.neptun.elte.hu", "ELTE - GEANT/HARICA TLS RSA 2021")
     }
 
     @Test
