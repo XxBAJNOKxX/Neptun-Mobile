@@ -137,7 +137,6 @@ dependencies {
   implementation(libs.androidx.biometric)
   // implementation(libs.coil.compose)
   implementation(libs.kotlinx.serialization.json)
-  implementation(libs.firebase.ai)
   // Uncomment to use Firestore:
   // implementation(libs.firebase.firestore)
 
