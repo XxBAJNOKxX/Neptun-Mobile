@@ -218,6 +218,7 @@ class SettingsViewModel(
 
     fun setTargetCredits(credits: Int) {
         prefsManager.setTargetCredits(credits)
+        prefsManager.setShouldAutoSetTargetCredits(false)
     }
 
     fun setBiometricLockEnabled(enabled: Boolean) {

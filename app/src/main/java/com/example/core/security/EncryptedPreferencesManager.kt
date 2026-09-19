@@ -7,12 +7,15 @@ import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.example.domain.model.StudentCredentials
+import com.example.domain.model.DegreeProgress
 import com.example.ui.theme.AppAccentColor
 import com.example.ui.theme.ThemeMode
 import com.example.ui.theme.ThemeSettings
+import android.util.Log
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.serialization.json.Json
 
 /**
  * Adataink forrása (UI visszajelzéshez): valódi szerveradat, demo bejelentkezés vagy mock adat.
@@ -279,6 +282,35 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
 
     fun getShouldAutoSetTargetCredits(): Boolean {
         return prefs.getBoolean(KEY_AUTO_SET_TARGET_CREDITS, true)
+    }
+
+    // ------------------------------------------------------------------ //
+    // Tanulmányi előrehaladás (DegreeProgress) perzisztencia
+    // ------------------------------------------------------------------ //
+
+    private val jsonSerializer = Json { ignoreUnknownKeys = true }
+
+    fun saveDegreeProgress(progress: DegreeProgress) {
+        try {
+            val jsonStr = jsonSerializer.encodeToString(DegreeProgress.serializer(), progress)
+            prefs.edit().putString(KEY_DEGREE_PROGRESS, jsonStr).apply()
+        } catch (e: Exception) {
+            Log.e("EncryptedPrefs", "saveDegreeProgress error: ${e.message}")
+        }
+    }
+
+    fun getDegreeProgress(): DegreeProgress? {
+        val jsonStr = prefs.getString(KEY_DEGREE_PROGRESS, null) ?: return null
+        return try {
+            jsonSerializer.decodeFromString(DegreeProgress.serializer(), jsonStr)
+        } catch (e: Exception) {
+            Log.e("EncryptedPrefs", "getDegreeProgress error: ${e.message}")
+            null
+        }
+    }
+
+    fun clearDegreeProgress() {
+        prefs.edit().remove(KEY_DEGREE_PROGRESS).apply()
     }
 
     fun setBiometricLockEnabled(enabled: Boolean) {
@@ -685,6 +717,7 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
         private const val KEY_CACHED_LANGUAGES = "key_cached_languages"
         private const val KEY_NOTIFIED_PREFIX = "key_notified_"
         private const val KEY_NOTIFIED_BASELINE_PREFIX = "key_notified_baseline_"
+        private const val KEY_DEGREE_PROGRESS = "key_degree_progress"
     }
 }
 

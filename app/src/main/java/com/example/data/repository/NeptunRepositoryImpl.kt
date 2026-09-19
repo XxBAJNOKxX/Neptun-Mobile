@@ -22,12 +22,15 @@ import com.example.domain.model.FinanceItem
 import com.example.domain.model.NeptunMessage
 import com.example.domain.model.SubjectGrade
 import com.example.domain.repository.NeptunRepository
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class NeptunRepositoryImpl(
@@ -54,8 +57,24 @@ class NeptunRepositoryImpl(
         }
     }
 
-    private val _degreeProgressFlow = MutableStateFlow<DegreeProgress?>(null)
+    private val _degreeProgressFlow = MutableStateFlow<DegreeProgress?>(prefsManager.getDegreeProgress())
     private val _academicPeriodsFlow = MutableStateFlow<List<AcademicPeriod>>(emptyList())
+
+    init {
+        CoroutineScope(Dispatchers.IO).launch {
+            prefsManager.personalizationFlow.collect { personalization ->
+                _degreeProgressFlow.update { current ->
+                    if (current != null && current.totalRequiredCredits != personalization.targetCredits) {
+                        val updated = current.copy(totalRequiredCredits = personalization.targetCredits)
+                        prefsManager.saveDegreeProgress(updated)
+                        updated
+                    } else {
+                        current
+                    }
+                }
+            }
+        }
+    }
 
     override fun getFinances(): Flow<List<FinanceItem>> {
         return database.financesDao().getAllFinances().map { entities ->
@@ -723,7 +742,9 @@ class NeptunRepositoryImpl(
         val creds = prefsManager.loadCredentials()
         val isDemo = creds?.neptunCode == "DEMO01" || prefsManager.getDataMode() == DataMode.DEMO
         if (isDemo) {
-            _degreeProgressFlow.value = MockNeptunDataSource.getMockDegreeProgress()
+            val mock = MockNeptunDataSource.getMockDegreeProgress()
+            _degreeProgressFlow.value = mock
+            prefsManager.saveDegreeProgress(mock)
             return@withContext Result.success(Unit)
         }
 
@@ -731,7 +752,7 @@ class NeptunRepositoryImpl(
         if (creds != null && creds.neptunUrl.isNotEmpty()) {
             val baseUrl = prefsManager.getBaseUrl().ifEmpty { creds.neptunUrl }
             val token = ensureValidToken(forceRefresh = false)
-            val trainingId = creds.trainingProgram
+            val trainingId = prefsManager.getStudentTrainingId().ifEmpty { creds.trainingProgram }
             val deviceCookie = prefsManager.getDeviceCookie(creds.neptunCode)
 
             if (token.isNotBlank()) {
@@ -755,47 +776,77 @@ class NeptunRepositoryImpl(
             val effectiveAvg = if (progress.cumulativeWeightedAverage > 0.0) progress.cumulativeWeightedAverage else ((dbAvg * 100).toInt() / 100.0)
             val effectiveIndex = if (progress.cumulativeCreditIndex > 0.0) progress.cumulativeCreditIndex else (if (dbCompletedCredits > 0) ((dbAvg * 0.95) * 100).toInt() / 100.0 else 0.0)
 
+            val userTarget = prefsManager.loadPersonalization().targetCredits.coerceIn(30, 400)
+            val effectiveTarget = if (!prefsManager.getShouldAutoSetTargetCredits()) {
+                userTarget
+            } else if (progress.totalRequiredCredits in 30..400) {
+                progress.totalRequiredCredits
+            } else {
+                userTarget
+            }
+
             progress = progress.copy(
+                totalRequiredCredits = effectiveTarget,
                 completedCredits = effectiveCompleted,
                 cumulativeWeightedAverage = effectiveAvg,
                 cumulativeCreditIndex = effectiveIndex
             )
 
             _degreeProgressFlow.value = progress
-            if (progress.totalRequiredCredits in 30..400) {
+            prefsManager.saveDegreeProgress(progress)
+            if (prefsManager.getShouldAutoSetTargetCredits() && progress.totalRequiredCredits in 30..400) {
                 prefsManager.setTargetCredits(progress.totalRequiredCredits)
-                prefsManager.setShouldAutoSetTargetCredits(false)
             }
         } else {
-            // Fallback calculation from local grades if server didn't provide structured advancement
-            try {
-                val allGrades = database.gradesDao().getAllGrades().first()
+            val existingProgress = _degreeProgressFlow.value ?: prefsManager.getDegreeProgress()
+            if (existingProgress != null && (existingProgress.templates.isNotEmpty() || existingProgress.totalCurriculums > 0)) {
+                val allGrades = try { database.gradesDao().getAllGrades().first() } catch (_: Exception) { emptyList() }
                 val completedGrades = allGrades.filter { (it.grade ?: 0) >= 2 }
                 val completedCredits = completedGrades.sumOf { it.credit }
-                val totalTarget = prefsManager.loadPersonalization().targetCredits.coerceIn(30, 400)
                 val sumGradeTimesCredits = completedGrades.sumOf { (it.grade ?: 0) * it.credit }
                 val avg = if (completedCredits > 0) sumGradeTimesCredits.toDouble() / completedCredits else 0.0
-
-                progress = DegreeProgress(
-                    completedCredits = completedCredits,
-                    totalRequiredCredits = totalTarget,
-                    compulsoryCompleted = 0,
-                    compulsoryTotal = 0,
-                    compulsoryElectiveCompleted = 0,
-                    compulsoryElectiveTotal = 0,
-                    freeElectiveCompleted = 0,
-                    freeElectiveTotal = 0,
-                    thesisCompleted = 0,
-                    thesisTotal = 0,
-                    criteriaPassedCount = 0,
-                    criteriaTotalCount = 0,
-                    cumulativeWeightedAverage = (avg * 100).toInt() / 100.0,
-                    cumulativeCreditIndex = if (completedCredits > 0) ((avg * 0.95) * 100).toInt() / 100.0 else 0.0,
-                    templates = emptyList()
+                val userTarget = prefsManager.loadPersonalization().targetCredits.coerceIn(30, 400)
+                val effectiveTarget = if (!prefsManager.getShouldAutoSetTargetCredits()) userTarget else existingProgress.totalRequiredCredits
+                val updated = existingProgress.copy(
+                    completedCredits = if (completedCredits > 0) completedCredits else existingProgress.completedCredits,
+                    totalRequiredCredits = effectiveTarget,
+                    cumulativeWeightedAverage = if (avg > 0.0) ((avg * 100).toInt() / 100.0) else existingProgress.cumulativeWeightedAverage,
+                    cumulativeCreditIndex = if (completedCredits > 0) ((avg * 0.95) * 100).toInt() / 100.0 else existingProgress.cumulativeCreditIndex
                 )
-                _degreeProgressFlow.value = progress
-            } catch (e: Exception) {
-                e.printStackTrace()
+                _degreeProgressFlow.value = updated
+                prefsManager.saveDegreeProgress(updated)
+            } else {
+                // Fallback calculation from local grades if server didn't provide structured advancement
+                try {
+                    val allGrades = database.gradesDao().getAllGrades().first()
+                    val completedGrades = allGrades.filter { (it.grade ?: 0) >= 2 }
+                    val completedCredits = completedGrades.sumOf { it.credit }
+                    val totalTarget = prefsManager.loadPersonalization().targetCredits.coerceIn(30, 400)
+                    val sumGradeTimesCredits = completedGrades.sumOf { (it.grade ?: 0) * it.credit }
+                    val avg = if (completedCredits > 0) sumGradeTimesCredits.toDouble() / completedCredits else 0.0
+
+                    progress = DegreeProgress(
+                        completedCredits = completedCredits,
+                        totalRequiredCredits = totalTarget,
+                        compulsoryCompleted = 0,
+                        compulsoryTotal = 0,
+                        compulsoryElectiveCompleted = 0,
+                        compulsoryElectiveTotal = 0,
+                        freeElectiveCompleted = 0,
+                        freeElectiveTotal = 0,
+                        thesisCompleted = 0,
+                        thesisTotal = 0,
+                        criteriaPassedCount = 0,
+                        criteriaTotalCount = 0,
+                        cumulativeWeightedAverage = (avg * 100).toInt() / 100.0,
+                        cumulativeCreditIndex = if (completedCredits > 0) ((avg * 0.95) * 100).toInt() / 100.0 else 0.0,
+                        templates = emptyList()
+                    )
+                    _degreeProgressFlow.value = progress
+                    prefsManager.saveDegreeProgress(progress)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
             }
         }
 
@@ -853,13 +904,15 @@ class NeptunRepositoryImpl(
                 val token = ensureValidToken()
                 val isModern = prefsManager.isModernApi()
                 val password = prefsManager.getPassword()
+                val deviceCookie = prefsManager.getDeviceCookie(creds.neptunCode)
                 neptunApiClient.markMessageAsReadOnServer(
                     baseUrl = baseUrl,
                     token = token,
                     messageId = messageId,
                     isModern = isModern,
                     username = creds.neptunCode,
-                    password = password
+                    password = password,
+                    deviceCookie = deviceCookie
                 )
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -885,6 +938,7 @@ class NeptunRepositoryImpl(
                 var token = ensureValidToken()
                 val isModern = prefsManager.isModernApi()
                 val password = prefsManager.getPassword()
+                val deviceCookie = prefsManager.getDeviceCookie(creds.neptunCode)
 
                 var content = neptunApiClient.getMessageContent(
                     baseUrl = baseUrl,
@@ -892,20 +946,23 @@ class NeptunRepositoryImpl(
                     messageId = messageId,
                     isModern = isModern,
                     username = creds.neptunCode,
-                    password = password
+                    password = password,
+                    deviceCookie = deviceCookie
                 )
 
                 // If content is empty and modern API, attempt token refresh and retry
                 if (content.isBlank() && isModern && creds.neptunCode.isNotEmpty()) {
                     token = ensureValidToken(forceRefresh = true)
                     if (token.isNotBlank()) {
+                        val updatedCookie = prefsManager.getDeviceCookie(creds.neptunCode)
                         content = neptunApiClient.getMessageContent(
                             baseUrl = baseUrl,
                             token = token,
                             messageId = messageId,
                             isModern = isModern,
                             username = creds.neptunCode,
-                            password = password
+                            password = password,
+                            deviceCookie = updatedCookie
                         )
                     }
                 }
@@ -921,7 +978,7 @@ class NeptunRepositoryImpl(
                         bodyHtml = content,
                         previewText = plainPreview.take(150)
                     )
-                    database.messagesDao().markAsRead(messageId)
+                    markMessageAsRead(messageId)
                     return@withContext content
                 }
             } catch (e: Exception) {
@@ -933,7 +990,7 @@ class NeptunRepositoryImpl(
         val existing = database.messagesDao().getAllMessages().first().firstOrNull { it.id == messageId }
         val body = existing?.bodyHtml ?: ""
         if (body.isNotBlank()) {
-            database.messagesDao().markAsRead(messageId)
+            markMessageAsRead(messageId)
             return@withContext body
         }
 
@@ -945,7 +1002,7 @@ class NeptunRepositoryImpl(
                 bodyHtml = fallbackContent,
                 previewText = fallbackContent.take(150)
             )
-            database.messagesDao().markAsRead(messageId)
+            markMessageAsRead(messageId)
             return@withContext fallbackContent
         }
 
@@ -959,6 +1016,7 @@ class NeptunRepositoryImpl(
         database.financesDao().clearAll()
         database.examsDao().clearAll()
         _degreeProgressFlow.value = null
+        prefsManager.clearDegreeProgress()
         _academicPeriodsFlow.value = emptyList()
     }
 }

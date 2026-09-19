@@ -174,5 +174,77 @@ class NeptunApiClientTest {
         assertTrue(!errors[0].contains("button"))
         assertEquals("Az e-mail kód kötőjel utáni része csak számjegyekből állhat!", errors[1])
     }
+
+    @Test
+    fun testDegreeProgressSerialization() {
+        val original = com.example.domain.model.DegreeProgress(
+            completedCredits = 105,
+            totalRequiredCredits = 210,
+            completedCurriculums = 2,
+            totalCurriculums = 3,
+            compulsoryCompleted = 60,
+            compulsoryTotal = 120,
+            templates = listOf(
+                com.example.domain.model.CurriculumTemplateItem(
+                    id = "T1",
+                    name = "Alapozó tárgyak",
+                    completedCredits = 30,
+                    totalCredits = 30,
+                    isCompleted = true
+                )
+            )
+        )
+        val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }.encodeToString(
+            com.example.domain.model.DegreeProgress.serializer(),
+            original
+        )
+        val decoded = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }.decodeFromString(
+            com.example.domain.model.DegreeProgress.serializer(),
+            json
+        )
+        assertEquals(105, decoded.completedCredits)
+        assertEquals(210, decoded.totalRequiredCredits)
+        assertEquals(1, decoded.templates.size)
+        assertEquals("Alapozó tárgyak", decoded.templates[0].name)
+        assertEquals(50, decoded.progressPercentage)
+    }
+
+    @Test
+    fun testTargetCreditsDynamicCalculation() {
+        val progress = com.example.domain.model.DegreeProgress(
+            completedCredits = 120,
+            totalRequiredCredits = 240
+        )
+        assertEquals(0.5f, progress.progressFraction, 0.001f)
+        assertEquals(50, progress.progressPercentage)
+
+        // When user overrides target credits in settings to 180:
+        val updated = progress.copy(totalRequiredCredits = 180)
+        assertEquals(0.666f, updated.progressFraction, 0.01f)
+        assertEquals(66, updated.progressPercentage)
+    }
+
+    @Test
+    fun testTimetableMessagesI18n() {
+        val hu = com.example.core.i18n.AppStringsProvider.HUNGARIAN
+        val en = com.example.core.i18n.AppStringsProvider.ENGLISH
+        val de = com.example.core.i18n.AppStringsProvider.GERMAN
+
+        assertTrue(hu.weekendFreeMessages.size >= 4)
+        assertTrue(hu.weekdayFreeMessages.size >= 4)
+        assertTrue(hu.classesDoneMessages.size >= 4)
+
+        assertTrue(en.weekendFreeMessages.size >= 4)
+        assertTrue(en.weekdayFreeMessages.size >= 4)
+        assertTrue(en.classesDoneMessages.size >= 4)
+
+        assertTrue(de.weekendFreeMessages.size >= 4)
+        assertTrue(de.weekdayFreeMessages.size >= 4)
+        assertTrue(de.classesDoneMessages.size >= 4)
+
+        assertTrue(hu.targetCreditsDesc.contains("Kezdőlap"))
+        assertTrue(en.targetCreditsDesc.contains("Dashboard"))
+        assertTrue(de.targetCreditsDesc.contains("Startseiten"))
+    }
 }
 

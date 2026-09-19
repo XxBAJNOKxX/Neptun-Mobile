@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.Grading
@@ -36,6 +37,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -143,6 +145,7 @@ fun DashboardScreen(
                 NextClassCard(
                     ongoing = uiState.ongoingEvent,
                     next = uiState.nextEvent,
+                    hasClassesToday = uiState.todayClasses.isNotEmpty(),
                     onOpenTimetable = { onNavigate(NavigationItem.TIMETABLE) }
                 )
             }
@@ -217,12 +220,19 @@ fun DashboardScreen(
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Column(
-                            modifier = Modifier.padding(24.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
+                        Row(
+                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
+                            Icon(
+                                imageVector = Icons.Default.DateRange,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
                             Text(
-                                text = strings.noMoreClassesToday,
+                                text = strings.noClassesScheduledToday,
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -294,10 +304,30 @@ fun DashboardScreen(
 private fun NextClassCard(
     ongoing: CalendarEvent?,
     next: CalendarEvent?,
+    hasClassesToday: Boolean,
     onOpenTimetable: () -> Unit
 ) {
     val strings = currentStrings()
     val event = ongoing ?: next
+    val isWeekend = remember {
+        val dow = java.time.LocalDate.now().dayOfWeek
+        dow == java.time.DayOfWeek.SATURDAY || dow == java.time.DayOfWeek.SUNDAY
+    }
+
+    val randomMessage = remember(hasClassesToday, isWeekend, strings.languageCode) {
+        val dayOfYear = java.time.LocalDate.now().dayOfYear
+        if (hasClassesToday) {
+            val list = strings.classesDoneMessages
+            list[dayOfYear % list.size]
+        } else if (isWeekend) {
+            val list = strings.weekendFreeMessages
+            list[dayOfYear % list.size]
+        } else {
+            val list = strings.weekdayFreeMessages
+            list[dayOfYear % list.size]
+        }
+    }
+
     Card(
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
@@ -314,8 +344,26 @@ private fun NextClassCard(
     ) {
         if (event == null) {
             Column(modifier = Modifier.padding(18.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = if (hasClassesToday) Icons.Default.CheckCircle else Icons.Default.DateRange,
+                        contentDescription = null,
+                        tint = if (hasClassesToday) NeptunGreen else MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (hasClassesToday) strings.todayClasses
+                               else if (isWeekend) (when (strings.languageCode) { "de" -> "Wochenende"; "en" -> "Weekend"; else -> "Hétvége" })
+                               else strings.todayClasses,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = if (hasClassesToday) NeptunGreen else MaterialTheme.colorScheme.primary
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = strings.noMoreClassesToday,
+                    text = randomMessage,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface

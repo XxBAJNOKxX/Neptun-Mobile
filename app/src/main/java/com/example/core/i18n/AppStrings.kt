@@ -77,6 +77,10 @@ interface AppStrings {
     val todayClasses: String
     val noClassesToday: String
     val noMoreClassesToday: String
+    val noClassesScheduledToday: String
+    val weekendFreeMessages: List<String>
+    val weekdayFreeMessages: List<String>
+    val classesDoneMessages: List<String>
     val viewFullTimetable: String
     val recentMessages: String
     val unreadMessagesCount: (Int) -> String
@@ -538,6 +542,30 @@ class HungarianStrings : AppStrings {
     override val todayClasses = "Mai órák"
     override val noClassesToday = "Ma nincsenek óráid 🎉"
     override val noMoreClassesToday = "Mára végeztél az órákkal! 🎉"
+    override val noClassesScheduledToday = "Nincsenek órák a mai napra felvéve."
+    override val weekendFreeMessages = listOf(
+        "Kellemes hétvégét! Mára nincsenek óráid. ☕",
+        "Hétvégi pihenőidő! Kapcsolódj ki egy kicsit! 🎮",
+        "Élvezd a hétvégét, a Neptun most pihen! ✨",
+        "Nincs mára órarendi esemény. Jó pihenést! 🛋️",
+        "Hétvége van! Semmi órarendi kötelezettség mára. 🌿",
+        "Szép hétvégét kívánunk! Töltődj fel a következő hétre! ☀️"
+    )
+    override val weekdayFreeMessages = listOf(
+        "Mára egyetlen órád sincs beosztva. Élvezd a szabadnapot! 🏖️",
+        "Nincs mára órád! Kiváló alkalom a felkészülésre vagy pihenésre. 📚",
+        "Szabad a mai napod! Használd ki okosan! 🎯",
+        "Üres az órarend mára. Egy kis én-idő vagy tanulás? ☕",
+        "Mára tiszta a terep, nincsenek óráid. 🌟",
+        "Ma nincsenek óráid, egy szabad nap a naptáradban! 🧘"
+    )
+    override val classesDoneMessages = listOf(
+        "Mára végeztél az órákkal! 🎉",
+        "Minden mára tervezett óra véget ért. Szép munka! 👏",
+        "Mára letudva minden előadás és gyakorlat! Pihenj egy jót! 🛋️",
+        "Kész vagy a mai napra! Jöhet a megérdemelt pihenés! 🌟",
+        "Minden mai órán túl vagy. Sikeres nap volt! ✨"
+    )
     override val viewFullTimetable = "Teljes órarend megnyitása"
     override val recentMessages = "Legfrissebb üzenetek"
     override val unreadMessagesCount = { count: Int -> "$count olvasatlan üzenet" }
@@ -701,7 +729,7 @@ class HungarianStrings : AppStrings {
     override val visiblePagesLabel = "Látható oldalak"
     override val visiblePagesDesc = "A számodra nem hasznos oldalakat elrejtheted – eltűnnek az alsó sávból. A Profil mindig látható marad."
     override val targetCreditsLabel = "Cél kreditek (diploma)"
-    override val targetCreditsDesc = "A kredithaladás sávja ezt a célt mutatja a Jegyek fülön."
+    override val targetCreditsDesc = "A kredithaladás sávja ezt a célt mutatja a Jegyek, a Haladás és a Kezdőlap felületen."
     override val creditsUnit = "kredit"
     override val quietHoursLabel = "Halk órák"
     override val quietHoursDesc = "Ebben az időszakban nem küldünk üzenet-, jegy- és pénzügyi értesítést (az óra-emlékeztetők maradnak)."
@@ -994,6 +1022,27 @@ class EnglishStrings : AppStrings {
     override val todayClasses = "Today's Schedule"
     override val noClassesToday = "No classes today 🎉"
     override val noMoreClassesToday = "You're done for today! 🎉"
+    override val noClassesScheduledToday = "No classes scheduled for today."
+    override val weekendFreeMessages = listOf(
+        "Have a great weekend! No classes scheduled today. ☕",
+        "Weekend chill time! Take a well-deserved break! 🎮",
+        "Enjoy your weekend, Neptun can wait! ✨",
+        "No timetable events for today. Rest up! 🛋️",
+        "It's the weekend! Zero classes on your schedule today. 🌿"
+    )
+    override val weekdayFreeMessages = listOf(
+        "No classes scheduled for today. Enjoy your day off! 🏖️",
+        "Free day today! Great time to study or relax. 📚",
+        "Your schedule is clear today! Make the most of it! 🎯",
+        "Empty timetable today. Time for yourself or study? ☕",
+        "All clear today, no classes on your schedule. 🌟"
+    )
+    override val classesDoneMessages = listOf(
+        "You're done for today! 🎉",
+        "All classes for today are finished. Great job! 👏",
+        "Lectures and labs are done for today! Enjoy your evening! 🛋️",
+        "Done for the day! Time to relax! 🌟"
+    )
     override val viewFullTimetable = "Open full timetable"
     override val recentMessages = "Recent Messages"
     override val unreadMessagesCount = { count: Int -> "$count unread messages" }
@@ -1157,7 +1206,7 @@ class EnglishStrings : AppStrings {
     override val visiblePagesLabel = "Visible Pages"
     override val visiblePagesDesc = "Hide pages you don't need – they will disappear from the bottom bar. Settings remains visible."
     override val targetCreditsLabel = "Target Credits (Degree)"
-    override val targetCreditsDesc = "Credit progress bar shows this target on the Grades tab."
+    override val targetCreditsDesc = "The credit progress bar shows this target on the Grades, Degree Progress, and Dashboard screens."
     override val creditsUnit = "credits"
     override val quietHoursLabel = "Quiet Hours"
     override val quietHoursDesc = "No message, grade, or finance alerts will be sent during this period (class reminders remain active)."
@@ -1450,6 +1499,25 @@ class GermanStrings : AppStrings {
     override val todayClasses = "Heutiger Stundenplan"
     override val noClassesToday = "Heute keine Vorlesungen 🎉"
     override val noMoreClassesToday = "Für heute sind alle Vorlesungen vorbei! 🎉"
+    override val noClassesScheduledToday = "Für heute sind keine Vorlesungen eingetragen."
+    override val weekendFreeMessages = listOf(
+        "Schönes Wochenende! Heute keine Vorlesungen. ☕",
+        "Wochenendpause! Gönn dir eine Auszeit! 🎮",
+        "Genieß das Wochenende, Neptun schläft auch! ✨",
+        "Keine Termine im Stundenplan für heute. Gute Erholung! 🛋️"
+    )
+    override val weekdayFreeMessages = listOf(
+        "Heute stehen keine Vorlesungen an. Genieß den freien Tag! 🏖️",
+        "Vorlesungsfreier Tag! Gute Zeit zum Lernen oder Entspannen. 📚",
+        "Dein Tag ist frei! Nutze ihn sinnvoll! 🎯",
+        "Keine Vorlesungen heute. Zeit für Kaffee oder Selbststudium? ☕"
+    )
+    override val classesDoneMessages = listOf(
+        "Für heute sind alle Vorlesungen vorbei! 🎉",
+        "Alle Vorlesungen für heute beendet. Gute Arbeit! 👏",
+        "Feierabend für heute! Genieß deinen wohlverdienten Feierabend! 🛋️",
+        "Geschafft für heute! Jetzt ist Zeit zum Entspannen! 🌟"
+    )
     override val viewFullTimetable = "Vollständigen Stundenplan öffnen"
     override val recentMessages = "Neueste Nachrichten"
     override val unreadMessagesCount = { count: Int -> "$count ungelesene Nachrichten" }
@@ -1613,7 +1681,7 @@ class GermanStrings : AppStrings {
     override val visiblePagesLabel = "Sichtbare Seiten"
     override val visiblePagesDesc = "Blenden Sie nicht benötigte Seiten aus. Die Einstellungen bleiben immer sichtbar."
     override val targetCreditsLabel = "Ziel-Credits (Abschluss)"
-    override val targetCreditsDesc = "Der Kreditfortschrittsbalken zeigt dieses Ziel im Noten-Tab."
+    override val targetCreditsDesc = "Der Kreditfortschrittsbalken zeigt dieses Ziel im Noten-, Studienfortschritts- und Startseiten-Tab."
     override val creditsUnit = "Credits"
     override val quietHoursLabel = "Ruhezeiten"
     override val quietHoursDesc = "In diesem Zeitraum werden keine Nachrichten-, Noten- oder Finanzbenachrichtigungen gesendet."
