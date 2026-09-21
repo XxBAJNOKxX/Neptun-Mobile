@@ -72,7 +72,35 @@ class AppUpdateManager(
                 val releaseObj: JSONObject = if (channel == UpdateChannel.DEV) {
                     val jsonArray = JSONArray(body)
                     if (jsonArray.length() == 0) return@withContext null
-                    jsonArray.getJSONObject(0)
+
+                    var bestRelease: JSONObject? = null
+                    var bestParsedVersion: ParsedVersion? = null
+
+                    for (i in 0 until jsonArray.length()) {
+                        val item = jsonArray.optJSONObject(i) ?: continue
+                        val tag = item.optString("tag_name", "").trim()
+                        if (tag.isEmpty()) continue
+
+                        val assets = item.optJSONArray("assets")
+                        var hasApk = false
+                        if (assets != null) {
+                            for (j in 0 until assets.length()) {
+                                if (assets.optJSONObject(j)?.optString("name", "")?.endsWith(".apk", ignoreCase = true) == true) {
+                                    hasApk = true
+                                    break
+                                }
+                            }
+                        }
+                        if (!hasApk) continue
+
+                        val parsed = ParsedVersion.parse(tag)
+                        if (bestParsedVersion == null || parsed.isNewerThan(bestParsedVersion)) {
+                            bestParsedVersion = parsed
+                            bestRelease = item
+                        }
+                    }
+
+                    bestRelease ?: jsonArray.getJSONObject(0)
                 } else {
                     JSONObject(body)
                 }
