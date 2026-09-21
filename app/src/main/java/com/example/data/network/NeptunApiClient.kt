@@ -162,9 +162,9 @@ class NeptunApiClient {
         return if (cleanMethod.isEmpty()) legacyBase else "$legacyBase/$cleanMethod"
     }
 
-    private fun safeParseJson(raw: String?): JsonElement? {
+    internal fun safeParseJson(raw: String?): JsonElement? {
         if (raw == null) return null
-        val trimmed = raw.trim()
+        val trimmed = raw.trim().removePrefix("\uFEFF")
         if (trimmed.isEmpty() || trimmed.startsWith("<") || (!trimmed.startsWith("{") && !trimmed.startsWith("["))) {
             return null
         }
@@ -175,7 +175,7 @@ class NeptunApiClient {
         }
     }
 
-    private fun safeParseJsonObject(raw: String?): JsonObject? {
+    internal fun safeParseJsonObject(raw: String?): JsonObject? {
         return safeParseJson(raw) as? JsonObject
     }
 
@@ -2467,7 +2467,7 @@ class NeptunApiClient {
             throw e
         } catch (e: Exception) {
             Log.e(tag, "Modern messages error: ${e.message}")
-            emptyList()
+            throw e
         }
     }
 
@@ -2482,98 +2482,83 @@ class NeptunApiClient {
     ): String = withContext(Dispatchers.IO) {
         if (isModern && token.isNotBlank()) {
             val cleanBase = normalizeBaseUrl(baseUrl)
-            val candidateBases = if (cleanBase.contains("hallgato2_uj", ignoreCase = true)) {
-                listOf(cleanBase, cleanBase.replace("hallgato2_uj", "hallgato2_api", ignoreCase = true)).distinct()
-            } else if (cleanBase.contains("elte.hu", ignoreCase = true) && !cleanBase.contains("hallgato", ignoreCase = true)) {
-                listOf("https://hallgato1.neptun.elte.hu")
+            val apiBase = if (cleanBase.contains("elte.hu", ignoreCase = true) && !cleanBase.contains("hallgato", ignoreCase = true)) {
+                "https://hallgato1.neptun.elte.hu"
             } else {
-                listOf(cleanBase)
+                cleanBase
             }
 
-            val candidateUrls = mutableListOf<String>()
-            for (b in candidateBases) {
-                candidateUrls.add("$b/api/Messages/$messageId/Posts?messageId=$messageId")
-                candidateUrls.add("$b/api/Message/GetMessagePosts?messageId=$messageId")
-                candidateUrls.add("$b/api/Messages/$messageId/Posts")
-                candidateUrls.add("$b/api/Message/GetArchivedMessagePosts?messageId=$messageId")
-                candidateUrls.add("$b/api/Message/GetReceivedMessageDetail?messageId=$messageId")
-                candidateUrls.add("$b/api/Messages/GetMessagePosts?messageId=$messageId")
-                candidateUrls.add("$b/api/Messages/$messageId")
-            }
+            val modernEndpoints = listOf(
+                "$apiBase/api/Messages/$messageId/Posts",
+                "$apiBase/api/Message/GetArchivedMessagePosts?messageId=$messageId"
+            )
 
-            for (url in candidateUrls) {
+            for (url in modernEndpoints) {
                 try {
                     val req = Request.Builder()
                         .url(url)
                         .get()
                         .addHeader("Authorization", "Bearer $token")
+                        .addHeader("Accept", "application/json, text/plain, */*")
                         .addHeader("Content-Type", "application/json")
                         .apply {
                             if (deviceCookie.isNotBlank()) addHeader("Cookie", deviceCookie)
                         }
                         .build()
 
-                    var resp = okHttpClient.newCall(req).execute()
-                    var bodyStr = resp.body?.string() ?: ""
+                    val resp = okHttpClient.newCall(req).execute()
+                    val bodyStr = resp.body?.string() ?: ""
+                    val code = resp.code
+                    resp.close()
 
-                    if (resp.code >= 500 || bodyStr.contains("Hiba történt") || bodyStr.contains("\"statusCode\":500")) {
-                        kotlinx.coroutines.delay(200)
-                        resp = okHttpClient.newCall(req).execute()
-                        bodyStr = resp.body?.string() ?: ""
-                    }
-
-                    if (!resp.isSuccessful || bodyStr.isBlank()) continue
+                    if (code !in 200..299 || bodyStr.isBlank()) continue
 
                     val parsed = safeParseJson(bodyStr)
                     if (parsed is JsonObject) {
                         val collectedPostIds = mutableListOf<String>()
+                        val unreadPostIds = mutableListOf<String>()
                         val dataObj = parsed["data"]
-                        if (dataObj is JsonObject) {
-                            val posts = dataObj["posts"]?.jsonArray
-                            if (!posts.isNullOrEmpty()) {
-                                var foundHtml = ""
-                                for (postItem in posts) {
-                                    if (postItem is JsonObject) {
-                                        val pid = postItem["postId"]?.jsonPrimitive?.contentOrNull
-                                        if (!pid.isNullOrBlank()) {
-                                            collectedPostIds.add(pid)
-                                        }
-                                        val html = postItem["htmlText"]?.jsonPrimitive?.contentOrNull
-                                            ?: postItem["text"]?.jsonPrimitive?.contentOrNull
-                                            ?: postItem["detail"]?.jsonPrimitive?.contentOrNull
-                                            ?: postItem["body"]?.jsonPrimitive?.contentOrNull
-                                        if (!html.isNullOrBlank() && foundHtml.isBlank()) {
-                                            foundHtml = html
-                                        }
-                                    }
-                                }
-                                if (collectedPostIds.isNotEmpty()) {
-                                    markPostsProcessed(baseUrl, token, messageId, collectedPostIds, deviceCookie)
-                                }
-                                if (foundHtml.isNotBlank()) {
-                                    val cleaned = cleanHtml(foundHtml)
-                                    if (cleaned.isNotBlank()) return@withContext cleaned
-                                }
-                            }
-                        } else if (dataObj is JsonArray) {
-                            for (postItem in dataObj) {
+                        val posts = (dataObj as? JsonObject)?.get("posts")?.jsonArray
+                            ?: (dataObj as? JsonArray)
+                            ?: parsed["posts"]?.jsonArray
+
+                        if (!posts.isNullOrEmpty()) {
+                            var foundHtml = ""
+                            for (postItem in posts) {
                                 if (postItem is JsonObject) {
                                     val pid = postItem["postId"]?.jsonPrimitive?.contentOrNull
-                                    if (!pid.isNullOrBlank()) collectedPostIds.add(pid)
+                                        ?: postItem["id"]?.jsonPrimitive?.contentOrNull
+                                    val isRead = postItem["isRead"]?.jsonPrimitive?.booleanOrNull == true
+                                    if (!pid.isNullOrBlank()) {
+                                        collectedPostIds.add(pid)
+                                        if (!isRead) {
+                                            unreadPostIds.add(pid)
+                                        }
+                                    }
                                     val html = postItem["htmlText"]?.jsonPrimitive?.contentOrNull
                                         ?: postItem["text"]?.jsonPrimitive?.contentOrNull
-                                    if (!html.isNullOrBlank()) {
-                                        if (collectedPostIds.isNotEmpty()) {
-                                            markPostsProcessed(baseUrl, token, messageId, collectedPostIds, deviceCookie)
-                                        }
-                                        val cleaned = cleanHtml(html)
-                                        if (cleaned.isNotBlank()) return@withContext cleaned
+                                        ?: postItem["detail"]?.jsonPrimitive?.contentOrNull
+                                        ?: postItem["body"]?.jsonPrimitive?.contentOrNull
+                                    if (!html.isNullOrBlank() && foundHtml.isBlank()) {
+                                        foundHtml = html
                                     }
                                 }
+                            }
+
+                            // Mark posts processed immediately on the server!
+                            val targetPostIds = if (unreadPostIds.isNotEmpty()) unreadPostIds else collectedPostIds
+                            if (targetPostIds.isNotEmpty()) {
+                                val isArchived = url.contains("Archived", ignoreCase = true)
+                                markPostsProcessed(apiBase, token, messageId, targetPostIds, deviceCookie, isArchived)
+                            }
+
+                            if (foundHtml.isNotBlank()) {
+                                val cleaned = cleanHtml(foundHtml)
+                                if (cleaned.isNotBlank()) return@withContext cleaned
                             }
                         }
 
-                        val directHtml = (parsed["data"]?.jsonObject ?: parsed).let { obj ->
+                        val directHtml = (dataObj as? JsonObject ?: parsed).let { obj ->
                             obj["htmlText"]?.jsonPrimitive?.contentOrNull
                                 ?: obj["detail"]?.jsonPrimitive?.contentOrNull
                                 ?: obj["body"]?.jsonPrimitive?.contentOrNull
@@ -2582,21 +2567,18 @@ class NeptunApiClient {
                         }
 
                         if (!directHtml.isNullOrBlank()) {
-                            if (collectedPostIds.isNotEmpty()) {
-                                markPostsProcessed(baseUrl, token, messageId, collectedPostIds)
-                            }
                             val cleaned = cleanHtml(directHtml)
                             if (cleaned.isNotBlank()) return@withContext cleaned
                         }
                     }
                 } catch (e: Exception) {
-                    Log.e(tag, "Failed URL $url: ${e.message}")
+                    Log.d(tag, "Failed URL $url: ${e.message}")
                 }
             }
         }
 
-        // If legacy or modern failed, try legacy /GetMessages with message ID
-        if (username.isNotBlank() && password.isNotBlank() && !baseUrl.contains("elte.hu", ignoreCase = true)) {
+        // If legacy and not modern, try legacy /GetMessages with message ID
+        if (!isModern && username.isNotBlank() && password.isNotBlank() && !baseUrl.contains("elte.hu", ignoreCase = true)) {
             try {
                 val numId = messageId.toLongOrNull() ?: 0L
                 val body = """{"UserLogin":"$username","Password":"$password","CurrentPage":0,"TotalRowCount":-1,"MessageID":$numId,"MessageSortEnum":0}"""
@@ -2685,14 +2667,14 @@ class NeptunApiClient {
                         subject = subject,
                         sender = sender,
                         sendDate = formattedDate,
-                        previewText = stripHtmlForPreview(detail).take(120),
+                        previewText = if (detail.isNotBlank()) stripHtmlForPreview(detail) else "Koppints a teljes üzenet megtekintéséhez...",
                         bodyHtml = detail,
                         isRead = !isNew,
-                        isOfficial = sender.equals("Rendszerüzenet", ignoreCase = true) || sender.contains("hivatal", ignoreCase = true) || sender.contains("tanulmányi", ignoreCase = true)
+                        isOfficial = sender.contains("hivatal", ignoreCase = true) || sender.contains("tanulmányi", ignoreCase = true)
                     )
                 )
             }
-            return@withContext list
+            list
         } catch (e: Exception) {
             Log.e(tag, "Legacy messages error: ${e.message}")
             emptyList()
@@ -2704,66 +2686,74 @@ class NeptunApiClient {
         token: String,
         messageId: String,
         postIds: List<String>,
-        deviceCookie: String = ""
-    ) = withContext(Dispatchers.IO) {
-        if (token.isBlank() || postIds.isEmpty()) return@withContext
+        deviceCookie: String = "",
+        isArchived: Boolean = false
+    ): Boolean = withContext(Dispatchers.IO) {
+        if (token.isBlank() || postIds.isEmpty()) return@withContext false
         try {
             val cleanBase = normalizeBaseUrl(baseUrl)
-            val candidateBases = if (cleanBase.contains("hallgato2_uj", ignoreCase = true)) {
-                listOf(cleanBase, cleanBase.replace("hallgato2_uj", "hallgato2_api", ignoreCase = true)).distinct()
-            } else if (cleanBase.contains("elte.hu", ignoreCase = true) && !cleanBase.contains("hallgato", ignoreCase = true)) {
-                listOf("https://hallgato1.neptun.elte.hu")
+            val apiBase = if (cleanBase.contains("elte.hu", ignoreCase = true) && !cleanBase.contains("hallgato", ignoreCase = true)) {
+                "https://hallgato1.neptun.elte.hu"
             } else {
-                listOf(cleanBase)
+                cleanBase
             }
 
             val postIdsJson = postIds.joinToString(separator = ",", prefix = "[", postfix = "]") { pid ->
                 if (pid.toLongOrNull() != null) pid else "\"$pid\""
             }
-            val body = """{"postIds":$postIdsJson}"""
-            val numMessageId = messageId.toLongOrNull()
 
-            for (b in candidateBases) {
-                try {
-                    val processUrl = "$b/api/Messages/$messageId/Posts/Processed"
-                    val req = Request.Builder()
-                        .url(processUrl)
-                        .post(body.toRequestBody("application/json".toMediaType()))
-                        .addHeader("Authorization", "Bearer $token")
-                        .addHeader("Content-Type", "application/json")
-                        .apply {
-                            if (deviceCookie.isNotBlank()) addHeader("Cookie", deviceCookie)
-                        }
-                        .build()
-                    val resp = okHttpClient.newCall(req).execute()
+            var success = false
+
+            if (!isArchived) {
+                val processUrl = "$apiBase/api/Messages/$messageId/Posts/Processed"
+                val body = """{"postIds":$postIdsJson}"""
+                val req = Request.Builder()
+                    .url(processUrl)
+                    .post(body.toRequestBody("application/json".toMediaType()))
+                    .addHeader("Authorization", "Bearer $token")
+                    .addHeader("Accept", "application/json, text/plain, */*")
+                    .addHeader("Content-Type", "application/json")
+                    .apply {
+                        if (deviceCookie.isNotBlank()) addHeader("Cookie", deviceCookie)
+                    }
+                    .build()
+                okHttpClient.newCall(req).execute().use { resp ->
                     val code = resp.code
-                    resp.close()
-                    if (code in 200..299) {
-                        Log.d(tag, "markPostsProcessed success on $b (code $code)")
+                    if (resp.isSuccessful || code in 200..299) {
+                        Log.d(tag, "markPostsProcessed success on $processUrl (code $code)")
+                        success = true
+                    } else {
+                        Log.w(tag, "markPostsProcessed returned code $code for message $messageId")
                     }
-
-                    // Archive processed endpoint as fallback
-                    if (numMessageId != null) {
-                        val archiveBody = """{"archivedMessageId":$numMessageId,"archivedPostIds":$postIdsJson}"""
-                        val archiveUrl = "$b/api/Message/MarkArchivedMessagePostsAsReaded"
-                        val reqArchive = Request.Builder()
-                            .url(archiveUrl)
-                            .post(archiveBody.toRequestBody("application/json".toMediaType()))
-                            .addHeader("Authorization", "Bearer $token")
-                            .addHeader("Content-Type", "application/json")
-                            .apply {
-                                if (deviceCookie.isNotBlank()) addHeader("Cookie", deviceCookie)
-                            }
-                            .build()
-                        val respArchive = okHttpClient.newCall(reqArchive).execute()
-                        respArchive.close()
-                    }
-                } catch (e: Exception) {
-                    Log.d(tag, "markPostsProcessed candidate $b error: ${e.message}")
                 }
             }
+
+            val numMessageId = messageId.toLongOrNull()
+            if (!success && numMessageId != null) {
+                val archiveBody = """{"archivedMessageId":$numMessageId,"archivedPostIds":$postIdsJson}"""
+                val archiveUrl = "$apiBase/api/Message/MarkArchivedMessagePostsAsReaded"
+                val reqArchive = Request.Builder()
+                    .url(archiveUrl)
+                    .post(archiveBody.toRequestBody("application/json".toMediaType()))
+                    .addHeader("Authorization", "Bearer $token")
+                    .addHeader("Accept", "application/json, text/plain, */*")
+                    .addHeader("Content-Type", "application/json")
+                    .apply {
+                        if (deviceCookie.isNotBlank()) addHeader("Cookie", deviceCookie)
+                    }
+                    .build()
+                okHttpClient.newCall(reqArchive).execute().use { respArchive ->
+                    if (respArchive.isSuccessful || respArchive.code in 200..299) {
+                        Log.d(tag, "markArchivedPostsProcessed success on $archiveUrl (code ${respArchive.code})")
+                        success = true
+                    }
+                }
+            }
+
+            return@withContext success
         } catch (e: Exception) {
             Log.e(tag, "markPostsProcessed error: ${e.message}")
+            return@withContext false
         }
     }
 
@@ -2780,38 +2770,67 @@ class NeptunApiClient {
         try {
             if (isModern && token.isNotBlank()) {
                 val cleanBase = normalizeBaseUrl(baseUrl)
-                val candidateBases = if (cleanBase.contains("hallgato2_uj", ignoreCase = true)) {
-                    listOf(cleanBase, cleanBase.replace("hallgato2_uj", "hallgato2_api", ignoreCase = true)).distinct()
-                } else if (cleanBase.contains("elte.hu", ignoreCase = true) && !cleanBase.contains("hallgato", ignoreCase = true)) {
-                    listOf("https://hallgato1.neptun.elte.hu")
+                val apiBase = if (cleanBase.contains("elte.hu", ignoreCase = true) && !cleanBase.contains("hallgato", ignoreCase = true)) {
+                    "https://hallgato1.neptun.elte.hu"
                 } else {
-                    listOf(cleanBase)
+                    cleanBase
                 }
 
                 // 1. Fetch posts for this message to discover exact postId(s)
                 val postIds = mutableListOf<String>()
-                for (b in candidateBases) {
-                    val postsUrls = listOf(
-                        "$b/api/Messages/$messageId/Posts",
-                        "$b/api/Message/GetArchivedMessagePosts?messageId=$messageId",
-                        "$b/api/Message/GetMessagePosts?messageId=$messageId"
-                    )
-                    for (postsUrl in postsUrls) {
-                        try {
-                            val req = Request.Builder()
-                                .url(postsUrl)
-                                .get()
-                                .addHeader("Authorization", "Bearer $token")
-                                .addHeader("Content-Type", "application/json")
-                                .apply {
-                                    if (deviceCookie.isNotBlank()) addHeader("Cookie", deviceCookie)
+                var isArchived = false
+
+                val postsUrl = "$apiBase/api/Messages/$messageId/Posts"
+                try {
+                    val req = Request.Builder()
+                        .url(postsUrl)
+                        .get()
+                        .addHeader("Authorization", "Bearer $token")
+                        .addHeader("Accept", "application/json, text/plain, */*")
+                        .addHeader("Content-Type", "application/json")
+                        .apply {
+                            if (deviceCookie.isNotBlank()) addHeader("Cookie", deviceCookie)
+                        }
+                        .build()
+                    okHttpClient.newCall(req).execute().use { resp ->
+                        val bodyStr = resp.body?.string() ?: ""
+                        if (resp.isSuccessful && bodyStr.isNotBlank()) {
+                            val parsed = safeParseJson(bodyStr)
+                            if (parsed is JsonObject) {
+                                val data = parsed["data"]
+                                val posts = (data as? JsonObject)?.get("posts")?.jsonArray
+                                    ?: (data as? JsonArray)
+                                    ?: parsed["posts"]?.jsonArray
+                                posts?.forEach { p ->
+                                    if (p is JsonObject) {
+                                        val pid = p["postId"]?.jsonPrimitive?.contentOrNull
+                                            ?: p["id"]?.jsonPrimitive?.contentOrNull
+                                        if (!pid.isNullOrBlank()) postIds.add(pid)
+                                    }
                                 }
-                                .build()
-                            val resp = okHttpClient.newCall(req).execute()
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.d(tag, "Failed fetch posts from $postsUrl: ${e.message}")
+                }
+
+                if (postIds.isEmpty()) {
+                    val archivedUrl = "$apiBase/api/Message/GetArchivedMessagePosts?messageId=$messageId"
+                    try {
+                        val req = Request.Builder()
+                            .url(archivedUrl)
+                            .get()
+                            .addHeader("Authorization", "Bearer $token")
+                            .addHeader("Accept", "application/json, text/plain, */*")
+                            .addHeader("Content-Type", "application/json")
+                            .apply {
+                                if (deviceCookie.isNotBlank()) addHeader("Cookie", deviceCookie)
+                            }
+                            .build()
+                        okHttpClient.newCall(req).execute().use { resp ->
                             val bodyStr = resp.body?.string() ?: ""
-                            val code = resp.code
-                            resp.close()
-                            if (code in 200..299 && bodyStr.isNotBlank()) {
+                            if (resp.isSuccessful && bodyStr.isNotBlank()) {
                                 val parsed = safeParseJson(bodyStr)
                                 if (parsed is JsonObject) {
                                     val data = parsed["data"]
@@ -2825,14 +2844,13 @@ class NeptunApiClient {
                                             if (!pid.isNullOrBlank()) postIds.add(pid)
                                         }
                                     }
+                                    if (postIds.isNotEmpty()) isArchived = true
                                 }
-                                if (postIds.isNotEmpty()) break
                             }
-                        } catch (e: Exception) {
-                            Log.d(tag, "Failed fetch posts from $postsUrl: ${e.message}")
                         }
+                    } catch (e: Exception) {
+                        Log.d(tag, "Failed fetch archived posts from $archivedUrl: ${e.message}")
                     }
-                    if (postIds.isNotEmpty()) break
                 }
 
                 if (postIds.isEmpty()) {
@@ -2840,41 +2858,34 @@ class NeptunApiClient {
                 }
 
                 // 2. Call modern Neptun /Posts/Processed endpoint
-                markPostsProcessed(baseUrl, token, messageId, postIds, deviceCookie)
-                success = true
+                success = markPostsProcessed(apiBase, token, messageId, postIds, deviceCookie, isArchived)
+                if (success) return@withContext true
 
-                // 3. Hit other potential modern read endpoints as safety fallback
-                for (b in candidateBases) {
-                    val urls = listOf(
-                        "$b/api/Message/SetMessageRead?messageId=$messageId",
-                        "$b/api/Message/SetReadState?messageId=$messageId",
-                        "$b/api/Message/MarkAsRead?messageId=$messageId",
-                        "$b/api/Messages/$messageId/Read"
-                    )
-                    for (url in urls) {
-                        try {
-                            val req = Request.Builder()
-                                .url(url)
-                                .post("""{"messageId":"$messageId","isRead":true}""".toRequestBody("application/json".toMediaType()))
-                                .addHeader("Authorization", "Bearer $token")
-                                .addHeader("Content-Type", "application/json")
-                                .apply {
-                                    if (deviceCookie.isNotBlank()) addHeader("Cookie", deviceCookie)
-                                }
-                                .build()
-                            val resp = okHttpClient.newCall(req).execute()
-                            if (resp.isSuccessful || resp.code == 204 || resp.code == 200) success = true
-                            resp.close()
-                        } catch (_: Exception) {
-                            // ignore fallback errors
+                // 3. Fallback modern endpoints if Posts/Processed did not return 2xx
+                val fallbackUrls = listOf(
+                    "$apiBase/api/Message/SetMessageRead?messageId=$messageId",
+                    "$apiBase/api/Message/SetReadState?messageId=$messageId"
+                )
+                for (url in fallbackUrls) {
+                    try {
+                        val req = Request.Builder()
+                            .url(url)
+                            .post("""{"messageId":"$messageId","isRead":true}""".toRequestBody("application/json".toMediaType()))
+                            .addHeader("Authorization", "Bearer $token")
+                            .addHeader("Accept", "application/json, text/plain, */*")
+                            .addHeader("Content-Type", "application/json")
+                            .apply {
+                                if (deviceCookie.isNotBlank()) addHeader("Cookie", deviceCookie)
+                            }
+                            .build()
+                        okHttpClient.newCall(req).execute().use { resp ->
+                            if (resp.isSuccessful || resp.code in 200..299) success = true
                         }
-                    }
+                    } catch (_: Exception) {}
                 }
-            }
-
-            if (username.isNotBlank() && password.isNotBlank()) {
+            } else if (!isModern && username.isNotBlank() && password.isNotBlank()) {
                 val numId = messageId.toLongOrNull() ?: 0L
-                val legacyServices = listOf("SetMessageRead", "ReadMessage", "GetMessageDetail")
+                val legacyServices = listOf("SetMessageRead", "ReadMessage")
                 for (svc in legacyServices) {
                     try {
                         val body = """{"UserLogin":"$username","Password":"$password","MessageID":$numId,"PersonMessageID":$numId,"PersonMessageId":$numId,"IsRead":true,"isRead":true}"""
@@ -2951,11 +2962,7 @@ class NeptunApiClient {
             "/api/Exams/GetExams",
             "/api/Exams/GetExamTerms"
         )
-        val candidateBaseUrls = if (baseUrl.contains("hallgato2_uj", ignoreCase = true)) {
-            listOf(baseUrl, baseUrl.replace("hallgato2_uj", "hallgato2_api", ignoreCase = true)).distinct()
-        } else {
-            listOf(baseUrl)
-        }
+        val candidateBaseUrls = listOf(baseUrl)
 
         for (base in candidateBaseUrls) {
             for (path in modernPaths) {
@@ -3469,9 +3476,7 @@ class NeptunApiClient {
         deviceCookie: String = ""
     ): com.example.domain.model.DegreeProgress? = withContext(Dispatchers.IO) {
         val cleanBase = resolveApiBaseUrl(baseUrl)
-        val candidateBaseUrls = if (cleanBase.contains("hallgato2_uj", ignoreCase = true)) {
-            listOf(cleanBase, cleanBase.replace("hallgato2_uj", "hallgato2_api", ignoreCase = true)).distinct()
-        } else if (cleanBase.contains("elte.hu", ignoreCase = true) && !cleanBase.contains("hallgato", ignoreCase = true)) {
+        val candidateBaseUrls = if (cleanBase.contains("elte.hu", ignoreCase = true) && !cleanBase.contains("hallgato", ignoreCase = true)) {
             listOf("https://hallgato1.neptun.elte.hu")
         } else {
             listOf(cleanBase)
@@ -3765,9 +3770,7 @@ class NeptunApiClient {
         token: String,
         deviceCookie: String = ""
     ): List<com.example.domain.model.AcademicPeriod> = withContext(Dispatchers.IO) {
-        val candidateBaseUrls = if (baseUrl.contains("hallgato2_uj", ignoreCase = true)) {
-            listOf(baseUrl, baseUrl.replace("hallgato2_uj", "hallgato2_api", ignoreCase = true)).distinct()
-        } else if (baseUrl.contains("elte.hu", ignoreCase = true) && !baseUrl.contains("hallgato", ignoreCase = true)) {
+        val candidateBaseUrls = if (baseUrl.contains("elte.hu", ignoreCase = true) && !baseUrl.contains("hallgato", ignoreCase = true)) {
             listOf("https://hallgato1.neptun.elte.hu")
         } else {
             listOf(baseUrl)

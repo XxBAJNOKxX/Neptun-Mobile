@@ -157,47 +157,93 @@ fun MessagesScreen(
             onRefresh = onRefresh,
             modifier = Modifier.fillMaxSize()
         ) {
-        if (uiState.filteredMessages.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(32.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        imageVector = Icons.Default.DoneAll,
-                        contentDescription = strings.noMessages,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(48.dp)
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        text = if (uiState.showUnreadOnly) strings.noUnreadMessages else strings.noMessagesInInbox,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+            Column(modifier = Modifier.fillMaxSize()) {
+                if (uiState.errorMessage != null) {
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 6.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Info,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onErrorContainer,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = uiState.errorMessage,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                            }
+                            IconButton(onClick = onRefresh) {
+                                Icon(
+                                    imageVector = Icons.Default.Refresh,
+                                    contentDescription = strings.retry,
+                                    tint = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                            }
+                        }
+                    }
+                }
+
+                if (uiState.filteredMessages.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(32.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                imageVector = Icons.Default.DoneAll,
+                                contentDescription = strings.noMessages,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(48.dp)
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                text = if (uiState.showUnreadOnly) strings.noUnreadMessages else strings.noMessagesInInbox,
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        item { Spacer(modifier = Modifier.height(4.dp)) }
+
+                        items(uiState.filteredMessages) { msg ->
+                            MessageCard(
+                                message = msg,
+                                onClick = { onOpenMessage(msg) }
+                            )
+                        }
+
+                        item { Spacer(modifier = Modifier.height(20.dp)) }
+                    }
                 }
             }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                item { Spacer(modifier = Modifier.height(4.dp)) }
-
-                items(uiState.filteredMessages) { msg ->
-                    MessageCard(
-                        message = msg,
-                        onClick = { onOpenMessage(msg) }
-                    )
-                }
-
-                item { Spacer(modifier = Modifier.height(20.dp)) }
-            }
-        }
         }
     }
 
@@ -211,6 +257,7 @@ fun MessagesScreen(
             MessageDetailContent(
                 message = uiState.selectedMessage,
                 isLoading = uiState.isLoadingContent,
+                errorMessage = uiState.contentErrorMessage,
                 onClose = onCloseMessage,
                 onReload = onReloadMessage
             )
@@ -337,6 +384,7 @@ private fun MessageCard(
 private fun MessageDetailContent(
     message: NeptunMessage,
     isLoading: Boolean,
+    errorMessage: String? = null,
     onClose: () -> Unit,
     onReload: () -> Unit
 ) {
@@ -344,8 +392,16 @@ private fun MessageDetailContent(
     val displaySender = getDisplaySender(message.sender, strings)
     val isSystem = message.isOfficial || displaySender.equals(strings.systemMessage, ignoreCase = true) || displaySender.contains("hivatal", ignoreCase = true)
     
-    val rawBody = message.bodyHtml.ifBlank { message.previewText }
-    val htmlBlocks = remember(rawBody) { parseHtmlBlocks(rawBody) }
+    val effectiveBody = when {
+        message.bodyHtml.isNotBlank() -> message.bodyHtml
+        message.previewText.isNotBlank() &&
+            !message.previewText.startsWith("Koppints a teljes üzenet") &&
+            !message.previewText.startsWith("Tap to view") &&
+            !message.previewText.startsWith("Tippen Sie") &&
+            !message.previewText.startsWith(strings.tapToViewFullMessage) -> message.previewText
+        else -> ""
+    }
+    val htmlBlocks = remember(effectiveBody) { parseHtmlBlocks(effectiveBody) }
 
     Column(
         modifier = Modifier
@@ -437,6 +493,50 @@ private fun MessageDetailContent(
         HorizontalDivider()
         Spacer(modifier = Modifier.height(16.dp))
 
+        if (errorMessage != null && !isLoading && htmlBlocks.isNotEmpty()) {
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = errorMessage,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    }
+                    IconButton(onClick = onReload) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = strings.retry,
+                            tint = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    }
+                }
+            }
+        }
+
         if (isLoading) {
             Box(
                 modifier = Modifier
@@ -499,11 +599,14 @@ private fun MessageDetailContent(
                     .padding(vertical = 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                val emptyContentText = when (strings.languageCode) {
-                    "de" -> "Der Inhalt der Nachricht ist leer oder konnte nicht von Neptun geladen werden."
-                    "en" -> "The message content is empty or failed to load from Neptun."
-                    else -> "A levél tartalma üres vagy nem sikerült közvetlenül betölteni a Neptunból."
-                }
+                Icon(
+                    imageVector = Icons.Default.Info,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(36.dp)
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                val emptyContentText = errorMessage ?: strings.messageDetailLoadFailed
                 Text(
                     text = emptyContentText,
                     style = MaterialTheme.typography.bodyMedium,

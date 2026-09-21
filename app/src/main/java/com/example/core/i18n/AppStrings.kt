@@ -137,6 +137,8 @@ interface AppStrings {
     val noMessages: String
     val sender: String
     val date: String
+    val messagesLoadFailed: String
+    val messageDetailLoadFailed: String
 
     // Finances
     val financesTitle: String
@@ -619,6 +621,8 @@ class HungarianStrings : AppStrings {
     override val noMessages = "Nincsenek üzenetek"
     override val sender = "Feladó"
     override val date = "Dátum"
+    override val messagesLoadFailed = "Az üzenetek betöltése nem sikerült."
+    override val messageDetailLoadFailed = "Az üzenet betöltése nem sikerült."
 
     override val financesTitle = "Pénzügyek"
     override val statusPending = "Kiírva"
@@ -1096,6 +1100,8 @@ class EnglishStrings : AppStrings {
     override val noMessages = "No messages"
     override val sender = "Sender"
     override val date = "Date"
+    override val messagesLoadFailed = "Failed to load messages."
+    override val messageDetailLoadFailed = "Failed to load message."
 
     override val financesTitle = "Finances"
     override val statusPending = "Pending"
@@ -1571,6 +1577,8 @@ class GermanStrings : AppStrings {
     override val noMessages = "Keine Nachrichten"
     override val sender = "Absender"
     override val date = "Datum"
+    override val messagesLoadFailed = "Nachrichten konnten nicht geladen werden."
+    override val messageDetailLoadFailed = "Nachricht konnte nicht geladen werden."
 
     override val financesTitle = "Finanzen"
     override val statusPending = "Offen"

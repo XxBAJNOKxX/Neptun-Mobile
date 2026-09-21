@@ -21,7 +21,8 @@ class SslTrustHelperTest {
         try {
             client.newCall(req).execute().use { resp ->
                 println("SUCCESS [$description] $url -> Code ${resp.code}")
-                assertTrue("Expected 2xx or 3xx but got ${resp.code} for $url", resp.isSuccessful || resp.code in 200..399)
+                // If we receive an HTTP status code, the TLS handshake succeeded. 503/403/401 indicate server maintenance or WAF blocks, not SSL failures.
+                assertTrue("Expected HTTP response but got ${resp.code} for $url", resp.code in 200..399 || resp.code in listOf(401, 403, 404, 503))
             }
         } catch (e: Throwable) {
             System.err.println("FAILED [$description] $url -> ${e.javaClass.simpleName}: ${e.message}")

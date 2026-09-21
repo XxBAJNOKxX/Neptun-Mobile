@@ -1,7 +1,11 @@
 package com.example
 
 import com.example.data.network.NeptunApiClient
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -245,6 +249,46 @@ class NeptunApiClientTest {
         assertTrue(hu.targetCreditsDesc.contains("Kezdőlap"))
         assertTrue(en.targetCreditsDesc.contains("Dashboard"))
         assertTrue(de.targetCreditsDesc.contains("Startseiten"))
+    }
+
+    @Test
+    fun testSafeParseJsonWithBom() {
+        val rawWithBom = "\uFEFF{\"data\":{\"posts\":[{\"postId\":\"1001\",\"isRead\":false}]}}"
+        val parsed = client.safeParseJsonObject(rawWithBom)
+        assertNotNull(parsed)
+        val data = parsed?.get("data") as? JsonObject
+        val posts = data?.get("posts") as? JsonArray
+        assertEquals(1, posts?.size)
+        val firstPost = posts?.get(0) as? JsonObject
+        assertEquals("1001", (firstPost?.get("postId") as? JsonPrimitive)?.content)
+    }
+
+    @Test
+    fun testMessagesI18nStrings() {
+        val hu = com.example.core.i18n.AppStringsProvider.HUNGARIAN
+        val en = com.example.core.i18n.AppStringsProvider.ENGLISH
+        val de = com.example.core.i18n.AppStringsProvider.GERMAN
+
+        assertEquals("Az üzenetek betöltése nem sikerült.", hu.messagesLoadFailed)
+        assertEquals("Az üzenet betöltése nem sikerült.", hu.messageDetailLoadFailed)
+
+        assertEquals("Failed to load messages.", en.messagesLoadFailed)
+        assertEquals("Failed to load message.", en.messageDetailLoadFailed)
+
+        assertEquals("Nachrichten konnten nicht geladen werden.", de.messagesLoadFailed)
+        assertEquals("Nachricht konnte nicht geladen werden.", de.messageDetailLoadFailed)
+    }
+
+    @Test
+    fun testPostsProcessedJsonFormat() {
+        val postIds = listOf("12345", "67890")
+        val idsJson = postIds.joinToString(separator = ",", prefix = "[", postfix = "]") { "\"$it\"" }
+        val jsonPayload = """{"postIds":$idsJson}"""
+        val parsed = client.safeParseJsonObject(jsonPayload)
+        val array = parsed?.get("postIds") as? JsonArray
+        assertEquals(2, array?.size)
+        assertEquals("12345", (array?.get(0) as? JsonPrimitive)?.content)
+        assertEquals("67890", (array?.get(1) as? JsonPrimitive)?.content)
     }
 }
 

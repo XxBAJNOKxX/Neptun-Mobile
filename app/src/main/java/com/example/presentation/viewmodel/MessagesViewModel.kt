@@ -19,7 +19,9 @@ data class MessagesUiState(
     val showUnreadOnly: Boolean = false,
     val isRefreshing: Boolean = false,
     val unreadCount: Int = 0,
-    val searchQuery: String = ""
+    val searchQuery: String = "",
+    val errorMessage: String? = null,
+    val contentErrorMessage: String? = null
 )
 
 class MessagesViewModel(
@@ -93,47 +95,70 @@ class MessagesViewModel(
 
     fun openMessage(message: NeptunMessage) {
         val needsFetch = message.bodyHtml.isBlank()
-        _uiState.update { it.copy(selectedMessage = message, isLoadingContent = needsFetch) }
+        _uiState.update {
+            it.copy(
+                selectedMessage = message,
+                isLoadingContent = needsFetch,
+                contentErrorMessage = null
+            )
+        }
         viewModelScope.launch {
-            if (!message.isRead) {
-                neptunRepository.markMessageAsRead(message.id)
-            }
             if (needsFetch) {
                 val content = neptunRepository.getMessageContent(message.id)
                 if (content.isNotBlank()) {
                     val updated = message.copy(bodyHtml = content, isRead = true)
                     _uiState.update { state ->
                         if (state.selectedMessage?.id == message.id) {
-                            state.copy(selectedMessage = updated, isLoadingContent = false)
+                            state.copy(selectedMessage = updated, isLoadingContent = false, contentErrorMessage = null)
                         } else {
                             state.copy(isLoadingContent = false)
                         }
                     }
                 } else {
-                    _uiState.update { it.copy(isLoadingContent = false) }
+                    _uiState.update { state ->
+                        if (state.selectedMessage?.id == message.id) {
+                            state.copy(isLoadingContent = false, contentErrorMessage = "Az üzenet betöltése nem sikerült.")
+                        } else {
+                            state.copy(isLoadingContent = false)
+                        }
+                    }
+                }
+            } else {
+                if (!message.isRead) {
+                    neptunRepository.markMessageAsRead(message.id)
                 }
             }
         }
     }
 
     fun closeMessage() {
-        _uiState.update { it.copy(selectedMessage = null, isLoadingContent = false) }
+        _uiState.update { it.copy(selectedMessage = null, isLoadingContent = false, contentErrorMessage = null) }
     }
 
     fun reloadSelectedMessageContent() {
         val message = _uiState.value.selectedMessage ?: return
-        _uiState.update { it.copy(isLoadingContent = true) }
+        _uiState.update { it.copy(isLoadingContent = true, contentErrorMessage = null) }
         viewModelScope.launch {
             val content = neptunRepository.getMessageContent(message.id)
-            val updated = message.copy(
-                bodyHtml = content.ifBlank { "Az üzenet tartalma nem érhető el vagy üres." },
-                isRead = true
-            )
-            _uiState.update { state ->
-                if (state.selectedMessage?.id == message.id) {
-                    state.copy(selectedMessage = updated, isLoadingContent = false)
-                } else {
-                    state.copy(isLoadingContent = false)
+            if (content.isNotBlank()) {
+                val updated = message.copy(
+                    bodyHtml = content,
+                    isRead = true
+                )
+                _uiState.update { state ->
+                    if (state.selectedMessage?.id == message.id) {
+                        state.copy(selectedMessage = updated, isLoadingContent = false, contentErrorMessage = null)
+                    } else {
+                        state.copy(isLoadingContent = false)
+                    }
+                }
+            } else {
+                _uiState.update { state ->
+                    if (state.selectedMessage?.id == message.id) {
+                        state.copy(isLoadingContent = false, contentErrorMessage = "Az üzenet betöltése nem sikerült.")
+                    } else {
+                        state.copy(isLoadingContent = false)
+                    }
                 }
             }
         }
@@ -141,10 +166,19 @@ class MessagesViewModel(
 
     fun refreshMessages() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isRefreshing = true) }
-            neptunRepository.refreshMessages()
-            _uiState.update { it.copy(isRefreshing = false) }
+            _uiState.update { it.copy(isRefreshing = true, errorMessage = null) }
+            val res = neptunRepository.refreshMessages()
+            _uiState.update {
+                it.copy(
+                    isRefreshing = false,
+                    errorMessage = if (res.isFailure) "Az üzenetek betöltése nem sikerült." else null
+                )
+            }
         }
+    }
+
+    fun clearError() {
+        _uiState.update { it.copy(errorMessage = null) }
     }
 
     companion object {

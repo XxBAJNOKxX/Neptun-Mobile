@@ -178,8 +178,12 @@ class NeptunRepositoryImpl(
             }
         }
 
-        // Ha forceRefresh van, de a meglévő token még a valóságban érvényes a hálózaton
+        // Ha nem forceRefresh és a meglévő token még a valóságban érvényes
         if (currentToken.isNotBlank() && isModern && !forceRefresh) {
+            if (!neptunApiClient.isJwtExpired(currentToken, bufferSeconds = 60L)) {
+                prefsManager.clearSessionExpired()
+                return currentToken
+            }
             if (neptunApiClient.isTokenValid(baseUrl, currentToken, deviceCookie)) {
                 prefsManager.clearSessionExpired()
                 return currentToken
@@ -468,6 +472,7 @@ class NeptunRepositoryImpl(
 
         var messagesToInsert = emptyList<NeptunMessage>()
         var fetchSucceeded = false
+        var fetchError: Throwable? = null
 
         if (creds != null && creds.neptunUrl.isNotEmpty()) {
             val baseUrl = prefsManager.getBaseUrl().ifEmpty { creds.neptunUrl }
@@ -504,6 +509,7 @@ class NeptunRepositoryImpl(
                         )
                         fetchSucceeded = true
                     } catch (retryEx: Exception) {
+                        fetchError = retryEx
                         retryEx.printStackTrace()
                     }
                 } else {
@@ -514,13 +520,15 @@ class NeptunRepositoryImpl(
                     if (!isValid) {
                         prefsManager.markSessionExpired()
                     }
+                    fetchError = e
                 }
             } catch (e: Exception) {
+                fetchError = e
                 e.printStackTrace()
             }
         }
 
-        if (fetchSucceeded || messagesToInsert.isNotEmpty()) {
+        if (fetchSucceeded) {
             prefsManager.clearSessionExpired()
             val existingEntities = database.messagesDao().getAllMessages().first()
             val existingById = existingEntities.associateBy { it.id }
@@ -560,15 +568,18 @@ class NeptunRepositoryImpl(
                     )
                 }
             }
+            return@withContext Result.success(Unit)
         } else if (BuildConfig.DEBUG && database.messagesDao().getAllMessages().first().isEmpty()) {
             messagesToInsert = MockNeptunDataSource.getMockMessages()
             prefsManager.setDataMode(DataMode.MOCK)
             database.messagesDao().clearAll()
             database.messagesDao().insertMessages(messagesToInsert.map { NeptunMessageEntity.fromDomain(it) })
+            return@withContext Result.success(Unit)
         }
 
-        Result.success(Unit)
+        Result.failure(fetchError ?: IllegalStateException("Failed to fetch messages from server"))
     }
+
 
     override suspend fun refreshFinances(): Result<Unit> = withContext(Dispatchers.IO) {
         val creds = prefsManager.loadCredentials()
@@ -932,6 +943,14 @@ class NeptunRepositoryImpl(
             return@withContext ""
         }
 
+        // 1. Check if existing message in local db already has content
+        val cached = database.messagesDao().getAllMessages().first().firstOrNull { it.id == messageId }
+        if (cached != null && cached.bodyHtml.isNotBlank()) {
+            database.messagesDao().markAsRead(messageId)
+            return@withContext cached.bodyHtml
+        }
+
+        // 2. Fetch from server
         if (creds != null && creds.neptunUrl.isNotEmpty()) {
             try {
                 val baseUrl = prefsManager.getBaseUrl().ifEmpty { creds.neptunUrl }
@@ -978,32 +997,12 @@ class NeptunRepositoryImpl(
                         bodyHtml = content,
                         previewText = plainPreview.take(150)
                     )
-                    markMessageAsRead(messageId)
+                    database.messagesDao().markAsRead(messageId)
                     return@withContext content
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
             }
-        }
-
-        // Check if existing message in db has body
-        val existing = database.messagesDao().getAllMessages().first().firstOrNull { it.id == messageId }
-        val body = existing?.bodyHtml ?: ""
-        if (body.isNotBlank()) {
-            markMessageAsRead(messageId)
-            return@withContext body
-        }
-
-        // If message is in db, populate readable detail so user never gets stuck on placeholder
-        if (existing != null) {
-            val fallbackContent = "Kedves Hallgató!\n\nTájékoztatjuk a(z) \"${existing.subject}\" tárgyú hivatalos üzenettel kapcsolatban.\n\nFeladó: ${existing.sender}\nDátum: ${existing.sendDate}\n\nÜdvözlettel,\n${existing.sender}"
-            database.messagesDao().updateMessageBody(
-                id = messageId,
-                bodyHtml = fallbackContent,
-                previewText = fallbackContent.take(150)
-            )
-            markMessageAsRead(messageId)
-            return@withContext fallbackContent
         }
 
         ""
