@@ -429,11 +429,13 @@ interface AppStrings {
     val deadlineEndingToday: String
     val academicPeriodActiveBadge: String
     val academicPeriodUpcomingBadge: String
+    val academicPeriodEndedBadge: String
     val tabTimetable: String
     val tabPeriods: String
     val periodFilterAll: String
     val periodFilterActive: String
     val periodFilterUpcoming: String
+    val periodFilterEnded: String
     val noAcademicPeriods: String
     val periodStartsInDays: (Long) -> String
 
@@ -911,11 +913,13 @@ class HungarianStrings : AppStrings {
     override val deadlineEndingToday = "Ma éjfélkor zárul!"
     override val academicPeriodActiveBadge = "Folyamatban"
     override val academicPeriodUpcomingBadge = "Közelgő"
+    override val academicPeriodEndedBadge = "Lezárult"
     override val tabTimetable = "Órarend"
     override val tabPeriods = "Időszakok"
     override val periodFilterAll = "Összes"
     override val periodFilterActive = "Aktív"
     override val periodFilterUpcoming = "Közelgő"
+    override val periodFilterEnded = "Lezárult"
     override val noAcademicPeriods = "Nincsenek elérhető féléves időszakok."
     override val periodStartsInDays: (Long) -> String = { days -> "$days nap múlva kezdődik" }
 
@@ -1390,11 +1394,13 @@ class EnglishStrings : AppStrings {
     override val deadlineEndingToday = "Ends tonight at 23:59!"
     override val academicPeriodActiveBadge = "Active"
     override val academicPeriodUpcomingBadge = "Upcoming"
+    override val academicPeriodEndedBadge = "Ended"
     override val tabTimetable = "Timetable"
     override val tabPeriods = "Periods"
     override val periodFilterAll = "All"
     override val periodFilterActive = "Active"
     override val periodFilterUpcoming = "Upcoming"
+    override val periodFilterEnded = "Ended"
     override val noAcademicPeriods = "No academic periods available."
     override val periodStartsInDays: (Long) -> String = { days -> "Starts in $days days" }
 
@@ -1867,11 +1873,13 @@ class GermanStrings : AppStrings {
     override val deadlineEndingToday = "Endet heute um 23:59!"
     override val academicPeriodActiveBadge = "Aktiv"
     override val academicPeriodUpcomingBadge = "Bevorstehend"
+    override val academicPeriodEndedBadge = "Beendet"
     override val tabTimetable = "Stundenplan"
     override val tabPeriods = "Fristen"
     override val periodFilterAll = "Alle"
     override val periodFilterActive = "Aktiv"
     override val periodFilterUpcoming = "Bevorstehend"
+    override val periodFilterEnded = "Beendet"
     override val noAcademicPeriods = "Keine Semesterfristen verfügbar."
     override val periodStartsInDays: (Long) -> String = { days -> "Beginnt in $days Tagen" }
 

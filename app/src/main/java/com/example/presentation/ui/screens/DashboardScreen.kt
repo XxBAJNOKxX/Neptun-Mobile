@@ -527,13 +527,16 @@ private fun AcademicPeriodsDashboardCard(
     onOpenPeriods: () -> Unit = {}
 ) {
     val strings = currentStrings()
-    val activePeriod = periods.firstOrNull { it.isActive } ?: periods.firstOrNull() ?: return
-    val daysLeft = activePeriod.daysRemaining
+    val activePeriod = periods.firstOrNull { it.isCurrentlyActive }
+        ?: periods.firstOrNull { it.isUpcoming }
+        ?: return
+    val isActive = activePeriod.isCurrentlyActive
+    val daysLeft = if (isActive) activePeriod.daysRemaining else activePeriod.daysUntilStart
 
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (daysLeft != null && daysLeft <= 2) {
+            containerColor = if (isActive && daysLeft != null && daysLeft <= 2) {
                 MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.7f)
             } else {
                 MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
@@ -549,14 +552,14 @@ private fun AcademicPeriodsDashboardCard(
         ) {
             Surface(
                 shape = CircleShape,
-                color = if (daysLeft != null && daysLeft <= 2) NeptunRed.copy(alpha = 0.2f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                color = if (isActive && daysLeft != null && daysLeft <= 2) NeptunRed.copy(alpha = 0.2f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
                 modifier = Modifier.size(38.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
                         imageVector = Icons.Default.DateRange,
                         contentDescription = null,
-                        tint = if (daysLeft != null && daysLeft <= 2) NeptunRed else MaterialTheme.colorScheme.primary,
+                        tint = if (isActive && daysLeft != null && daysLeft <= 2) NeptunRed else MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -571,13 +574,13 @@ private fun AcademicPeriodsDashboardCard(
                 ) {
                     Surface(
                         shape = RoundedCornerShape(4.dp),
-                        color = if (activePeriod.isActive) NeptunGreen.copy(alpha = 0.2f) else NeptunBlue40.copy(alpha = 0.2f)
+                        color = if (isActive) NeptunGreen.copy(alpha = 0.2f) else NeptunBlue40.copy(alpha = 0.2f)
                     ) {
                         Text(
-                            text = if (activePeriod.isActive) strings.academicPeriodActiveBadge else strings.academicPeriodUpcomingBadge,
+                            text = if (isActive) strings.academicPeriodActiveBadge else strings.academicPeriodUpcomingBadge,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
-                            color = if (activePeriod.isActive) NeptunGreen else NeptunBlue40,
+                            color = if (isActive) NeptunGreen else NeptunBlue40,
                             modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
                         )
                     }
@@ -597,16 +600,15 @@ private fun AcademicPeriodsDashboardCard(
                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                 )
                 Text(
-                    text = if (daysLeft != null && daysLeft == 0L) {
-                        strings.deadlineEndingToday
-                    } else if (daysLeft != null) {
-                        strings.deadlineDaysRemaining(daysLeft)
-                    } else {
-                        "${activePeriod.startDate} - ${activePeriod.endDate}"
+                    text = when {
+                        isActive && daysLeft != null && daysLeft == 0L -> strings.deadlineEndingToday
+                        isActive && daysLeft != null -> strings.deadlineDaysRemaining(daysLeft)
+                        !isActive && daysLeft != null -> strings.periodStartsInDays(daysLeft)
+                        else -> "${activePeriod.startDate} - ${activePeriod.endDate}"
                     },
                     style = MaterialTheme.typography.bodySmall,
                     fontWeight = FontWeight.SemiBold,
-                    color = if (daysLeft != null && daysLeft <= 2) NeptunRed else MaterialTheme.colorScheme.onSurfaceVariant
+                    color = if (isActive && daysLeft != null && daysLeft <= 2) NeptunRed else MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 

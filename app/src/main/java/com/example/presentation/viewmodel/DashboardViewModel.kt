@@ -109,7 +109,7 @@ class DashboardViewModel(
         }
         viewModelScope.launch {
             neptunRepository.getAcademicPeriods().collect { periods ->
-                val activeOrUpcoming = periods.filter { it.isActive || (it.daysRemaining ?: -1) >= 0 }
+                val activeOrUpcoming = periods.filter { !it.isPast && (it.isCurrentlyActive || it.isUpcoming) }
                 _uiState.update {
                     it.copy(activePeriods = activeOrUpcoming)
                 }

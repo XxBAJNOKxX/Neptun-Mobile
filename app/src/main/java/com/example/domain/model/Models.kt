@@ -274,18 +274,78 @@ data class AcademicPeriod(
     val type: String = "", // e.g. "REGISTRATION", "COURSE_REG", "EXAM", "EDUCATION", "BREAK"
     val isActive: Boolean = true
 ) {
+    val parsedStartDate: java.time.LocalDate?
+        get() = parseDate(startDate)
+
+    val parsedEndDate: java.time.LocalDate?
+        get() = parseDate(endDate)
+
+    val isPast: Boolean
+        get() {
+            val end = parsedEndDate
+            if (end != null) {
+                return java.time.LocalDate.now().isAfter(end)
+            }
+            return false
+        }
+
+    val isCurrentlyActive: Boolean
+        get() {
+            if (isPast) return false
+            val today = java.time.LocalDate.now()
+            val start = parsedStartDate
+            val end = parsedEndDate
+            return when {
+                start != null && end != null -> !today.isBefore(start) && !today.isAfter(end)
+                start != null -> !today.isBefore(start)
+                end != null -> !today.isAfter(end)
+                else -> isActive
+            }
+        }
+
+    val isUpcoming: Boolean
+        get() {
+            if (isPast || isCurrentlyActive) return false
+            val today = java.time.LocalDate.now()
+            val start = parsedStartDate
+            return if (start != null) {
+                today.isBefore(start)
+            } else {
+                !isActive
+            }
+        }
+
     val daysRemaining: Long?
         get() {
-            if (endDate.isBlank()) return null
+            val end = parsedEndDate ?: return null
+            val diff = java.time.temporal.ChronoUnit.DAYS.between(java.time.LocalDate.now(), end)
+            return if (diff < 0) null else diff
+        }
+
+    val daysUntilStart: Long?
+        get() {
+            val start = parsedStartDate ?: return null
+            val diff = java.time.temporal.ChronoUnit.DAYS.between(java.time.LocalDate.now(), start)
+            return if (diff <= 0) null else diff
+        }
+
+    private fun parseDate(raw: String): java.time.LocalDate? {
+        if (raw.isBlank()) return null
+        val match = Regex("""(\d{4})[.\-/]\s*(\d{1,2})[.\-/]\s*(\d{1,2})""").find(raw)
+        if (match != null) {
+            val (y, m, d) = match.destructured
             return try {
-                val cleanDate = endDate.replace(".", "-").trim().take(10)
-                val parsed = java.time.LocalDate.parse(cleanDate)
-                val diff = java.time.temporal.ChronoUnit.DAYS.between(java.time.LocalDate.now(), parsed)
-                diff.coerceAtLeast(0)
-            } catch (e: Exception) {
+                java.time.LocalDate.of(y.toInt(), m.toInt(), d.toInt())
+            } catch (_: Exception) {
                 null
             }
         }
+        return try {
+            java.time.LocalDate.parse(raw.take(10).replace('.', '-').trim())
+        } catch (_: Exception) {
+            null
+        }
+    }
 }
 
 data class FinanceItem(
