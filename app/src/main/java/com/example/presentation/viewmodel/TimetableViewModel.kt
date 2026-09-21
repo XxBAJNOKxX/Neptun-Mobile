@@ -43,7 +43,7 @@ data class TimetableUiState(
     val showWeekend: Boolean = false,
     val selectedTab: Int = 0, // 0 = Órarend, 1 = Időszakok
     val academicPeriods: List<AcademicPeriod> = emptyList(),
-    val periodFilter: Int = 0, // 0 = Mind, 1 = Aktív, 2 = Közelgő
+    val periodFilter: Int = 0, // 0 = Mind, 1 = Aktív, 2 = Közelgő, 3 = Lezárult
     val isRefreshingPeriods: Boolean = false
 )
 

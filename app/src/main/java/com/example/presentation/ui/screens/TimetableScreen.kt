@@ -19,6 +19,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -792,8 +794,9 @@ private fun AcademicPeriodsTabContent(
     val strings = currentStrings()
 
     val filteredPeriods = when (filter) {
-        1 -> periods.filter { it.isActive }
-        2 -> periods.filter { !it.isActive }
+        1 -> periods.filter { it.isCurrentlyActive }
+        2 -> periods.filter { it.isUpcoming }
+        3 -> periods.filter { it.isPast }
         else -> periods
     }
 
@@ -806,6 +809,7 @@ private fun AcademicPeriodsTabContent(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp, vertical = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
@@ -823,6 +827,11 @@ private fun AcademicPeriodsTabContent(
                 selected = filter == 2,
                 onClick = { onFilterChange(2) },
                 label = { Text(strings.periodFilterUpcoming) }
+            )
+            FilterChip(
+                selected = filter == 3,
+                onClick = { onFilterChange(3) },
+                label = { Text(strings.periodFilterEnded) }
             )
         }
 
@@ -880,20 +889,27 @@ private fun AcademicPeriodsTabContent(
 @Composable
 private fun AcademicPeriodCard(period: AcademicPeriod) {
     val strings = currentStrings()
+    val isEnded = period.isPast
+    val isActive = period.isCurrentlyActive
+    val isUpcoming = period.isUpcoming
     val daysLeft = period.daysRemaining
+    val daysUntilStart = period.daysUntilStart
 
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (period.isActive && daysLeft != null && daysLeft <= 2) {
-                MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.45f)
-            } else if (period.isActive) {
-                MaterialTheme.colorScheme.surface
-            } else {
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+            containerColor = when {
+                isActive && daysLeft != null && daysLeft <= 2 ->
+                    MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.45f)
+                isActive ->
+                    MaterialTheme.colorScheme.surface
+                isUpcoming ->
+                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+                else ->
+                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)
             }
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (period.isActive) 2.dp else 0.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isActive) 2.dp else 0.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(
@@ -909,20 +925,29 @@ private fun AcademicPeriodCard(period: AcademicPeriod) {
                 Surface(
                     shape = RoundedCornerShape(6.dp),
                     color = when {
-                        period.isActive -> NeptunGreen.copy(alpha = 0.15f)
-                        else -> NeptunBlue40.copy(alpha = 0.15f)
+                        isActive -> NeptunGreen.copy(alpha = 0.15f)
+                        isUpcoming -> NeptunBlue40.copy(alpha = 0.15f)
+                        else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
                     }
                 ) {
                     Text(
-                        text = if (period.isActive) strings.academicPeriodActiveBadge else strings.academicPeriodUpcomingBadge,
+                        text = when {
+                            isActive -> strings.academicPeriodActiveBadge
+                            isUpcoming -> strings.academicPeriodUpcomingBadge
+                            else -> strings.academicPeriodEndedBadge
+                        },
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
-                        color = if (period.isActive) NeptunGreen else NeptunBlue40,
+                        color = when {
+                            isActive -> NeptunGreen
+                            isUpcoming -> NeptunBlue40
+                            else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        },
                         modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
                     )
                 }
 
-                if (period.isActive) {
+                if (isActive) {
                     Surface(
                         shape = RoundedCornerShape(6.dp),
                         color = if (daysLeft != null && daysLeft <= 2) NeptunRed.copy(alpha = 0.15f) else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
@@ -941,13 +966,13 @@ private fun AcademicPeriodCard(period: AcademicPeriod) {
                             modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
                         )
                     }
-                } else if (daysLeft != null && daysLeft > 0) {
+                } else if (isUpcoming && daysUntilStart != null && daysUntilStart > 0) {
                     Surface(
                         shape = RoundedCornerShape(6.dp),
                         color = MaterialTheme.colorScheme.surfaceVariant
                     ) {
                         Text(
-                            text = strings.periodStartsInDays(daysLeft),
+                            text = strings.periodStartsInDays(daysUntilStart),
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Medium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,

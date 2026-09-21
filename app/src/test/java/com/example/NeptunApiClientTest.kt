@@ -8,7 +8,9 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -374,6 +376,55 @@ class NeptunApiClientTest {
         assertEquals("p1", decoded[0].id)
         assertEquals("Szorgalmi időszak", decoded[0].name)
         assertTrue(decoded[0].isActive)
+    }
+
+    @Test
+    fun testAcademicPeriodStatusLifecycle() {
+        val today = java.time.LocalDate.now()
+
+        // Past period
+        val pastPeriod = AcademicPeriod(
+            id = "past_1",
+            name = "Beiratkozási időszak",
+            startDate = today.minusDays(30).toString(),
+            endDate = today.minusDays(10).toString(),
+            type = "REGISTRATION",
+            isActive = false
+        )
+        assertTrue(pastPeriod.isPast)
+        assertFalse(pastPeriod.isCurrentlyActive)
+        assertFalse(pastPeriod.isUpcoming)
+        assertNull(pastPeriod.daysRemaining)
+        assertNull(pastPeriod.daysUntilStart)
+
+        // Active period
+        val activePeriod = AcademicPeriod(
+            id = "act_1",
+            name = "Szorgalmi időszak",
+            startDate = today.minusDays(5).toString(),
+            endDate = today.plusDays(20).toString(),
+            type = "EDUCATION",
+            isActive = true
+        )
+        assertFalse(activePeriod.isPast)
+        assertTrue(activePeriod.isCurrentlyActive)
+        assertFalse(activePeriod.isUpcoming)
+        assertEquals(20L, activePeriod.daysRemaining)
+        assertNull(activePeriod.daysUntilStart)
+
+        // Upcoming period
+        val upcomingPeriod = AcademicPeriod(
+            id = "up_1",
+            name = "Vizsgaidőszak",
+            startDate = today.plusDays(40).toString(),
+            endDate = today.plusDays(70).toString(),
+            type = "EXAM",
+            isActive = false
+        )
+        assertFalse(upcomingPeriod.isPast)
+        assertFalse(upcomingPeriod.isCurrentlyActive)
+        assertTrue(upcomingPeriod.isUpcoming)
+        assertEquals(40L, upcomingPeriod.daysUntilStart)
     }
 }
 

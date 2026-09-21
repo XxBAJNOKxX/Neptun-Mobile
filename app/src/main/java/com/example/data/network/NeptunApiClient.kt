@@ -3928,7 +3928,9 @@ class NeptunApiClient {
         return results
             .distinctBy { "${it.name}_${it.startDate}_${it.endDate}" }
             .sortedWith(
-                compareByDescending<com.example.domain.model.AcademicPeriod> { it.isActive }
+                compareByDescending<com.example.domain.model.AcademicPeriod> { it.isCurrentlyActive }
+                    .thenByDescending { it.isUpcoming }
+                    .thenBy { it.daysUntilStart ?: Long.MAX_VALUE }
                     .thenBy { it.daysRemaining ?: Long.MAX_VALUE }
                     .thenBy { it.startDate }
             )
