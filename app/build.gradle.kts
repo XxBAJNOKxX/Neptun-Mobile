@@ -20,7 +20,7 @@ val appVersionName = (project.findProperty("versionName") as? String)
 val githubRepo = (project.findProperty("githubRepository") as? String)
     ?: System.getenv("GITHUB_REPO")
     ?: System.getenv("GITHUB_REPOSITORY")
-    ?: "danitanki2005/neptun-mobile"
+    ?: "XxBAJNOKxX/Neptun-Mobile"
 
 android {
   namespace = "com.example"
