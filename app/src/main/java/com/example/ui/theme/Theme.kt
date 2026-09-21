@@ -38,10 +38,21 @@ fun MyApplicationTheme(
         baseScheme.copy(
             background = lerp(baseScheme.background, Color.Black, 0.45f),
             surface = lerp(baseScheme.surface, Color.White, 0.055f),
-            surfaceVariant = lerp(baseScheme.surfaceVariant, Color.White, 0.05f)
+            surfaceVariant = lerp(baseScheme.surfaceVariant, Color.White, 0.05f),
+            surfaceContainer = lerp(baseScheme.surface, Color.White, 0.08f),
+            surfaceContainerHigh = lerp(baseScheme.surface, Color.White, 0.12f),
+            surfaceContainerHighest = lerp(baseScheme.surface, Color.White, 0.16f),
+            surfaceContainerLow = lerp(baseScheme.surface, Color.White, 0.035f),
+            surfaceContainerLowest = lerp(baseScheme.background, Color.Black, 0.6f)
         )
     } else {
-        baseScheme
+        baseScheme.copy(
+            surfaceContainer = lerp(baseScheme.surface, baseScheme.primary, 0.035f),
+            surfaceContainerHigh = lerp(baseScheme.surface, baseScheme.primary, 0.065f),
+            surfaceContainerHighest = lerp(baseScheme.surface, baseScheme.primary, 0.10f),
+            surfaceContainerLow = lerp(baseScheme.surface, Color.White, 0.4f),
+            surfaceContainerLowest = Color.White
+        )
     }
 
     MaterialTheme(colorScheme = colorScheme, typography = Typography, content = content)
