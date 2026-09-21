@@ -58,7 +58,7 @@ class NeptunRepositoryImpl(
     }
 
     private val _degreeProgressFlow = MutableStateFlow<DegreeProgress?>(prefsManager.getDegreeProgress())
-    private val _academicPeriodsFlow = MutableStateFlow<List<AcademicPeriod>>(emptyList())
+    private val _academicPeriodsFlow = MutableStateFlow<List<AcademicPeriod>>(prefsManager.getAcademicPeriods())
 
     init {
         CoroutineScope(Dispatchers.IO).launch {
@@ -868,7 +868,9 @@ class NeptunRepositoryImpl(
         val creds = prefsManager.loadCredentials()
         val isDemo = creds?.neptunCode == "DEMO01" || prefsManager.getDataMode() == DataMode.DEMO
         if (isDemo) {
-            _academicPeriodsFlow.value = MockNeptunDataSource.getMockAcademicPeriods()
+            val mock = MockNeptunDataSource.getMockAcademicPeriods()
+            _academicPeriodsFlow.value = mock
+            prefsManager.saveAcademicPeriods(mock)
             return@withContext Result.success(Unit)
         }
 
@@ -887,11 +889,14 @@ class NeptunRepositoryImpl(
             }
         }
 
-        if (periods.isEmpty() && BuildConfig.DEBUG) {
-            periods = MockNeptunDataSource.getMockAcademicPeriods()
+        if (periods.isNotEmpty()) {
+            _academicPeriodsFlow.value = periods
+            prefsManager.saveAcademicPeriods(periods)
+        } else {
+            val existing = _academicPeriodsFlow.value.ifEmpty { prefsManager.getAcademicPeriods() }
+            _academicPeriodsFlow.value = existing
         }
 
-        _academicPeriodsFlow.value = periods
         Result.success(Unit)
     }
 
@@ -1017,5 +1022,6 @@ class NeptunRepositoryImpl(
         _degreeProgressFlow.value = null
         prefsManager.clearDegreeProgress()
         _academicPeriodsFlow.value = emptyList()
+        prefsManager.clearAcademicPeriods()
     }
 }

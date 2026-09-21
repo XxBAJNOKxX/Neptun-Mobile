@@ -3770,46 +3770,113 @@ class NeptunApiClient {
         token: String,
         deviceCookie: String = ""
     ): List<com.example.domain.model.AcademicPeriod> = withContext(Dispatchers.IO) {
-        val candidateBaseUrls = if (baseUrl.contains("elte.hu", ignoreCase = true) && !baseUrl.contains("hallgato", ignoreCase = true)) {
-            listOf("https://hallgato1.neptun.elte.hu")
+        val cleanBase = normalizeBaseUrl(baseUrl)
+        val apiBase = if (cleanBase.contains("elte.hu", ignoreCase = true) && !cleanBase.contains("hallgato", ignoreCase = true)) {
+            "https://hallgato1.neptun.elte.hu"
         } else {
-            listOf(baseUrl)
+            cleanBase
         }
 
-        val paths = listOf(
-            "/api/Informations/GetPeriodsGridData",
-            "/api/Information/GetPeriodsGridData",
-            "/api/Periods/GetPeriodsGridData"
+        // 1. Fetch terms to identify the current semester / available term IDs
+        val termIds = mutableListOf<String>()
+        var actualTermId: String? = null
+
+        val termsUrls = listOf(
+            "$apiBase/api/Periods/GetTerms",
+            "$apiBase/api/Period/GetTerms",
+            "$apiBase/api/TakenSubjects/Terms"
         )
 
-        for (base in candidateBaseUrls) {
-            for (path in paths) {
-                try {
-                    val req = Request.Builder()
-                        .url("$base$path")
-                        .get()
-                        .addHeader("Authorization", "Bearer $token")
-                        .addHeader("Accept", "application/json, text/plain, */*")
-                    if (deviceCookie.isNotBlank()) req.addHeader("Cookie", deviceCookie)
+        for (termsUrl in termsUrls) {
+            try {
+                val req = Request.Builder()
+                    .url(termsUrl)
+                    .get()
+                    .addHeader("Authorization", "Bearer $token")
+                    .addHeader("Accept", "application/json, text/plain, */*")
+                    .apply {
+                        if (deviceCookie.isNotBlank()) addHeader("Cookie", deviceCookie)
+                    }
+                    .build()
 
-                    val resp = okHttpClient.newCall(req.build()).execute()
+                okHttpClient.newCall(req).execute().use { resp ->
                     if (resp.isSuccessful) {
                         val body = resp.body?.string() ?: ""
                         val parsed = safeParseJson(body)
                         if (parsed != null) {
-                            val list = parseAcademicPeriods(parsed)
-                            if (list.isNotEmpty()) return@withContext list
+                            val arrays = mutableListOf<JsonArray>()
+                            collectArrays(parsed, arrays, depth = 0)
+                            for (arr in arrays) {
+                                for (elem in arr) {
+                                    val obj = elem as? JsonObject ?: continue
+                                    val value = firstNonBlank(obj, "value", "id", "termId", "TermId") ?: continue
+                                    termIds.add(value)
+                                    val isActual = obj["isActualTerm"]?.jsonPrimitive?.booleanOrNull
+                                        ?: obj["selected"]?.jsonPrimitive?.booleanOrNull
+                                        ?: (obj["text"]?.jsonPrimitive?.contentOrNull?.contains("akt", ignoreCase = true) == true)
+                                    if (isActual && actualTermId == null) {
+                                        actualTermId = value
+                                    }
+                                }
+                            }
                         }
                     }
-                } catch (e: Exception) {
-                    Log.d(tag, "getAcademicPeriods error ($path): ${e.message}")
                 }
+                if (termIds.isNotEmpty()) break
+            } catch (e: Exception) {
+                Log.d(tag, "Failed fetching terms from $termsUrl: ${e.message}")
             }
         }
+
+        if (actualTermId == null && termIds.isNotEmpty()) {
+            actualTermId = termIds.first()
+        }
+
+        // 2. Query periods from the authentic modern endpoints
+        val candidateEndpoints = mutableListOf<String>()
+        if (actualTermId != null) {
+            candidateEndpoints.add("$apiBase/api/Periods/GetPeriods?request.termId=$actualTermId&sortAndPage.firstRow=0&sortAndPage.lastRow=100")
+            candidateEndpoints.add("$apiBase/api/Periods/GetPeriods?termId=$actualTermId")
+            candidateEndpoints.add("$apiBase/api/Period/GetPeriods?termId=$actualTermId")
+        }
+        candidateEndpoints.add("$apiBase/api/Periods/GetPeriods?sortAndPage.firstRow=0&sortAndPage.lastRow=100")
+        candidateEndpoints.add("$apiBase/api/Periods/GetPeriods")
+        candidateEndpoints.add("$apiBase/api/Period/GetPeriods")
+        candidateEndpoints.add("$apiBase/api/Calendar/GetCalendarEvents")
+
+        for (url in candidateEndpoints) {
+            try {
+                val req = Request.Builder()
+                    .url(url)
+                    .get()
+                    .addHeader("Authorization", "Bearer $token")
+                    .addHeader("Accept", "application/json, text/plain, */*")
+                    .apply {
+                        if (deviceCookie.isNotBlank()) addHeader("Cookie", deviceCookie)
+                    }
+                    .build()
+
+                okHttpClient.newCall(req).execute().use { resp ->
+                    if (resp.isSuccessful) {
+                        val body = resp.body?.string() ?: ""
+                        val parsed = safeParseJson(body)
+                        if (parsed != null) {
+                            val periods = parseAcademicPeriods(parsed)
+                            if (periods.isNotEmpty()) {
+                                return@withContext periods
+                            }
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.d(tag, "Failed fetching periods from $url: ${e.message}")
+            }
+        }
+
         emptyList()
     }
 
-    private fun parseAcademicPeriods(root: JsonElement): List<com.example.domain.model.AcademicPeriod> {
+    internal fun parseAcademicPeriods(root: JsonElement): List<com.example.domain.model.AcademicPeriod> {
         val results = mutableListOf<com.example.domain.model.AcademicPeriod>()
         try {
             val arraysToCheck = mutableListOf<JsonArray>()
@@ -3819,31 +3886,36 @@ class NeptunApiClient {
             for (array in arraysToCheck) {
                 for (elem in array) {
                     val obj = elem as? JsonObject ?: continue
-                    val name = firstNonBlank(obj, "periodName", "PeriodName", "name", "Name", "description", "title") ?: continue
+                    val name = firstNonBlank(obj, "periodName", "PeriodName", "name", "Name", "description", "title", "subject", "text") ?: continue
                     if (name.length < 3) continue
 
-                    val startRaw = firstNonBlank(obj, "startDate", "StartDate", "start", "kezdes", "from") ?: ""
-                    val endRaw = firstNonBlank(obj, "endDate", "EndDate", "end", "vege", "to") ?: ""
-                    val type = firstNonBlank(obj, "type", "Type", "periodType", "PeriodType", "kategoria") ?: ""
+                    val startRaw = firstNonBlank(obj, "fromDate", "FromDate", "startDate", "StartDate", "start", "kezdes", "from") ?: ""
+                    val endRaw = firstNonBlank(obj, "toDate", "ToDate", "endDate", "EndDate", "end", "vege", "to") ?: ""
+                    val rawType = firstNonBlank(obj, "periodType", "PeriodType", "type", "Type", "typeName", "kategoria") ?: ""
 
-                    val startClean = startRaw.take(10).replace(".", "-")
-                    val endClean = endRaw.take(10).replace(".", "-")
+                    val startClean = normalizeDateIso(startRaw)
+                    val endClean = normalizeDateIso(endRaw)
 
-                    val isActive = try {
-                        val start = java.time.LocalDate.parse(startClean)
-                        val end = java.time.LocalDate.parse(endClean)
-                        !today.isBefore(start) && !today.isAfter(end)
-                    } catch (e: Exception) {
-                        true
+                    val start = try { java.time.LocalDate.parse(startClean) } catch (_: Exception) { null }
+                    val end = try { java.time.LocalDate.parse(endClean) } catch (_: Exception) { null }
+
+                    val isActive = when {
+                        start != null && end != null -> !today.isBefore(start) && !today.isAfter(end)
+                        start != null -> !today.isBefore(start)
+                        end != null -> !today.isAfter(end)
+                        else -> true
                     }
+
+                    val periodId = firstNonBlank(obj, "periodId", "PeriodId", "id", "Id")
+                        ?: "period_${name.hashCode()}_${startClean}"
 
                     results.add(
                         com.example.domain.model.AcademicPeriod(
-                            id = firstNonBlank(obj, "id", "Id", "periodId") ?: "period_${name.hashCode()}",
+                            id = periodId,
                             name = name,
-                            startDate = startRaw,
-                            endDate = endRaw,
-                            type = type,
+                            startDate = if (startClean.isNotEmpty()) startClean else startRaw,
+                            endDate = if (endClean.isNotEmpty()) endClean else endRaw,
+                            type = mapPeriodType(rawType, name),
                             isActive = isActive
                         )
                     )
@@ -3852,6 +3924,37 @@ class NeptunApiClient {
         } catch (e: Exception) {
             Log.e(tag, "parseAcademicPeriods error: ${e.message}")
         }
-        return results.distinctBy { it.id }
+
+        return results
+            .distinctBy { "${it.name}_${it.startDate}_${it.endDate}" }
+            .sortedWith(
+                compareByDescending<com.example.domain.model.AcademicPeriod> { it.isActive }
+                    .thenBy { it.daysRemaining ?: Long.MAX_VALUE }
+                    .thenBy { it.startDate }
+            )
+    }
+
+    internal fun normalizeDateIso(raw: String): String {
+        if (raw.isBlank()) return ""
+        val match = Regex("""(\d{4})[.\-/]\s*(\d{1,2})[.\-/]\s*(\d{1,2})""").find(raw)
+        if (match != null) {
+            val (y, m, d) = match.destructured
+            return "%04d-%02d-%02d".format(y.toInt(), m.toInt(), d.toInt())
+        }
+        return raw.take(10).replace('.', '-').trim()
+    }
+
+    internal fun mapPeriodType(rawType: String, name: String): String {
+        val combined = "$rawType $name".lowercase()
+        return when {
+            combined.contains("bejelentkez") || combined.contains("regisztr") -> "REGISTRATION"
+            combined.contains("kurzus") || combined.contains("tárgyfelvétel") || combined.contains("tárgyleadás") || combined.contains("kurzusjelentkezés") -> "COURSE_REG"
+            combined.contains("vizsga") -> "EXAM"
+            combined.contains("szorgalm") || combined.contains("oktatás") || combined.contains("tanítás") -> "EDUCATION"
+            combined.contains("szünet") || combined.contains("ünnep") -> "BREAK"
+            combined.contains("díj") || combined.contains("pénzügy") || combined.contains("befizetés") || combined.contains("térítés") -> "FINANCE"
+            combined.contains("jelentkezés") -> "COURSE_REG"
+            else -> rawType.ifBlank { "PERIOD" }
+        }
     }
 }

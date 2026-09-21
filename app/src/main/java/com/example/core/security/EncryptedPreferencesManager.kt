@@ -8,6 +8,8 @@ import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.example.domain.model.StudentCredentials
 import com.example.domain.model.DegreeProgress
+import com.example.domain.model.AcademicPeriod
+import kotlinx.serialization.builtins.ListSerializer
 import com.example.ui.theme.AppAccentColor
 import com.example.ui.theme.ThemeMode
 import com.example.ui.theme.ThemeSettings
@@ -311,6 +313,29 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
 
     fun clearDegreeProgress() {
         prefs.edit().remove(KEY_DEGREE_PROGRESS).apply()
+    }
+
+    fun saveAcademicPeriods(periods: List<AcademicPeriod>) {
+        try {
+            val jsonStr = jsonSerializer.encodeToString(ListSerializer(AcademicPeriod.serializer()), periods)
+            prefs.edit().putString(KEY_ACADEMIC_PERIODS, jsonStr).apply()
+        } catch (e: Exception) {
+            Log.e("EncryptedPrefs", "saveAcademicPeriods error: ${e.message}")
+        }
+    }
+
+    fun getAcademicPeriods(): List<AcademicPeriod> {
+        val jsonStr = prefs.getString(KEY_ACADEMIC_PERIODS, null) ?: return emptyList()
+        return try {
+            jsonSerializer.decodeFromString(ListSerializer(AcademicPeriod.serializer()), jsonStr)
+        } catch (e: Exception) {
+            Log.e("EncryptedPrefs", "getAcademicPeriods error: ${e.message}")
+            emptyList()
+        }
+    }
+
+    fun clearAcademicPeriods() {
+        prefs.edit().remove(KEY_ACADEMIC_PERIODS).apply()
     }
 
     fun setBiometricLockEnabled(enabled: Boolean) {
@@ -718,6 +743,7 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
         private const val KEY_NOTIFIED_PREFIX = "key_notified_"
         private const val KEY_NOTIFIED_BASELINE_PREFIX = "key_notified_baseline_"
         private const val KEY_DEGREE_PROGRESS = "key_degree_progress"
+        private const val KEY_ACADEMIC_PERIODS = "key_academic_periods"
     }
 }
 

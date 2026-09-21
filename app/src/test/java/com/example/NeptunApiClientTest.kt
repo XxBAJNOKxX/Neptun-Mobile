@@ -1,6 +1,9 @@
 package com.example
 
 import com.example.data.network.NeptunApiClient
+import com.example.domain.model.AcademicPeriod
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -289,6 +292,88 @@ class NeptunApiClientTest {
         assertEquals(2, array?.size)
         assertEquals("12345", (array?.get(0) as? JsonPrimitive)?.content)
         assertEquals("67890", (array?.get(1) as? JsonPrimitive)?.content)
+    }
+
+    @Test
+    fun testNormalizeDateIso() {
+        assertEquals("2026-09-10", client.normalizeDateIso("2026-09-10T08:00:00"))
+        assertEquals("2026-09-10", client.normalizeDateIso("2026.09.10."))
+        assertEquals("2026-09-10", client.normalizeDateIso("2026. 9. 10."))
+        assertEquals("2026-09-10", client.normalizeDateIso("2026/09/10"))
+        assertEquals("2026-09-10", client.normalizeDateIso("2026-09-10"))
+    }
+
+    @Test
+    fun testMapPeriodType() {
+        assertEquals("COURSE_REG", client.mapPeriodType("Kurzus", "Végleges kurzusfelvétel"))
+        assertEquals("REGISTRATION", client.mapPeriodType("Adminisztrációs", "Féléves bejelentkezési időszak"))
+        assertEquals("EXAM", client.mapPeriodType("Vizsga", "Keresztféléves vizsgaidőszak"))
+        assertEquals("EDUCATION", client.mapPeriodType("Oktatás", "Szorgalmi időszak"))
+        assertEquals("BREAK", client.mapPeriodType("Szünet", "Tavaszi szünet"))
+        assertEquals("FINANCE", client.mapPeriodType("Pénzügy", "Önköltség befizetési határidő"))
+    }
+
+    @Test
+    fun testParseAcademicPeriods() {
+        val json = """
+            {
+                "data": [
+                    {
+                        "periodId": "p_101",
+                        "periodName": "Végleges kurzusfelvétel",
+                        "periodType": "Kurzus",
+                        "fromDate": "2026-09-01T08:00:00",
+                        "toDate": "2026-10-31T23:59:59"
+                    },
+                    {
+                        "periodId": "p_102",
+                        "periodName": "Vizsgaidőszak",
+                        "periodType": "Vizsga",
+                        "fromDate": "2026-12-15T08:00:00",
+                        "toDate": "2027-01-28T23:59:59"
+                    }
+                ]
+            }
+        """.trimIndent()
+
+        val parsed = client.safeParseJsonObject(json)
+        assertNotNull(parsed)
+        val periods = client.parseAcademicPeriods(parsed!!)
+        assertEquals(2, periods.size)
+
+        val courseReg = periods.firstOrNull { it.id == "p_101" }
+        assertNotNull(courseReg)
+        assertEquals("Végleges kurzusfelvétel", courseReg?.name)
+        assertEquals("COURSE_REG", courseReg?.type)
+        assertEquals("2026-09-01", courseReg?.startDate)
+        assertEquals("2026-10-31", courseReg?.endDate)
+
+        val exam = periods.firstOrNull { it.id == "p_102" }
+        assertNotNull(exam)
+        assertEquals("Vizsgaidőszak", exam?.name)
+        assertEquals("EXAM", exam?.type)
+        assertEquals("2026-12-15", exam?.startDate)
+        assertEquals("2027-01-28", exam?.endDate)
+    }
+
+    @Test
+    fun testAcademicPeriodSerialization() {
+        val periods = listOf(
+            AcademicPeriod(
+                id = "p1",
+                name = "Szorgalmi időszak",
+                startDate = "2026-09-07",
+                endDate = "2026-12-11",
+                type = "EDUCATION",
+                isActive = true
+            )
+        )
+        val jsonStr = Json.encodeToString(ListSerializer(AcademicPeriod.serializer()), periods)
+        val decoded = Json.decodeFromString(ListSerializer(AcademicPeriod.serializer()), jsonStr)
+        assertEquals(1, decoded.size)
+        assertEquals("p1", decoded[0].id)
+        assertEquals("Szorgalmi időszak", decoded[0].name)
+        assertTrue(decoded[0].isActive)
     }
 }
 
