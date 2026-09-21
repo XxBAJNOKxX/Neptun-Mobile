@@ -1281,62 +1281,6 @@ fun SettingsScreen(
                             ) { Text("+10") }
                         }
                     }
-
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-
-                    // 4. Halk órák (quiet hours)
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = Icons.Default.NotificationsOff,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(strings.quietHoursLabel, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-                                }
-                                Text(
-                                    text = strings.quietHoursDesc,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            Switch(
-                                checked = notificationPreferences.quietHoursEnabled,
-                                onCheckedChange = onQuietHoursEnabledChange
-                            )
-                        }
-
-                        if (notificationPreferences.quietHoursEnabled) {
-                            Text(
-                                text = strings.activeWindowLabel,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                listOf(
-                                    "22:00–07:00" to (22 * 60 to 7 * 60),
-                                    "23:00–08:00" to (23 * 60 to 8 * 60),
-                                    "20:00–08:00" to (20 * 60 to 8 * 60),
-                                    "21:00–06:00" to (21 * 60 to 6 * 60)
-                                ).forEach { (label, window) ->
-                                    FilterChip(
-                                        selected = notificationPreferences.quietStartMinute == window.first &&
-                                            notificationPreferences.quietEndMinute == window.second,
-                                        onClick = { onQuietHoursWindowChange(window.first, window.second) },
-                                        label = { Text(label, fontSize = 12.sp) }
-                                    )
-                                }
-                            }
-                        }
-                    }
                 }
             }
 
