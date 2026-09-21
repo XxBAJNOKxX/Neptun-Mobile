@@ -6,6 +6,7 @@ on:
       - main
       - stable
       - 'arena/**'
+      - m3-redesign
   pull_request:
   workflow_dispatch:
 
@@ -31,6 +32,17 @@ jobs:
 
       - name: Grant Execute Permission for Gradlew
         run: chmod +x gradlew
+
+      - name: Restore Keystore for Consistent Signing
+        if: env.DEBUG_KEYSTORE_BASE64 != ''
+        env:
+          DEBUG_KEYSTORE_BASE64: ${{ secrets.DEBUG_KEYSTORE_BASE64 }}
+        run: |
+          mkdir -p ~/.android
+          echo "$DEBUG_KEYSTORE_BASE64" | base64 -d > debug.keystore
+          cp debug.keystore app/debug.keystore
+          cp debug.keystore ~/.android/debug.keystore
+          echo "Successfully restored consistent debug.keystore"
 
       - name: Unit tesztek futtatása
         run: |

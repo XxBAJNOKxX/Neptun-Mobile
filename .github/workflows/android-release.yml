@@ -142,6 +142,13 @@ jobs:
             cp app/build/outputs/apk/release/app-release.apk release-artifacts/neptun-mobile-${{ steps.versioning.outputs.VERSION_NAME }}-release.apk
           fi
 
+      - name: Upload APK Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: neptun-mobile-apks
+          path: release-artifacts/*.apk
+          if-no-files-found: ignore
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
