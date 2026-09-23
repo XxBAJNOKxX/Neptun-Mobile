@@ -429,11 +429,11 @@ class NeptunApiClientTest {
 
     @Test
     fun testSystemMessageSenderNormalization() {
-        assertEquals("Neptun", com.example.core.util.SystemMessageHelper.normalizeSenderName("SYSTEM USER"))
-        assertEquals("Neptun", com.example.core.util.SystemMessageHelper.normalizeSenderName("SYSTEM"))
-        assertEquals("Neptun", com.example.core.util.SystemMessageHelper.normalizeSenderName("Rendszerüzenet"))
-        assertEquals("Neptun", com.example.core.util.SystemMessageHelper.normalizeSenderName(""))
-        assertEquals("Neptun", com.example.core.util.SystemMessageHelper.normalizeSenderName(null))
+        assertEquals("Rendszerüzenet", com.example.core.util.SystemMessageHelper.normalizeSenderName("SYSTEM USER"))
+        assertEquals("Rendszerüzenet", com.example.core.util.SystemMessageHelper.normalizeSenderName("SYSTEM"))
+        assertEquals("Rendszerüzenet", com.example.core.util.SystemMessageHelper.normalizeSenderName("Rendszerüzenet"))
+        assertEquals("Rendszerüzenet", com.example.core.util.SystemMessageHelper.normalizeSenderName(""))
+        assertEquals("Rendszerüzenet", com.example.core.util.SystemMessageHelper.normalizeSenderName(null))
         assertEquals("Dr. Nagy Ádám", com.example.core.util.SystemMessageHelper.normalizeSenderName("Dr. Nagy Ádám"))
         assertTrue(com.example.core.util.SystemMessageHelper.isSystemSender("SYSTEM USER"))
         assertFalse(com.example.core.util.SystemMessageHelper.isSystemSender("Dr. Nagy Ádám"))

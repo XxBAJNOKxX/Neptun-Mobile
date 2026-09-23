@@ -2424,7 +2424,7 @@ class NeptunApiClient {
                 val isSystem = obj["isSystemMessage"]?.jsonPrimitive?.booleanOrNull == true ||
                         obj["IsSystemMessage"]?.jsonPrimitive?.booleanOrNull == true ||
                         com.example.core.util.SystemMessageHelper.isSystemSender(rawSender)
-                val sender = if (isSystem) "Neptun" else rawSender
+                val sender = if (isSystem) "Rendszerüzenet" else rawSender
                 val dateStr = obj["lastPostDate"]?.jsonPrimitive?.contentOrNull ?: ""
                 val unreadCount = obj["unreadedPostCount"]?.jsonPrimitive?.intOrNull ?: 0
 
@@ -2643,7 +2643,7 @@ class NeptunApiClient {
                     ?: obj["Sender"]?.jsonPrimitive?.contentOrNull?.trim()
                     ?: ""
                 val isSystem = com.example.core.util.SystemMessageHelper.isSystemSender(senderRaw)
-                val sender = if (isSystem) "Neptun" else senderRaw
+                val sender = if (isSystem) "Rendszerüzenet" else senderRaw
                 val sendDateRaw = obj["SendDate"]?.jsonPrimitive?.contentOrNull?.replace(Regex("""\D"""), "")?.toLongOrNull() ?: System.currentTimeMillis()
 
                 val id = obj["PersonMessageId"]?.jsonPrimitive?.contentOrNull

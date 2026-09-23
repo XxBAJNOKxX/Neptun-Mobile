@@ -149,7 +149,7 @@ class SyncWorker(
                 channelId = NotificationHelper.CHANNEL_ID_MESSAGES,
                 notificationId = NOTIFICATION_ID_MESSAGES_SUMMARY,
                 title = strings.notifMessagesSummaryTitle(newOnes.size),
-                text = newOnes.take(4).joinToString("\n") { "• ${com.example.core.util.SystemMessageHelper.normalizeSenderName(it.sender)}: ${it.subject}" }
+                text = newOnes.take(4).joinToString("\n") { "• ${com.example.core.util.SystemMessageHelper.normalizeSenderName(it.sender, fallback = strings.systemMessage)}: ${it.subject}" }
             )
         }
         val idsToMark = newOnes.flatMap { msg ->

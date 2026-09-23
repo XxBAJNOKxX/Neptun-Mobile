@@ -233,7 +233,7 @@ fun MessagesScreen(
 }
 
 private fun getDisplaySender(sender: String, strings: AppStrings): String {
-    return com.example.core.util.SystemMessageHelper.normalizeSenderName(sender, fallback = "Neptun")
+    return com.example.core.util.SystemMessageHelper.normalizeSenderName(sender, fallback = strings.systemMessage)
 }
 
 private fun getDisplayPreviewText(previewText: String, strings: AppStrings): String {
@@ -256,7 +256,7 @@ private fun MessageCard(
     val strings = currentStrings()
     val displaySender = getDisplaySender(message.sender, strings)
     val isSystem = message.isOfficial ||
-        displaySender.equals("Neptun", ignoreCase = true) ||
+        com.example.core.util.SystemMessageHelper.isSystemSender(displaySender) ||
         displaySender.equals(strings.systemMessage, ignoreCase = true) ||
         displaySender.contains("hivatal", ignoreCase = true)
 
@@ -353,7 +353,7 @@ private fun MessageDetailContent(
     val strings = currentStrings()
     val displaySender = getDisplaySender(message.sender, strings)
     val isSystem = message.isOfficial ||
-        displaySender.equals("Neptun", ignoreCase = true) ||
+        com.example.core.util.SystemMessageHelper.isSystemSender(displaySender) ||
         displaySender.equals(strings.systemMessage, ignoreCase = true) ||
         displaySender.contains("hivatal", ignoreCase = true)
     
@@ -383,7 +383,7 @@ private fun MessageDetailContent(
                 color = if (isSystem) MaterialTheme.colorScheme.tertiary.copy(alpha = 0.12f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
                 shape = RoundedCornerShape(8.dp)
             ) {
-                val tagText = if (displaySender.equals(strings.systemMessage, ignoreCase = true) || displaySender.equals("Neptun", ignoreCase = true)) {
+                val tagText = if (displaySender.equals(strings.systemMessage, ignoreCase = true) || com.example.core.util.SystemMessageHelper.isSystemSender(displaySender)) {
                     strings.systemMessage
                 } else if (message.isOfficial) {
                     strings.officialNotice

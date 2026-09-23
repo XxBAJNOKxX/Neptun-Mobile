@@ -6,9 +6,9 @@ object SystemMessageHelper {
      * Normalizálja a feladó nevét.
      * Ha a Neptun szerverről rendszerüzenetként érkezett a bejegyzés
      * (pl. "SYSTEM USER", "SYSTEM", "SYSTEM_USER", "Rendszerüzenet", üres feladó stb.),
-     * akkor a felhasználóbarát "Neptun" nevet adja vissza.
+     * akkor a felhasználóbarát "Rendszerüzenet" nevet adja vissza.
      */
-    fun normalizeSenderName(sender: String?, fallback: String = "Neptun"): String {
+    fun normalizeSenderName(sender: String?, fallback: String = "Rendszerüzenet"): String {
         val trimmed = sender?.trim() ?: ""
         if (isSystemSender(trimmed)) {
             return fallback

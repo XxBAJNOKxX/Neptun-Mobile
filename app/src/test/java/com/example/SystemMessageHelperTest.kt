@@ -10,18 +10,24 @@ class SystemMessageHelperTest {
 
     @Test
     fun testNormalizeSenderName_systemSenders() {
-        assertEquals("Neptun", SystemMessageHelper.normalizeSenderName("SYSTEM USER"))
-        assertEquals("Neptun", SystemMessageHelper.normalizeSenderName("system user"))
-        assertEquals("Neptun", SystemMessageHelper.normalizeSenderName("SYSTEM"))
-        assertEquals("Neptun", SystemMessageHelper.normalizeSenderName("system_user"))
-        assertEquals("Neptun", SystemMessageHelper.normalizeSenderName("Rendszerüzenet"))
-        assertEquals("Neptun", SystemMessageHelper.normalizeSenderName("System message"))
-        assertEquals("Neptun", SystemMessageHelper.normalizeSenderName("Systemnachricht"))
-        assertEquals("Neptun", SystemMessageHelper.normalizeSenderName("Neptun"))
-        assertEquals("Neptun", SystemMessageHelper.normalizeSenderName("Neptun Rendszer"))
-        assertEquals("Neptun", SystemMessageHelper.normalizeSenderName(""))
-        assertEquals("Neptun", SystemMessageHelper.normalizeSenderName("   "))
-        assertEquals("Neptun", SystemMessageHelper.normalizeSenderName(null))
+        assertEquals("Rendszerüzenet", SystemMessageHelper.normalizeSenderName("SYSTEM USER"))
+        assertEquals("Rendszerüzenet", SystemMessageHelper.normalizeSenderName("system user"))
+        assertEquals("Rendszerüzenet", SystemMessageHelper.normalizeSenderName("SYSTEM"))
+        assertEquals("Rendszerüzenet", SystemMessageHelper.normalizeSenderName("system_user"))
+        assertEquals("Rendszerüzenet", SystemMessageHelper.normalizeSenderName("Rendszerüzenet"))
+        assertEquals("Rendszerüzenet", SystemMessageHelper.normalizeSenderName("System message"))
+        assertEquals("Rendszerüzenet", SystemMessageHelper.normalizeSenderName("Systemnachricht"))
+        assertEquals("Rendszerüzenet", SystemMessageHelper.normalizeSenderName("Neptun"))
+        assertEquals("Rendszerüzenet", SystemMessageHelper.normalizeSenderName("Neptun Rendszer"))
+        assertEquals("Rendszerüzenet", SystemMessageHelper.normalizeSenderName(""))
+        assertEquals("Rendszerüzenet", SystemMessageHelper.normalizeSenderName("   "))
+        assertEquals("Rendszerüzenet", SystemMessageHelper.normalizeSenderName(null))
+    }
+
+    @Test
+    fun testNormalizeSenderName_customFallback() {
+        assertEquals("System Message", SystemMessageHelper.normalizeSenderName("SYSTEM USER", fallback = "System Message"))
+        assertEquals("Systemnachricht", SystemMessageHelper.normalizeSenderName("SYSTEM", fallback = "Systemnachricht"))
     }
 
     @Test

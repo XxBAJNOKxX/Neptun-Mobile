@@ -143,7 +143,7 @@ object NotificationHelper {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val displaySender = com.example.core.util.SystemMessageHelper.normalizeSenderName(sender)
+        val displaySender = com.example.core.util.SystemMessageHelper.normalizeSenderName(sender, fallback = strings.systemMessage)
         val notification = NotificationCompat.Builder(context, CHANNEL_ID_MESSAGES)
             .setSmallIcon(R.drawable.ic_notif_message)
             .setContentTitle(strings.notifNewMessageTitle(displaySender))
