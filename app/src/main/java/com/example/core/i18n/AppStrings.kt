@@ -139,6 +139,13 @@ interface AppStrings {
     val date: String
     val messagesLoadFailed: String
     val messageDetailLoadFailed: String
+    val timetableLoadFailed: String
+    val gradesLoadFailed: String
+    val financesLoadFailed: String
+    val periodsLoadFailed: String
+    val examsLoadFailed: String
+    val degreeProgressLoadFailed: String
+    val syncFailed: String
 
     // Finances
     val financesTitle: String
@@ -625,6 +632,13 @@ class HungarianStrings : AppStrings {
     override val date = "Dátum"
     override val messagesLoadFailed = "Az üzenetek betöltése nem sikerült."
     override val messageDetailLoadFailed = "Az üzenet betöltése nem sikerült."
+    override val timetableLoadFailed = "Az órarend betöltése nem sikerült."
+    override val gradesLoadFailed = "A jegyek betöltése nem sikerült."
+    override val financesLoadFailed = "A pénzügyi tételek betöltése nem sikerült."
+    override val periodsLoadFailed = "Az időszakok betöltése nem sikerült."
+    override val examsLoadFailed = "A vizsgák betöltése nem sikerült."
+    override val degreeProgressLoadFailed = "A képzési haladás betöltése nem sikerült."
+    override val syncFailed = "Az adatok szinkronizálása nem sikerült."
 
     override val financesTitle = "Pénzügyek"
     override val statusPending = "Kiírva"
@@ -1106,6 +1120,13 @@ class EnglishStrings : AppStrings {
     override val date = "Date"
     override val messagesLoadFailed = "Failed to load messages."
     override val messageDetailLoadFailed = "Failed to load message."
+    override val timetableLoadFailed = "Failed to load timetable."
+    override val gradesLoadFailed = "Failed to load grades."
+    override val financesLoadFailed = "Failed to load finances."
+    override val periodsLoadFailed = "Failed to load academic periods."
+    override val examsLoadFailed = "Failed to load exams."
+    override val degreeProgressLoadFailed = "Failed to load degree progress."
+    override val syncFailed = "Failed to synchronize data."
 
     override val financesTitle = "Finances"
     override val statusPending = "Pending"
@@ -1585,6 +1606,13 @@ class GermanStrings : AppStrings {
     override val date = "Datum"
     override val messagesLoadFailed = "Nachrichten konnten nicht geladen werden."
     override val messageDetailLoadFailed = "Nachricht konnte nicht geladen werden."
+    override val timetableLoadFailed = "Stundenplan konnte nicht geladen werden."
+    override val gradesLoadFailed = "Noten konnten nicht geladen werden."
+    override val financesLoadFailed = "Finanzposten konnten nicht geladen werden."
+    override val periodsLoadFailed = "Semestertermine konnten nicht geladen werden."
+    override val examsLoadFailed = "Prüfungen konnten nicht geladen werden."
+    override val degreeProgressLoadFailed = "Studienverlauf konnte nicht geladen werden."
+    override val syncFailed = "Synchronisierung fehlgeschlagen."
 
     override val financesTitle = "Finanzen"
     override val statusPending = "Offen"

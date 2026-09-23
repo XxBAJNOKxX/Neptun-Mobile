@@ -18,7 +18,8 @@ data class FinancesUiState(
     val selectedStatusFilter: FinanceStatus? = null,
     val totalPendingHuf: Int = 0,
     val totalCompletedHuf: Int = 0,
-    val isRefreshing: Boolean = false
+    val isRefreshing: Boolean = false,
+    val errorMessage: String? = null
 )
 
 class FinancesViewModel(
@@ -71,9 +72,14 @@ class FinancesViewModel(
 
     fun refreshFinances() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isRefreshing = true) }
-            neptunRepository.refreshFinances()
-            _uiState.update { it.copy(isRefreshing = false) }
+            _uiState.update { it.copy(isRefreshing = true, errorMessage = null) }
+            val res = neptunRepository.refreshFinances()
+            _uiState.update {
+                it.copy(
+                    isRefreshing = false,
+                    errorMessage = if (res.isFailure) "FINANCES_LOAD_FAILED" else null
+                )
+            }
         }
     }
 

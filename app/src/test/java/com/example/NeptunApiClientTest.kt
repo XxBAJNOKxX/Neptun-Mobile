@@ -426,5 +426,17 @@ class NeptunApiClientTest {
         assertTrue(upcomingPeriod.isUpcoming)
         assertEquals(40L, upcomingPeriod.daysUntilStart)
     }
+
+    @Test
+    fun testSystemMessageSenderNormalization() {
+        assertEquals("Neptun", com.example.core.util.SystemMessageHelper.normalizeSenderName("SYSTEM USER"))
+        assertEquals("Neptun", com.example.core.util.SystemMessageHelper.normalizeSenderName("SYSTEM"))
+        assertEquals("Neptun", com.example.core.util.SystemMessageHelper.normalizeSenderName("Rendszerüzenet"))
+        assertEquals("Neptun", com.example.core.util.SystemMessageHelper.normalizeSenderName(""))
+        assertEquals("Neptun", com.example.core.util.SystemMessageHelper.normalizeSenderName(null))
+        assertEquals("Dr. Nagy Ádám", com.example.core.util.SystemMessageHelper.normalizeSenderName("Dr. Nagy Ádám"))
+        assertTrue(com.example.core.util.SystemMessageHelper.isSystemSender("SYSTEM USER"))
+        assertFalse(com.example.core.util.SystemMessageHelper.isSystemSender("Dr. Nagy Ádám"))
+    }
 }
 

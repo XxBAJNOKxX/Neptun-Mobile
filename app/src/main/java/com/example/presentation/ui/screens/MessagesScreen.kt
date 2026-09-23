@@ -159,47 +159,14 @@ fun MessagesScreen(
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
                 if (uiState.errorMessage != null) {
-                    Card(
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.errorContainer
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 6.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Info,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onErrorContainer,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = uiState.errorMessage,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onErrorContainer
-                                )
-                            }
-                            IconButton(onClick = onRefresh) {
-                                Icon(
-                                    imageVector = Icons.Default.Refresh,
-                                    contentDescription = strings.retry,
-                                    tint = MaterialTheme.colorScheme.onErrorContainer
-                                )
-                            }
-                        }
+                    val errorText = when (uiState.errorMessage) {
+                        "MESSAGES_LOAD_FAILED" -> strings.messagesLoadFailed
+                        else -> uiState.errorMessage
                     }
+                    com.example.presentation.ui.components.SyncErrorBanner(
+                        errorMessage = errorText,
+                        onRetry = onRefresh
+                    )
                 }
 
                 if (uiState.filteredMessages.isEmpty()) {
@@ -266,15 +233,7 @@ fun MessagesScreen(
 }
 
 private fun getDisplaySender(sender: String, strings: AppStrings): String {
-    val trimmed = sender.trim()
-    if (trimmed.isEmpty() ||
-        trimmed.equals("Rendszerüzenet", ignoreCase = true) ||
-        trimmed.equals("System message", ignoreCase = true) ||
-        trimmed.equals("Systemnachricht", ignoreCase = true)
-    ) {
-        return strings.systemMessage
-    }
-    return trimmed
+    return com.example.core.util.SystemMessageHelper.normalizeSenderName(sender, fallback = "Neptun")
 }
 
 private fun getDisplayPreviewText(previewText: String, strings: AppStrings): String {
@@ -296,7 +255,10 @@ private fun MessageCard(
 ) {
     val strings = currentStrings()
     val displaySender = getDisplaySender(message.sender, strings)
-    val isSystem = message.isOfficial || displaySender.equals(strings.systemMessage, ignoreCase = true) || displaySender.contains("hivatal", ignoreCase = true)
+    val isSystem = message.isOfficial ||
+        displaySender.equals("Neptun", ignoreCase = true) ||
+        displaySender.equals(strings.systemMessage, ignoreCase = true) ||
+        displaySender.contains("hivatal", ignoreCase = true)
 
     Card(
         shape = RoundedCornerShape(16.dp),
@@ -390,7 +352,10 @@ private fun MessageDetailContent(
 ) {
     val strings = currentStrings()
     val displaySender = getDisplaySender(message.sender, strings)
-    val isSystem = message.isOfficial || displaySender.equals(strings.systemMessage, ignoreCase = true) || displaySender.contains("hivatal", ignoreCase = true)
+    val isSystem = message.isOfficial ||
+        displaySender.equals("Neptun", ignoreCase = true) ||
+        displaySender.equals(strings.systemMessage, ignoreCase = true) ||
+        displaySender.contains("hivatal", ignoreCase = true)
     
     val effectiveBody = when {
         message.bodyHtml.isNotBlank() -> message.bodyHtml
@@ -418,7 +383,7 @@ private fun MessageDetailContent(
                 color = if (isSystem) MaterialTheme.colorScheme.tertiary.copy(alpha = 0.12f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
                 shape = RoundedCornerShape(8.dp)
             ) {
-                val tagText = if (displaySender.equals(strings.systemMessage, ignoreCase = true)) {
+                val tagText = if (displaySender.equals(strings.systemMessage, ignoreCase = true) || displaySender.equals("Neptun", ignoreCase = true)) {
                     strings.systemMessage
                 } else if (message.isOfficial) {
                     strings.officialNotice

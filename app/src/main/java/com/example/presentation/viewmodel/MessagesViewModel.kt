@@ -171,7 +171,7 @@ class MessagesViewModel(
             _uiState.update {
                 it.copy(
                     isRefreshing = false,
-                    errorMessage = if (res.isFailure) "Az üzenetek betöltése nem sikerült." else null
+                    errorMessage = if (res.isFailure) "MESSAGES_LOAD_FAILED" else null
                 )
             }
         }

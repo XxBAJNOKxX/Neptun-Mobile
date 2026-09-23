@@ -146,6 +146,23 @@ fun GradesScreen(
             }
         }
 
+        if (uiState.errorMessage != null) {
+            val errorText = when (uiState.errorMessage) {
+                "GRADES_LOAD_FAILED" -> strings.gradesLoadFailed
+                "EXAMS_LOAD_FAILED" -> strings.examsLoadFailed
+                "PROGRESS_LOAD_FAILED" -> strings.degreeProgressLoadFailed
+                else -> uiState.errorMessage
+            }
+            com.example.presentation.ui.components.SyncErrorBanner(
+                errorMessage = errorText,
+                onRetry = when (uiState.selectedTab) {
+                    1 -> onRefreshExams
+                    2 -> onRefreshProgress
+                    else -> onRefresh
+                }
+            )
+        }
+
         if (uiState.selectedTab == 1) {
             ExamsTabContent(
                 exams = uiState.exams,

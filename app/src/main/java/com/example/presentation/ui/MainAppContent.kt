@@ -373,7 +373,7 @@ private fun MainDashboard(
                             studentName = authState.credentials?.studentName ?: strings.studentDefaultName,
                             universityName = authState.credentials?.universityName ?: "",
                             trainingProgram = authState.credentials?.trainingProgram ?: "",
-                            isDemoData = dataMode != DataMode.REAL,
+                            isDemoData = authState.credentials?.neptunCode.equals("DEMO01", ignoreCase = true) || (authState.credentials == null && dataMode != DataMode.REAL),
                             onNavigate = { item ->
                                 if (item in visibleItems) {
                                     currentDestination = item

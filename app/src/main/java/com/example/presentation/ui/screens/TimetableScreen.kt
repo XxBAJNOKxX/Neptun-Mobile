@@ -173,6 +173,18 @@ fun TimetableScreen(
             }
         }
 
+        if (uiState.errorMessage != null) {
+            val errorText = when (uiState.errorMessage) {
+                "TIMETABLE_LOAD_FAILED" -> strings.timetableLoadFailed
+                "PERIODS_LOAD_FAILED" -> strings.periodsLoadFailed
+                else -> uiState.errorMessage
+            }
+            com.example.presentation.ui.components.SyncErrorBanner(
+                errorMessage = errorText,
+                onRetry = if (uiState.selectedTab == 1) onRefreshPeriods else onRefresh
+            )
+        }
+
         if (uiState.selectedTab == 1) {
             AcademicPeriodsTabContent(
                 periods = uiState.academicPeriods,

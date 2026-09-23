@@ -91,6 +91,20 @@ fun FinancesScreen(
         ) {
             item { Spacer(modifier = Modifier.height(4.dp)) }
 
+            if (uiState.errorMessage != null) {
+                item {
+                    val errorText = when (uiState.errorMessage) {
+                        "FINANCES_LOAD_FAILED" -> strings.financesLoadFailed
+                        else -> uiState.errorMessage
+                    }
+                    com.example.presentation.ui.components.SyncErrorBanner(
+                        errorMessage = errorText,
+                        onRetry = onRefresh,
+                        modifier = Modifier.padding(horizontal = 0.dp)
+                    )
+                }
+            }
+
             // Summary Card
             item {
                 FinanceSummaryCard(

@@ -37,7 +37,8 @@ data class DashboardUiState(
     val upcomingExams: List<ExamItem> = emptyList(),
     val nextUpcomingExam: ExamItem? = null,
     val activePeriods: List<AcademicPeriod> = emptyList(),
-    val degreeProgress: DegreeProgress? = null
+    val degreeProgress: DegreeProgress? = null,
+    val errorMessage: String? = null
 )
 
 class DashboardViewModel(
@@ -126,13 +127,18 @@ class DashboardViewModel(
 
     fun refresh() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isRefreshing = true) }
-            try {
+            _uiState.update { it.copy(isRefreshing = true, errorMessage = null) }
+            val res = try {
                 neptunRepository.syncAllData("", "")
             } catch (e: Exception) {
-                // A képernyők a helyi adatokat mutatják, hiba esetén is
+                Result.failure(e)
             }
-            _uiState.update { it.copy(isRefreshing = false) }
+            _uiState.update {
+                it.copy(
+                    isRefreshing = false,
+                    errorMessage = if (res.isFailure) "SYNC_FAILED" else null
+                )
+            }
         }
     }
 

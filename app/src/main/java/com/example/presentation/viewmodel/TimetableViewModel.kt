@@ -44,7 +44,8 @@ data class TimetableUiState(
     val selectedTab: Int = 0, // 0 = Órarend, 1 = Időszakok
     val academicPeriods: List<AcademicPeriod> = emptyList(),
     val periodFilter: Int = 0, // 0 = Mind, 1 = Aktív, 2 = Közelgő, 3 = Lezárult
-    val isRefreshingPeriods: Boolean = false
+    val isRefreshingPeriods: Boolean = false,
+    val errorMessage: String? = null
 )
 
 private fun currentOrNextSchoolDay(): Int {
@@ -298,9 +299,14 @@ class TimetableViewModel(
 
     fun refreshCalendar() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isRefreshing = true) }
-            neptunRepository.refreshCalendar()
-            _uiState.update { it.copy(isRefreshing = false) }
+            _uiState.update { it.copy(isRefreshing = true, errorMessage = null) }
+            val res = neptunRepository.refreshCalendar()
+            _uiState.update {
+                it.copy(
+                    isRefreshing = false,
+                    errorMessage = if (res.isFailure) "TIMETABLE_LOAD_FAILED" else null
+                )
+            }
         }
     }
 
@@ -328,9 +334,14 @@ class TimetableViewModel(
 
     fun refreshAcademicPeriods() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isRefreshingPeriods = true) }
-            neptunRepository.refreshAcademicPeriods()
-            _uiState.update { it.copy(isRefreshingPeriods = false) }
+            _uiState.update { it.copy(isRefreshingPeriods = true, errorMessage = null) }
+            val res = neptunRepository.refreshAcademicPeriods()
+            _uiState.update {
+                it.copy(
+                    isRefreshingPeriods = false,
+                    errorMessage = if (res.isFailure) "PERIODS_LOAD_FAILED" else null
+                )
+            }
         }
     }
 

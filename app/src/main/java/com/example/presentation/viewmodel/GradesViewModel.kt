@@ -40,7 +40,8 @@ data class GradesUiState(
     val isRefreshingExams: Boolean = false,
     val examFilter: Int = 0, // 0 = Összes, 1 = Felvett, 2 = Közelgő
     val degreeProgress: com.example.domain.model.DegreeProgress? = null,
-    val isRefreshingProgress: Boolean = false
+    val isRefreshingProgress: Boolean = false,
+    val errorMessage: String? = null
 )
 
 class GradesViewModel(
@@ -119,9 +120,14 @@ class GradesViewModel(
 
     fun refreshDegreeProgress() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isRefreshingProgress = true) }
-            neptunRepository.refreshDegreeProgress()
-            _uiState.update { it.copy(isRefreshingProgress = false) }
+            _uiState.update { it.copy(isRefreshingProgress = true, errorMessage = null) }
+            val res = neptunRepository.refreshDegreeProgress()
+            _uiState.update {
+                it.copy(
+                    isRefreshingProgress = false,
+                    errorMessage = if (res.isFailure) "PROGRESS_LOAD_FAILED" else null
+                )
+            }
         }
     }
 
@@ -218,19 +224,31 @@ class GradesViewModel(
 
     fun refreshGrades() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isRefreshing = true) }
-            neptunRepository.refreshGrades()
-            _uiState.update { it.copy(isRefreshing = false) }
+            _uiState.update { it.copy(isRefreshing = true, errorMessage = null) }
+            val res = neptunRepository.refreshGrades()
+            _uiState.update {
+                it.copy(
+                    isRefreshing = false,
+                    errorMessage = if (res.isFailure) "GRADES_LOAD_FAILED" else null
+                )
+            }
         }
     }
 
     fun refreshExams() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isRefreshingExams = true) }
-            neptunRepository.refreshExams()
-            _uiState.update { it.copy(isRefreshingExams = false) }
+            _uiState.update { it.copy(isRefreshingExams = true, errorMessage = null) }
+            val res = neptunRepository.refreshExams()
+            _uiState.update {
+                it.copy(
+                    isRefreshingExams = false,
+                    errorMessage = if (res.isFailure) "EXAMS_LOAD_FAILED" else null
+                )
+            }
         }
     }
+
+
 
     companion object {
         fun provideFactory(
