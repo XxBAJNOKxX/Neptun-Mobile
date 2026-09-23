@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.json.Json
+import com.example.BuildConfig
 
 /**
  * Adataink forrása (UI visszajelzéshez): valódi szerveradat, demo bejelentkezés vagy mock adat.
@@ -360,7 +361,16 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
     // Frissítési csatorna (STABLE / DEV)
     // ------------------------------------------------------------------ //
 
-    fun loadUpdateChannel(): UpdateChannel = UpdateChannel.fromName(prefs.getString(KEY_UPDATE_CHANNEL, UpdateChannel.STABLE.name))
+    fun getDefaultUpdateChannel(): UpdateChannel {
+        return if (BuildConfig.DEBUG || BuildConfig.VERSION_NAME.contains("dev", ignoreCase = true)) {
+            UpdateChannel.DEV
+        } else {
+            UpdateChannel.STABLE
+        }
+    }
+
+    fun loadUpdateChannel(): UpdateChannel =
+        UpdateChannel.fromName(prefs.getString(KEY_UPDATE_CHANNEL, getDefaultUpdateChannel().name))
 
     fun setUpdateChannel(channel: UpdateChannel) {
         prefs.edit().putString(KEY_UPDATE_CHANNEL, channel.name).apply()
@@ -643,7 +653,7 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
         val savedThemeMode = prefs.getString(KEY_THEME_MODE, ThemeMode.SYSTEM.name)
         val savedDynamicColor = prefs.getBoolean(KEY_DYNAMIC_COLOR, true)
         val savedAccent = prefs.getString(KEY_ACCENT_COLOR, AppAccentColor.BLUE.id)
-        val savedUpdateChannel = prefs.getString(KEY_UPDATE_CHANNEL, UpdateChannel.STABLE.name)
+        val savedUpdateChannel = prefs.getString(KEY_UPDATE_CHANNEL, getDefaultUpdateChannel().name)
         val notifyClasses = prefs.getBoolean(KEY_NOTIFY_CLASSES, true)
         val notifyGrades = prefs.getBoolean(KEY_NOTIFY_GRADES, true)
         val notifyMessages = prefs.getBoolean(KEY_NOTIFY_MESSAGES, true)

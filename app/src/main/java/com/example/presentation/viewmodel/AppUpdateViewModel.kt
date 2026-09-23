@@ -50,7 +50,7 @@ class AppUpdateViewModel(
             try {
                 val apkFile = updateManager.downloadApk(
                     context = context,
-                    downloadUrl = info.downloadUrl,
+                    info = info,
                     onProgress = { progress, downloaded, total ->
                         _updateState.value = InAppUpdateState.Downloading(
                             progress = progress,

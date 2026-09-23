@@ -480,7 +480,10 @@ private fun MainDashboard(
                                     exportTimetableAsIcs(app)
                                 }
                             },
-                            onClearCache = settingsViewModel::clearCachedData,
+                            onClearCache = {
+                                settingsViewModel.clearCachedData()
+                                com.example.core.update.AppUpdateManager.clearUpdateCache(context)
+                            },
                             onSimulateClassNotification = { settingsViewModel.simulateClassNotification(context) },
                             onSimulateMessageNotification = { settingsViewModel.simulateMessageNotification(context) },
                             onSimulateGradeNotification = { settingsViewModel.simulateGradeNotification(context) },

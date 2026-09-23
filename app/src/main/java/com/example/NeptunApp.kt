@@ -21,5 +21,9 @@ class NeptunApp : Application() {
         } catch (e: Exception) {
             // Handled gracefully in unit test / Robolectric environments
         }
+        try {
+            com.example.core.update.AppUpdateManager.checkAndCleanUpdateCacheOnNewVersion(this)
+        } catch (_: Exception) {
+        }
     }
 }
