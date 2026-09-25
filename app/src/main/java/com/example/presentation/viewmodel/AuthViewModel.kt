@@ -427,21 +427,39 @@ class AuthViewModel(
         }
     }
 
-    fun logout() {
+    fun logout(clearLocalData: Boolean = false) {
         viewModelScope.launch {
             authRepository.logout()
-            neptunRepository.clearLocalData()
+            if (clearLocalData) {
+                neptunRepository.clearLocalData()
+            }
+            val offlineAvailable = if (clearLocalData) false else authRepository.isOfflineModeAvailable()
             _uiState.update {
                 it.copy(
                     credentials = null,
                     password = "",
-                    isOfflineModeAvailable = false,
+                    isOfflineModeAvailable = offlineAvailable,
                     isTwoFactorRequired = false,
                     twoFactorSession = null,
                     twoFactorCode = "",
                     twoFactorSuccessMessage = null,
                     twoFactorErrorMessage = null
                 )
+            }
+        }
+    }
+
+    fun continueOffline() {
+        viewModelScope.launch {
+            val res = authRepository.continueOffline()
+            if (res.isSuccess) {
+                _uiState.update {
+                    it.copy(
+                        credentials = res.getOrNull(),
+                        isTwoFactorRequired = false,
+                        twoFactorErrorMessage = null
+                    )
+                }
             }
         }
     }

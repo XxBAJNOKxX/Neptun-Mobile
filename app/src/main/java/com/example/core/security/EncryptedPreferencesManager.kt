@@ -530,6 +530,11 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
         )
     }
 
+    fun setOfflineSession() {
+        prefs.edit().putBoolean(KEY_IS_LOGGED_IN, true).apply()
+        _credentialsFlow.value = loadCredentials()
+    }
+
     fun getSessionToken(): String {
         val access = prefs.getString(KEY_ACCESS_TOKEN, "") ?: ""
         if (access.isNotBlank()) return access

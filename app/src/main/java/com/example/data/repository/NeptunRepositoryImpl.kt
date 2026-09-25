@@ -143,8 +143,9 @@ class NeptunRepositoryImpl(
             refreshDegreeProgress()
             refreshAcademicPeriods()
             prefsManager.updateLastSyncTime()
+            val anySucceeded = calRes.isSuccess || grdRes.isSuccess || msgRes.isSuccess || finRes.isSuccess || exmRes.isSuccess
             val finalToken = prefsManager.getAccessToken()
-            if (finalToken.isNotBlank() && baseUrl.isNotBlank() && prefsManager.isModernApi()) {
+            if (anySucceeded && finalToken.isNotBlank() && baseUrl.isNotBlank() && prefsManager.isModernApi()) {
                 val devCookie = creds?.let { prefsManager.getDeviceCookie(it.neptunCode) } ?: ""
                 if (neptunApiClient.isTokenValid(baseUrl, finalToken, devCookie)) {
                     prefsManager.clearSessionExpired()
@@ -202,11 +203,9 @@ class NeptunRepositoryImpl(
         // Ha nem forceRefresh és a meglévő token még a valóságban érvényes
         if (currentToken.isNotBlank() && isModern && !forceRefresh) {
             if (!neptunApiClient.isJwtExpired(currentToken, bufferSeconds = 60L)) {
-                prefsManager.clearSessionExpired()
                 return currentToken
             }
             if (neptunApiClient.isTokenValid(baseUrl, currentToken, deviceCookie)) {
-                prefsManager.clearSessionExpired()
                 return currentToken
             }
         }
@@ -383,12 +382,15 @@ class NeptunRepositoryImpl(
 
         if (fetchSucceeded) {
             prefsManager.setDataMode(DataMode.REAL)
-            prefsManager.clearSessionExpired()
-            database.calendarDao().clearAll()
             if (eventsToInsert.isNotEmpty()) {
+                prefsManager.clearSessionExpired()
+                database.calendarDao().clearAll()
                 database.calendarDao().insertEvents(eventsToInsert.map { CalendarEventEntity.fromDomain(it) })
+                return@withContext Result.success(Unit)
+            } else {
+                Log.w("NeptunRepo", "Üres órarend érkezett a szervertől, meglévő adatok megőrzése.")
+                return@withContext Result.failure(IllegalStateException("Üres órarend érkezett a szervertől"))
             }
-            return@withContext Result.success(Unit)
         }
 
         Result.failure(fetchError ?: IllegalStateException("Failed to fetch calendar events from server"))
@@ -466,13 +468,16 @@ class NeptunRepositoryImpl(
         }
 
         if (fetchSucceeded) {
-            prefsManager.clearSessionExpired()
             prefsManager.setDataMode(DataMode.REAL)
-            database.gradesDao().clearAll()
             if (gradesToInsert.isNotEmpty()) {
+                prefsManager.clearSessionExpired()
+                database.gradesDao().clearAll()
                 database.gradesDao().insertGrades(gradesToInsert.map { SubjectGradeEntity.fromDomain(it) })
+                return@withContext Result.success(Unit)
+            } else {
+                Log.w("NeptunRepo", "Üres jegylista érkezett a szervertől, meglévő adatok megőrzése.")
+                return@withContext Result.failure(IllegalStateException("Üres jegylista érkezett a szervertől"))
             }
-            return@withContext Result.success(Unit)
         }
 
         Result.failure(fetchError ?: IllegalStateException("Failed to fetch grades from server"))
@@ -575,8 +580,9 @@ class NeptunRepositoryImpl(
                     isOfficial = msg.isOfficial
                 )
             }
-            database.messagesDao().clearAll()
             if (entitiesToSave.isNotEmpty()) {
+                prefsManager.clearSessionExpired()
+                database.messagesDao().clearAll()
                 prefsManager.setDataMode(DataMode.REAL)
                 database.messagesDao().insertMessages(entitiesToSave)
                 if (existingEntities.isEmpty() || !prefsManager.isBaselineDone("messages")) {
@@ -588,8 +594,11 @@ class NeptunRepositoryImpl(
                         altIdOf = { "${it.sender.trim()}_${it.subject.trim()}_${it.sendDate.trim()}" }
                     )
                 }
+                return@withContext Result.success(Unit)
+            } else {
+                Log.w("NeptunRepo", "Üres üzenetlista érkezett a szervertől, meglévő adatok megőrzése.")
+                return@withContext Result.failure(IllegalStateException("Üres üzenetlista érkezett a szervertől"))
             }
-            return@withContext Result.success(Unit)
         }
 
         Result.failure(fetchError ?: IllegalStateException("Failed to fetch messages from server"))
@@ -668,13 +677,16 @@ class NeptunRepositoryImpl(
         }
 
         if (fetchSucceeded) {
-            prefsManager.clearSessionExpired()
             prefsManager.setDataMode(DataMode.REAL)
-            database.financesDao().clearAll()
             if (financesToInsert.isNotEmpty()) {
+                prefsManager.clearSessionExpired()
+                database.financesDao().clearAll()
                 database.financesDao().insertFinances(financesToInsert.map { FinanceItemEntity.fromDomain(it) })
+                return@withContext Result.success(Unit)
+            } else {
+                Log.w("NeptunRepo", "Üres pénzügyi lista érkezett a szervertől, meglévő adatok megőrzése.")
+                return@withContext Result.failure(IllegalStateException("Üres pénzügyi lista érkezett a szervertől"))
             }
-            return@withContext Result.success(Unit)
         }
 
         Result.failure(fetchError ?: IllegalStateException("Failed to fetch finances from server"))
@@ -752,13 +764,16 @@ class NeptunRepositoryImpl(
         }
 
         if (fetchSucceeded) {
-            prefsManager.clearSessionExpired()
             prefsManager.setDataMode(DataMode.REAL)
-            database.examsDao().clearAll()
             if (examsToInsert.isNotEmpty()) {
+                prefsManager.clearSessionExpired()
+                database.examsDao().clearAll()
                 database.examsDao().insertExams(examsToInsert.map { ExamItemEntity.fromDomain(it) })
+                return@withContext Result.success(Unit)
+            } else {
+                Log.w("NeptunRepo", "Üres vizsgalista érkezett a szervertől, meglévő adatok megőrzése.")
+                return@withContext Result.failure(IllegalStateException("Üres vizsgalista érkezett a szervertől"))
             }
-            return@withContext Result.success(Unit)
         }
 
         Result.failure(fetchError ?: IllegalStateException("Failed to fetch exams from server"))

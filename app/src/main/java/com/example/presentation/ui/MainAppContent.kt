@@ -168,7 +168,8 @@ fun MainAppContent() {
             onRequestEmailCode = authViewModel::requestEmailCode,
             onSubmitTwoFactor = authViewModel::submitTwoFactor,
             onCancelTwoFactor = authViewModel::cancelTwoFactor,
-            onSelectLanguage = authViewModel::selectLanguage
+            onSelectLanguage = authViewModel::selectLanguage,
+            onContinueOffline = authViewModel::continueOffline
         )
     } else {
         // Biometrikus zár (ha be van kapcsolva)
@@ -291,7 +292,8 @@ private fun MainDashboard(
                 TextButton(
                     onClick = {
                         appContainer.prefsManager.clearSessionExpired()
-                        authViewModel.logout()
+                        // Nem töröljük a helyi adatokat szerveroldali munkamenet-lejáratkor!
+                        authViewModel.logout(clearLocalData = false)
                     }
                 ) {
                     Text(strings.loginTitle)
@@ -492,7 +494,7 @@ private fun MainDashboard(
                                 settingsViewModel.checkForUpdates()
                                 appUpdateViewModel.checkForUpdatesOnLaunch()
                             },
-                            onLogoutClick = authViewModel::logout,
+                            onLogoutClick = { authViewModel.logout(clearLocalData = true) },
                             onManualSync = {
                                 settingsViewModel.triggerManualSync()
                             }

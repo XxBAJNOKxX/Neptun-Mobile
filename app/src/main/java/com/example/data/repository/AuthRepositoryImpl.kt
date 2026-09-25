@@ -230,7 +230,19 @@ class AuthRepositoryImpl(
     }
 
     override suspend fun isOfflineModeAvailable(): Boolean = withContext(Dispatchers.IO) {
-        prefsManager.loadCredentials() != null
+        val creds = prefsManager.loadCredentials()
+        creds != null && creds.neptunCode.isNotBlank()
+    }
+
+    override suspend fun continueOffline(): Result<StudentCredentials> = withContext(Dispatchers.IO) {
+        val creds = prefsManager.loadCredentials()
+        if (creds != null && creds.neptunCode.isNotBlank()) {
+            prefsManager.setOfflineSession()
+            val updated = prefsManager.loadCredentials() ?: creds.copy(isLoggedIn = true)
+            Result.success(updated)
+        } else {
+            Result.failure(IllegalStateException("Nincs mentett offline fiók"))
+        }
     }
 
     override fun getSavedUniversityId(): String {
