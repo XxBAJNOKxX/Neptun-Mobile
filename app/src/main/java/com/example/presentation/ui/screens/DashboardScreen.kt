@@ -160,6 +160,7 @@ fun DashboardScreen(
                     ongoing = uiState.ongoingEvent,
                     next = uiState.nextEvent,
                     hasClassesToday = uiState.todayClasses.isNotEmpty(),
+                    isLoaded = uiState.isCalendarLoaded,
                     onOpenTimetable = { onNavigate(NavigationItem.TIMETABLE) }
                 )
             }
@@ -220,14 +221,34 @@ fun DashboardScreen(
             // Mai órák listája
             item {
                 Text(
-                    text = "${strings.todayClasses} (${uiState.todayClasses.size})",
+                    text = if (uiState.isCalendarLoaded) "${strings.todayClasses} (${uiState.todayClasses.size})" else strings.todayClasses,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
             }
 
-            if (uiState.todayClasses.isEmpty()) {
+            if (!uiState.isCalendarLoaded) {
+                item {
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(52.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.CenterStart, modifier = Modifier.padding(horizontal = 20.dp)) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth(0.4f)
+                                    .height(14.dp)
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+                            )
+                        }
+                    }
+                }
+            } else if (uiState.todayClasses.isEmpty()) {
                 item {
                     Surface(
                         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
@@ -319,6 +340,7 @@ private fun NextClassCard(
     ongoing: CalendarEvent?,
     next: CalendarEvent?,
     hasClassesToday: Boolean,
+    isLoaded: Boolean = true,
     onOpenTimetable: () -> Unit
 ) {
     val strings = currentStrings()
@@ -356,7 +378,33 @@ private fun NextClassCard(
             .fillMaxWidth()
             .clickable { onOpenTimetable() }
     ) {
-        if (event == null) {
+        if (!isLoaded) {
+            Column(modifier = Modifier.padding(18.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Schedule,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = strings.todayClasses,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                    )
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.55f)
+                        .height(20.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+                )
+            }
+        } else if (event == null) {
             Column(modifier = Modifier.padding(18.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(

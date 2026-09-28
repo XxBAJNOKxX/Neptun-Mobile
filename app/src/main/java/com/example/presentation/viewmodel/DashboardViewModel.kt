@@ -27,6 +27,7 @@ data class DashboardUiState(
     val todayClasses: List<CalendarEvent> = emptyList(),
     val ongoingEvent: CalendarEvent? = null,
     val nextEvent: CalendarEvent? = null,
+    val isCalendarLoaded: Boolean = false,
     val unreadMessages: Int = 0,
     val latestGrades: List<SubjectGrade> = emptyList(),
     val gradedCountThisTerm: Int = 0,
@@ -48,7 +49,20 @@ class DashboardViewModel(
 
     private val getTodayClasses = GetTodayClassesUseCase()
 
-    private val _uiState = MutableStateFlow(DashboardUiState(greeting = buildGreeting()))
+    private val initialEvents = (neptunRepository.getCalendarEvents() as? StateFlow<List<CalendarEvent>>)?.value ?: emptyList()
+    private val initialToday = if (initialEvents.isNotEmpty()) {
+        getTodayClasses(initialEvents, LocalDate.now(), LocalTime.now())
+    } else emptyList()
+
+    private val _uiState = MutableStateFlow(
+        DashboardUiState(
+            greeting = buildGreeting(),
+            todayClasses = initialToday,
+            ongoingEvent = if (initialToday.isNotEmpty()) getTodayClasses.ongoingClass(initialToday) else null,
+            nextEvent = if (initialToday.isNotEmpty()) getTodayClasses.nextClass(initialToday) else null,
+            isCalendarLoaded = initialEvents.isNotEmpty()
+        )
+    )
     val uiState: StateFlow<DashboardUiState> = _uiState.asStateFlow()
 
     init {
@@ -59,7 +73,8 @@ class DashboardViewModel(
                     it.copy(
                         todayClasses = today,
                         ongoingEvent = getTodayClasses.ongoingClass(today),
-                        nextEvent = getTodayClasses.nextClass(today)
+                        nextEvent = getTodayClasses.nextClass(today),
+                        isCalendarLoaded = true
                     )
                 }
             }

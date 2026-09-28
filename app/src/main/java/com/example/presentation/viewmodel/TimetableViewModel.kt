@@ -75,8 +75,8 @@ class TimetableViewModel(
         observeCalendar()
         observeAcademicPeriods()
         observePreferences()
-        refreshCalendar()
-        refreshAcademicPeriods()
+        refreshCalendar(isManual = false)
+        refreshAcademicPeriods(isManual = false)
     }
 
     private fun buildInitialUiState(): TimetableUiState {
@@ -297,14 +297,14 @@ class TimetableViewModel(
         _uiState.update { it.copy(isWeekView = !it.isWeekView) }
     }
 
-    fun refreshCalendar() {
+    fun refreshCalendar(isManual: Boolean = true) {
         viewModelScope.launch {
             _uiState.update { it.copy(isRefreshing = true, errorMessage = null) }
             val res = neptunRepository.refreshCalendar()
             _uiState.update {
                 it.copy(
                     isRefreshing = false,
-                    errorMessage = if (res.isFailure) "TIMETABLE_LOAD_FAILED" else null
+                    errorMessage = if (res.isFailure && (isManual || it.events.isEmpty())) "TIMETABLE_LOAD_FAILED" else null
                 )
             }
         }
@@ -332,14 +332,14 @@ class TimetableViewModel(
         _uiState.update { it.copy(periodFilter = filter) }
     }
 
-    fun refreshAcademicPeriods() {
+    fun refreshAcademicPeriods(isManual: Boolean = true) {
         viewModelScope.launch {
             _uiState.update { it.copy(isRefreshingPeriods = true, errorMessage = null) }
             val res = neptunRepository.refreshAcademicPeriods()
             _uiState.update {
                 it.copy(
                     isRefreshingPeriods = false,
-                    errorMessage = if (res.isFailure) "PERIODS_LOAD_FAILED" else null
+                    errorMessage = if (res.isFailure && (isManual || it.academicPeriods.isEmpty())) "PERIODS_LOAD_FAILED" else null
                 )
             }
         }

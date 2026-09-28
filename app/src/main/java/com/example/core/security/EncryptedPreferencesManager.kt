@@ -9,6 +9,7 @@ import androidx.security.crypto.MasterKey
 import com.example.domain.model.StudentCredentials
 import com.example.domain.model.DegreeProgress
 import com.example.domain.model.AcademicPeriod
+import com.example.domain.model.CalendarEvent
 import kotlinx.serialization.builtins.ListSerializer
 import com.example.ui.theme.AppAccentColor
 import com.example.ui.theme.ThemeMode
@@ -106,8 +107,14 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
     private val _updateChannelFlow = MutableStateFlow(loadUpdateChannel())
     val updateChannelFlow: StateFlow<UpdateChannel> = _updateChannelFlow.asStateFlow()
 
-    private val _sessionExpiredFlow = MutableStateFlow(prefs.getBoolean(KEY_SESSION_EXPIRED, false))
+    private val _sessionExpiredFlow = MutableStateFlow(false)
     val sessionExpiredFlow: StateFlow<Boolean> = _sessionExpiredFlow.asStateFlow()
+
+    init {
+        // Alkalmazás indulásakor tiszta lappal indulunk, hogy az automatikus háttérbeli
+        // token-megújítás előtt ne villanhasson fel a lejárt munkamenet dialógus.
+        prefs.edit().putBoolean(KEY_SESSION_EXPIRED, false).apply()
+    }
 
     private val _languageFlow = MutableStateFlow(loadLanguage())
     val languageFlow: StateFlow<com.example.domain.model.NeptunLanguage> = _languageFlow.asStateFlow()
@@ -337,6 +344,29 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
 
     fun clearAcademicPeriods() {
         prefs.edit().remove(KEY_ACADEMIC_PERIODS).apply()
+    }
+
+    fun saveCalendarEvents(events: List<CalendarEvent>) {
+        try {
+            val jsonStr = jsonSerializer.encodeToString(ListSerializer(CalendarEvent.serializer()), events)
+            prefs.edit().putString(KEY_CALENDAR_EVENTS, jsonStr).apply()
+        } catch (e: Exception) {
+            Log.e("EncryptedPrefs", "saveCalendarEvents error: ${e.message}")
+        }
+    }
+
+    fun getCalendarEvents(): List<CalendarEvent> {
+        val jsonStr = prefs.getString(KEY_CALENDAR_EVENTS, null) ?: return emptyList()
+        return try {
+            jsonSerializer.decodeFromString(ListSerializer(CalendarEvent.serializer()), jsonStr)
+        } catch (e: Exception) {
+            Log.e("EncryptedPrefs", "getCalendarEvents error: ${e.message}")
+            emptyList()
+        }
+    }
+
+    fun clearCalendarEvents() {
+        prefs.edit().remove(KEY_CALENDAR_EVENTS).apply()
     }
 
     fun setBiometricLockEnabled(enabled: Boolean) {
@@ -759,6 +789,7 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
         private const val KEY_NOTIFIED_BASELINE_PREFIX = "key_notified_baseline_"
         private const val KEY_DEGREE_PROGRESS = "key_degree_progress"
         private const val KEY_ACADEMIC_PERIODS = "key_academic_periods"
+        private const val KEY_CALENDAR_EVENTS = "key_calendar_events"
     }
 }
 

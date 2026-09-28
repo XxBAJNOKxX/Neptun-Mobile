@@ -71,6 +71,7 @@ data class StudentCredentials(
     val lastSyncTime: Long = 0L
 )
 
+@Serializable
 enum class CourseType(val displayName: String) {
     LECTURE("Előadás"),
     PRACTICE("Gyakorlat"),
@@ -89,6 +90,7 @@ enum class CourseType(val displayName: String) {
     }
 }
 
+@Serializable
 data class CalendarEvent(
     val id: String,
     val subjectName: String,
