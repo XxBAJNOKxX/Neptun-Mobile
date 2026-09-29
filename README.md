@@ -65,9 +65,17 @@ A GitHub [Releases](../../releases) oldalról tölthető le az APK (debug és re
 
 ## 🗺️ Tervezett funkciók
 
-- [ ] Vizsgára jelentkezés / tárgyfelvétel (a szerveroldali API függvényében)
 - [x] Teljes i18n többnyelvűség (magyar, angol, német)
-- [ ] Tárgyak részletes adatai (óra- és vizsgaidőpontok, követelmények)
+- [ ] **Jegyzetfüzet és Határidős Feladatkezelő (To-Do & Notes)**:
+  - Tanulmányi jegyzetek és beadandó feladatok vezetése tárgyakhoz rendelve
+  - Határidők (dátum, óra/perc) és konfigurálható előzetes értesítések (pl. 1 órával, 1 nappal előtte)
+  - Kipipálható státusz (checkbox): befejezéskor az ütemezett értesítés automatikusan törlődik
+  - Kezdőlapi kiemelés a közelgő határidőkről
+- [ ] Tárgyak részletes adatai (követelmények, kurzusok, oktatók elérhetősége)
+- [ ] Vizsgára jelentkezés / tárgyfelvétel (a szerveroldali API függvényében)
+- [ ] Kérvények státuszának követése (leadva, bírálat alatt, elfogadva) és push értesítés változáskor
+- [ ] Ösztöndíjak és kifizetések jóváírásainak listája a pénzügyeknél
+- [ ] Üres terem / szabad tanulóhely kereső a campus épületeiben
 
 ## 📜 Licenc
 
