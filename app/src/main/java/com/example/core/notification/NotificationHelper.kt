@@ -27,9 +27,8 @@ object NotificationHelper {
     const val CHANNEL_NAME_FINANCES = "Pénzügyi Értesítések"
 
     fun createNotificationChannels(context: Context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            val strings = AppStringsProvider.getForContext(context)
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val strings = AppStringsProvider.getForContext(context)
 
             val classesChannel = NotificationChannel(
                 CHANNEL_ID_CLASSES,
@@ -74,7 +73,6 @@ object NotificationHelper {
             notificationManager.createNotificationChannels(
                 listOf(classesChannel, messagesChannel, gradesChannel, financesChannel)
             )
-        }
     }
 
     fun areNotificationsEnabled(context: Context): Boolean {
@@ -279,8 +277,19 @@ object NotificationHelper {
      */
     private fun safeNotify(context: Context, notificationId: Int, notification: android.app.Notification) {
         try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                if (androidx.core.content.ContextCompat.checkSelfPermission(
+                        context,
+                        android.Manifest.permission.POST_NOTIFICATIONS
+                    ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+                ) {
+                    return
+                }
+            }
             if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) return
             NotificationManagerCompat.from(context).notify(notificationId, notification)
+        } catch (e: SecurityException) {
+            android.util.Log.e("NotificationHelper", "Értesítés küldése jogosultság hiányában sikertelen: ${e.message}")
         } catch (e: Exception) {
             android.util.Log.e("NotificationHelper", "Értesítés küldése sikertelen: ${e.message}")
         }
