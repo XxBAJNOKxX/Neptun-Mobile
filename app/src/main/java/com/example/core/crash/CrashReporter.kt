@@ -27,7 +27,7 @@ object CrashReporter {
                         appendLine("Verzió: ${appContext.packageManager.getPackageInfo(appContext.packageName, 0).versionName}")
                         appendLine("Szál: ${thread.name}")
                         appendLine()
-                        appendLine(Log.getStackTraceString(throwable))
+                        appendLine(maskSensitiveData(Log.getStackTraceString(throwable)))
                     }
                 )
             } catch (e: Exception) {
@@ -35,6 +35,20 @@ object CrashReporter {
             }
             defaultHandler?.uncaughtException(thread, throwable)
         }
+    }
+
+    /**
+     * Maszkolja a potenciálisan érzékeny adatokat (Bearer tokenek, jelszavak, sütik, Neptun kódok).
+     */
+    fun maskSensitiveData(raw: String): String {
+        var masked = raw
+        masked = Regex("(Authorization\\s*:\\s*)[^\\r\\n]+", RegexOption.IGNORE_CASE).replace(masked, "$1[REDACTED]")
+        masked = Regex("Bearer\\s+[A-Za-z0-9\\-._~+/]+=*", RegexOption.IGNORE_CASE).replace(masked, "Bearer [REDACTED]")
+        masked = Regex("([\"']?(?:password|pass|pwd|jelszo)[\"']?\\s*[:=]\\s*[\"']?)[^\"'\\s&,\n]+([\"']?)", RegexOption.IGNORE_CASE).replace(masked, "$1[REDACTED]$2")
+        masked = Regex("([\"']?(?:accessToken|refreshToken|token|api_key|apiKey)[\"']?\\s*[:=]\\s*[\"']?)[^\"'\\s&,\n]+([\"']?)", RegexOption.IGNORE_CASE).replace(masked, "$1[REDACTED]$2")
+        masked = Regex("([\"']?(?:cookie|sessionId|NeptunSession|ASP\\.NET_SessionId)[\"']?\\s*[:=]\\s*[\"']?)[^\"'\\s&;,\n]+([\"']?)", RegexOption.IGNORE_CASE).replace(masked, "$1[REDACTED]$2")
+        masked = Regex("([\"']?(?:user|username|neptunCode|login)[\"']?\\s*[:=]\\s*[\"']?)[A-Za-z0-9]{6}([\"']?)", RegexOption.IGNORE_CASE).replace(masked, "$1[REDACTED]$2")
+        return masked
     }
 
     /** Visszaadja és törli az utolsó rögzített crash naplóját (ha volt). */
