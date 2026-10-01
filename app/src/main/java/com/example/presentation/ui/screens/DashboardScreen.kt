@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -43,6 +44,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -129,7 +133,8 @@ fun DashboardScreen(
                         text = "$greetingText, $studentName!",
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.semantics { heading() }
                     )
                     if (isDemoData) {
                         Spacer(modifier = Modifier.height(4.dp))
@@ -224,7 +229,8 @@ fun DashboardScreen(
                     text = if (uiState.isCalendarLoaded) "${strings.todayClasses} (${uiState.todayClasses.size})" else strings.todayClasses,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.semantics { heading() }
                 )
             }
 
@@ -235,7 +241,7 @@ fun DashboardScreen(
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(52.dp)
+                            .defaultMinSize(minHeight = 52.dp)
                     ) {
                         Box(contentAlignment = Alignment.CenterStart, modifier = Modifier.padding(horizontal = 20.dp)) {
                             Box(
@@ -289,7 +295,12 @@ fun DashboardScreen(
                         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { onNavigate(NavigationItem.FINANCES) }
+                            .defaultMinSize(minHeight = 48.dp)
+                            .clickable(
+                                role = Role.Button,
+                                onClickLabel = strings.navFinances,
+                                onClick = { onNavigate(NavigationItem.FINANCES) }
+                            )
                     ) {
                         Row(
                             modifier = Modifier.padding(16.dp),
@@ -376,7 +387,12 @@ private fun NextClassCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onOpenTimetable() }
+            .defaultMinSize(minHeight = 48.dp)
+            .clickable(
+                role = Role.Button,
+                onClickLabel = strings.navTimetable,
+                onClick = onOpenTimetable
+            )
     ) {
         if (!isLoaded) {
             Column(modifier = Modifier.padding(18.dp)) {
@@ -499,7 +515,13 @@ private fun QuickStatCard(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-        modifier = modifier.clickable { onClick() }
+        modifier = modifier
+            .defaultMinSize(minHeight = 48.dp)
+            .clickable(
+                role = Role.Button,
+                onClickLabel = label.replace("\n", " "),
+                onClick = onClick
+            )
     ) {
         Column(
             modifier = Modifier
@@ -784,7 +806,12 @@ private fun DegreeProgressMiniCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onOpenProgress() }
+            .defaultMinSize(minHeight = 48.dp)
+            .clickable(
+                role = Role.Button,
+                onClickLabel = strings.degreeProgressTitle,
+                onClick = onOpenProgress
+            )
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Row(

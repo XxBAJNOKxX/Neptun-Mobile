@@ -66,6 +66,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -243,7 +246,10 @@ fun TimetableScreen(
                         Surface(
                             shape = RoundedCornerShape(12.dp),
                             color = MaterialTheme.colorScheme.primaryContainer,
-                            modifier = Modifier.clickable { onCurrentWeek() }
+                            modifier = Modifier.clickable(
+                                role = Role.Button,
+                                onClick = onCurrentWeek
+                            )
                         ) {
                             Text(
                                 text = if (strings.languageCode == "hu") "Mai hét" else if (strings.languageCode == "de") "Aktuelle Woche" else "Current week",
@@ -290,7 +296,8 @@ fun TimetableScreen(
                 text = dayHeader,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.semantics { heading() }
             )
 
             FilterChip(

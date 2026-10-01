@@ -63,6 +63,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import com.example.core.i18n.AppStrings
 import com.example.core.i18n.currentStrings
 import androidx.compose.ui.text.font.FontWeight
@@ -117,7 +119,8 @@ fun MessagesScreen(
                        else (if (strings.languageCode == "hu") "Összes üzenet (${uiState.messages.size})" else if (strings.languageCode == "de") "Alle Nachrichten (${uiState.messages.size})" else "All Messages (${uiState.messages.size})"),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.semantics { heading() }
             )
 
             FilterChip(

@@ -55,6 +55,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -257,7 +259,9 @@ fun GradesScreen(
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.weight(1f, fill = false),
+                        modifier = Modifier
+                            .weight(1f, fill = false)
+                            .semantics { heading() },
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -372,7 +376,8 @@ private fun AcademicSummaryCard(
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.semantics { heading() }
                         )
                         Text(
                             text = if (strings.languageCode == "de") "Formel: (Σ Note * Credits) / Σ Erreichte Credits" else if (strings.languageCode == "hu") "Formula: (Σ Jegy * Kredit) / Σ Teljesített Kredit" else "Formula: (Σ Grade * Credits) / Σ Completed Credits",
@@ -402,8 +407,8 @@ private fun AcademicSummaryCard(
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            maxLines = 1,
-                            softWrap = false
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }

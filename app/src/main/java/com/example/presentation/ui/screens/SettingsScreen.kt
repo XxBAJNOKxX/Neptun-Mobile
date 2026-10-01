@@ -99,6 +99,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -355,7 +357,8 @@ fun SettingsScreen(
                             Text(
                                 text = strings.sectionLanguage,
                                 style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.semantics { heading() }
                             )
                             Text(
                                 text = strings.languageSubtitle,
@@ -501,7 +504,8 @@ fun SettingsScreen(
                             Text(
                                 text = strings.appearanceTitle,
                                 style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.semantics { heading() }
                             )
                             Text(
                                 text = strings.appearanceSubtitle,
@@ -903,7 +907,8 @@ fun SettingsScreen(
                             Text(
                                 text = strings.notificationsTitle,
                                 style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.semantics { heading() }
                             )
                             Text(
                                 text = strings.notificationsSubtitle,
@@ -1061,7 +1066,8 @@ fun SettingsScreen(
                             Text(
                                 text = strings.personalizationTitle,
                                 style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.semantics { heading() }
                             )
                             Text(
                                 text = strings.personalizationSubtitle,
@@ -1317,7 +1323,8 @@ fun SettingsScreen(
                             Text(
                                 text = strings.securityTitle,
                                 style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.semantics { heading() }
                             )
                             Text(
                                 text = strings.securitySubtitle,
@@ -1424,7 +1431,8 @@ fun SettingsScreen(
                             Text(
                                 text = strings.appUpdatesTitle,
                                 style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.semantics { heading() }
                             )
                             Text(
                                 text = strings.appUpdatesSubtitle,
