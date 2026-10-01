@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.BrightnessAuto
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Contrast
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Download
@@ -542,6 +543,7 @@ fun SettingsScreen(
                                                 ThemeMode.SYSTEM -> Icons.Default.BrightnessAuto
                                                 ThemeMode.LIGHT -> Icons.Default.LightMode
                                                 ThemeMode.DARK -> Icons.Default.DarkMode
+                                                ThemeMode.AMOLED -> Icons.Default.Contrast
                                             }
                                             Icon(
                                                 imageVector = icon,

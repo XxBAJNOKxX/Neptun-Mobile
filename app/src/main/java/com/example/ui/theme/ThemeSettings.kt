@@ -8,7 +8,8 @@ import androidx.compose.ui.graphics.Color
 enum class ThemeMode(val title: String, val description: String) {
     SYSTEM("Rendszer", "Követi a telefon beállításait"),
     LIGHT("Világos", "Állandó világos megjelenés"),
-    DARK("Sötét", "Kíméli a szemet sötétben")
+    DARK("Sötét", "Kíméli a szemet sötétben"),
+    AMOLED("AMOLED", "Tiszta fekete háttér, OLED kímélő")
 }
 
 enum class AppAccentColor(
@@ -297,6 +298,7 @@ fun ThemeMode.getLocalizedTitle(strings: com.example.core.i18n.AppStrings): Stri
         ThemeMode.SYSTEM -> strings.themeModeSystem
         ThemeMode.LIGHT -> strings.themeModeLight
         ThemeMode.DARK -> strings.themeModeDark
+        ThemeMode.AMOLED -> strings.themeModeAmoled
     }
 }
 
@@ -305,6 +307,7 @@ fun ThemeMode.getLocalizedDescription(strings: com.example.core.i18n.AppStrings)
         ThemeMode.SYSTEM -> strings.themeModeSystemDesc
         ThemeMode.LIGHT -> strings.themeModeLightDesc
         ThemeMode.DARK -> strings.themeModeDarkDesc
+        ThemeMode.AMOLED -> strings.themeModeAmoledDesc
     }
 }
 

@@ -320,9 +320,11 @@ interface AppStrings {
     val themeModeSystem: String
     val themeModeLight: String
     val themeModeDark: String
+    val themeModeAmoled: String
     val themeModeSystemDesc: String
     val themeModeLightDesc: String
     val themeModeDarkDesc: String
+    val themeModeAmoledDesc: String
 
     // Accent Colors
     val colorBlue: String
@@ -811,9 +813,11 @@ class HungarianStrings : AppStrings {
     override val themeModeSystem = "Rendszer"
     override val themeModeLight = "Világos"
     override val themeModeDark = "Sötét"
+    override val themeModeAmoled = "AMOLED"
     override val themeModeSystemDesc = "Követi a telefon beállításait"
     override val themeModeLightDesc = "Állandó világos megjelenés"
     override val themeModeDarkDesc = "Kíméli a szemet sötétben"
+    override val themeModeAmoledDesc = "Tiszta fekete háttér, OLED kímélő"
 
     // Accent Colors
     override val colorBlue = "Neptun Kék"
@@ -1299,9 +1303,11 @@ class EnglishStrings : AppStrings {
     override val themeModeSystem = "System"
     override val themeModeLight = "Light"
     override val themeModeDark = "Dark"
+    override val themeModeAmoled = "AMOLED"
     override val themeModeSystemDesc = "Follows system settings"
     override val themeModeLightDesc = "Always light appearance"
     override val themeModeDarkDesc = "Easy on the eyes in dark"
+    override val themeModeAmoledDesc = "Pure black background, OLED battery saving"
 
     // Accent Colors
     override val colorBlue = "Neptune Blue"
@@ -1785,9 +1791,11 @@ class GermanStrings : AppStrings {
     override val themeModeSystem = "System"
     override val themeModeLight = "Hell"
     override val themeModeDark = "Dunkel"
+    override val themeModeAmoled = "AMOLED"
     override val themeModeSystemDesc = "Folgt den Systemeinstellungen"
     override val themeModeLightDesc = "Dauerhaft helles Erscheinungsbild"
     override val themeModeDarkDesc = "Schont die Augen im Dunkeln"
+    override val themeModeAmoledDesc = "Reines Schwarz, schont den OLED-Akku"
 
     // Accent Colors
     override val colorBlue = "Neptun Blau"
