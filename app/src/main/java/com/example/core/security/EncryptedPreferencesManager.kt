@@ -73,20 +73,25 @@ data class AppPersonalization(
 class EncryptedPreferencesManager(context: Context) : NotifiedStore {
 
     private val prefs: SharedPreferences = try {
-        val masterKey = MasterKey.Builder(context)
-            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-            .build()
-
-        EncryptedSharedPreferences.create(
-            context,
-            "neptun_secure_storage",
-            masterKey,
-            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-        )
+        createEncryptedPrefs(context)
     } catch (e: Exception) {
-        // Fallback to standard private preferences if keystore issue occurs on emulator
-        context.getSharedPreferences("neptun_secure_storage_fallback", Context.MODE_PRIVATE)
+        if (isTestEnvironment()) {
+            // Csak és kizárólag Robolectric / JVM unit teszt környezetben engedélyezett, ahol nincs AndroidKeyStore daemon
+            context.getSharedPreferences("neptun_secure_storage_test", Context.MODE_PRIVATE)
+        } else {
+            // Éles Android eszközön soha nem engedünk titkosítatlan fallbacket: újrakíséreljük a tiszta inicializációt
+            try {
+                context.deleteSharedPreferences("neptun_secure_storage")
+                createEncryptedPrefs(context)
+            } catch (retryEx: Exception) {
+                throw SecurityException("A hardveres Keystore vagy titkosított tároló nem inicializálható: ${retryEx.message}", retryEx)
+            }
+        }
+    }.also {
+        // Korábbi nem biztonságos fallback tároló törlése, ha létezett
+        try {
+            context.deleteSharedPreferences("neptun_secure_storage_fallback")
+        } catch (_: Exception) {}
     }
 
     private val _credentialsFlow = MutableStateFlow(loadCredentials())
@@ -741,6 +746,25 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
     }
 
     companion object {
+        fun createEncryptedPrefs(context: Context): SharedPreferences {
+            val masterKey = MasterKey.Builder(context)
+                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                .build()
+
+            return EncryptedSharedPreferences.create(
+                context,
+                "neptun_secure_storage",
+                masterKey,
+                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+            )
+        }
+
+        fun isTestEnvironment(): Boolean {
+            return android.os.Build.FINGERPRINT == "robolectric" ||
+                   System.getProperty("java.runtime.name")?.contains("Android Runtime") == false
+        }
+
         private const val KEY_NEPTUN_CODE = "key_neptun_code"
         private const val KEY_PASSWORD = "key_password"
         private const val KEY_UNIVERSITY_ID = "key_uni_id"
