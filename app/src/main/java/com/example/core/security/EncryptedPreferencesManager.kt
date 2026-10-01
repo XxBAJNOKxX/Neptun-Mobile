@@ -501,7 +501,7 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
 
     fun saveCredentials(
         neptunCode: String,
-        password: String,
+        password: String = "",
         universityId: String,
         universityName: String,
         neptunUrl: String,
@@ -509,9 +509,8 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
         sessionToken: String = "",
         trainingProgram: String = "Egyetemi Képzés"
     ) {
-        prefs.edit()
+        val editor = prefs.edit()
             .putString(KEY_NEPTUN_CODE, neptunCode)
-            .putString(KEY_PASSWORD, password)
             .putString(KEY_UNIVERSITY_ID, universityId)
             .putString(KEY_UNIVERSITY_NAME, universityName)
             .putString(KEY_NEPTUN_URL, neptunUrl)
@@ -526,7 +525,13 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
             .putString(KEY_TRAINING_PROGRAM, trainingProgram)
             .putBoolean(KEY_IS_LOGGED_IN, true)
             .putLong(KEY_LAST_SYNC, System.currentTimeMillis())
-            .apply()
+
+        if (password.isNotBlank() && password != "******") {
+            editor.putString(KEY_PASSWORD, password)
+        } else {
+            editor.remove(KEY_PASSWORD)
+        }
+        editor.apply()
 
         _credentialsFlow.value = loadCredentials()
     }
@@ -655,7 +660,15 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
     }
 
     fun setPassword(password: String) {
-        prefs.edit().putString(KEY_PASSWORD, password).apply()
+        if (password.isNotBlank() && password != "******") {
+            prefs.edit().putString(KEY_PASSWORD, password).apply()
+        } else {
+            clearPassword()
+        }
+    }
+
+    fun clearPassword() {
+        prefs.edit().remove(KEY_PASSWORD).apply()
     }
 
     fun loadThemeSettings(): ThemeSettings {

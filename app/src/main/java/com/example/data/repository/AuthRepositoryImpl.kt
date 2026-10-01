@@ -111,18 +111,17 @@ class AuthRepositoryImpl(
 
         when (authResult) {
             is NeptunAuthResult.TwoFactorRequired -> {
-                prefsManager.setPassword(trimmedPassword)
                 Result.failure(TwoFactorRequiredException(authResult.twoFactorToken))
             }
             is NeptunAuthResult.TwoFactorSessionRequired -> {
-                prefsManager.setPassword(trimmedPassword)
                 Result.failure(TwoFactorSessionRequiredException(authResult.session))
             }
             is NeptunAuthResult.Success -> {
                 val loginUrl = university.neptunUrl.ifEmpty { authResult.normalizedBaseUrl }
+                val passwordToSave = if (authResult.isModernApi) "" else trimmedPassword
                 prefsManager.saveCredentials(
                     neptunCode = trimmedCode,
-                    password = trimmedPassword,
+                    password = passwordToSave,
                     universityId = university.id,
                     universityName = university.name,
                     neptunUrl = loginUrl,
@@ -181,11 +180,10 @@ class AuthRepositoryImpl(
                     neptunUrl = session.baseUrl
                 )
 
-                val savedPassword = prefsManager.getPassword().ifEmpty { "******" }
                 val loginUrl = session.baseUrl.ifEmpty { uni.neptunUrl.ifEmpty { authResult.normalizedBaseUrl } }
                 prefsManager.saveCredentials(
                     neptunCode = session.neptunCode,
-                    password = savedPassword,
+                    password = "",
                     universityId = uni.id,
                     universityName = uni.name,
                     neptunUrl = loginUrl,

@@ -276,9 +276,9 @@ class NeptunRepositoryImpl(
                 }
             }
 
-            // 4. Jelszavas belépés (végső fallback)
+            // 4. Jelszavas belépés (végső fallback kizárólag régebbi legacy WCF egyetemeknél)
             val password = prefsManager.getPassword()
-            if (creds.neptunCode.isNotEmpty() && password.isNotEmpty() && password != "******") {
+            if (!freshModern && creds.neptunCode.isNotEmpty() && password.isNotEmpty() && password != "******") {
                 try {
                     val authRes = neptunApiClient.authenticate(freshLoginUrl, creds.neptunCode, password, freshDeviceCookie)
                     when {
