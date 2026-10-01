@@ -66,6 +66,7 @@ data class AppPersonalization(
     val showWeekend: Boolean = false,
     val targetCredits: Int = 240,
     val biometricLockEnabled: Boolean = false,
+    val screenProtectionEnabled: Boolean = false,
     /** A kikapcsolt (elrejtett) oldalak nevei (NavigationItem.name). */
     val hiddenPages: Set<String> = emptySet()
 )
@@ -267,6 +268,7 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
             showWeekend = prefs.getBoolean(KEY_SHOW_WEEKEND, false),
             targetCredits = prefs.getInt(KEY_TARGET_CREDITS, 240).coerceIn(30, 400),
             biometricLockEnabled = prefs.getBoolean(KEY_BIOMETRIC_LOCK, false),
+            screenProtectionEnabled = prefs.getBoolean(KEY_SCREEN_PROTECTION, false),
             hiddenPages = prefs.getStringSet(KEY_HIDDEN_PAGES, emptySet())?.toSet() ?: emptySet()
         )
     }
@@ -376,6 +378,11 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
 
     fun setBiometricLockEnabled(enabled: Boolean) {
         prefs.edit().putBoolean(KEY_BIOMETRIC_LOCK, enabled).apply()
+        _personalizationFlow.value = loadPersonalization()
+    }
+
+    fun setScreenProtectionEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_SCREEN_PROTECTION, enabled).apply()
         _personalizationFlow.value = loadPersonalization()
     }
 
@@ -726,6 +733,7 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
             .putBoolean(KEY_SHOW_WEEKEND, savedPersonalization.showWeekend)
             .putInt(KEY_TARGET_CREDITS, savedPersonalization.targetCredits)
             .putBoolean(KEY_BIOMETRIC_LOCK, savedPersonalization.biometricLockEnabled)
+            .putBoolean(KEY_SCREEN_PROTECTION, savedPersonalization.screenProtectionEnabled)
             .putStringSet(KEY_HIDDEN_PAGES, savedPersonalization.hiddenPages)
             .putBoolean(KEY_QUIET_HOURS_ENABLED, savedNotifQuiet.quietHoursEnabled)
             .putInt(KEY_QUIET_START_MINUTE, savedNotifQuiet.quietStartMinute)
@@ -802,6 +810,7 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
         private const val KEY_TARGET_CREDITS = "key_target_credits"
         private const val KEY_AUTO_SET_TARGET_CREDITS = "key_auto_set_target_credits"
         private const val KEY_BIOMETRIC_LOCK = "key_biometric_lock"
+        private const val KEY_SCREEN_PROTECTION = "key_screen_protection"
         private const val KEY_HIDDEN_PAGES = "key_hidden_pages"
         private const val KEY_DATA_MODE = "key_data_mode"
         private const val KEY_SESSION_EXPIRED = "key_session_expired"

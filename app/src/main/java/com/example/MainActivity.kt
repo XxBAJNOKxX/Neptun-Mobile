@@ -30,10 +30,22 @@ class MainActivity : FragmentActivity() {
         setContent {
             val themeSettings by prefsManager.themeSettingsFlow.collectAsStateWithLifecycle()
             val currentLanguage by prefsManager.languageFlow.collectAsStateWithLifecycle()
+            val personalization by prefsManager.personalizationFlow.collectAsStateWithLifecycle()
             val appStrings = AppStringsProvider.getForCode(currentLanguage.code)
 
             LaunchedEffect(currentLanguage.code) {
                 updateAppLocale(currentLanguage.code)
+            }
+
+            LaunchedEffect(personalization.biometricLockEnabled, personalization.screenProtectionEnabled) {
+                if (personalization.biometricLockEnabled || personalization.screenProtectionEnabled) {
+                    window.setFlags(
+                        android.view.WindowManager.LayoutParams.FLAG_SECURE,
+                        android.view.WindowManager.LayoutParams.FLAG_SECURE
+                    )
+                } else {
+                    window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+                }
             }
 
             CompositionLocalProvider(LocalAppStrings provides appStrings) {
