@@ -2,6 +2,7 @@ package com.example.core.update
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
@@ -252,6 +253,11 @@ class AppUpdateManager(
             partFile.delete()
         }
 
+        if (info.expectedSizeBytes > 0 && finalFile.length() != info.expectedSizeBytes) {
+            finalFile.delete()
+            throw IllegalStateException("A letöltött fájl mérete (${finalFile.length()} B) eltér a várt mérettől (${info.expectedSizeBytes} B)!")
+        }
+
         finalFile
     }
 
@@ -297,7 +303,96 @@ class AppUpdateManager(
         }
     }
 
+    fun calculateSha256(file: File): String {
+        val digest = java.security.MessageDigest.getInstance("SHA-256")
+        file.inputStream().use { input ->
+            val buffer = ByteArray(8192)
+            var bytesRead: Int
+            while (input.read(buffer).also { bytesRead = it } != -1) {
+                digest.update(buffer, 0, bytesRead)
+            }
+        }
+        return digest.digest().joinToString("") { "%02x".format(it) }
+    }
+
+    /**
+     * Ellenőrzi, hogy a letöltött APK csomagneve és aláíró tanúsítványa
+     * megegyezik-e a jelenleg futó alkalmazáséval.
+     */
+    fun verifyApkSignature(context: Context, apkFile: File): Boolean {
+        return try {
+            val pm = context.packageManager
+            val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                PackageManager.GET_SIGNING_CERTIFICATES
+            } else {
+                @Suppress("DEPRECATION")
+                PackageManager.GET_SIGNATURES
+            }
+            val archiveInfo = pm.getPackageArchiveInfo(apkFile.absolutePath, flags)
+                ?: return false
+
+            if (archiveInfo.packageName != context.packageName) {
+                android.util.Log.e("AppUpdateManager", "APK csomagnév eltérés: ${archiveInfo.packageName} vs ${context.packageName}")
+                return false
+            }
+
+            val currentInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                pm.getPackageInfo(context.packageName, PackageManager.GET_SIGNING_CERTIFICATES)
+            } else {
+                @Suppress("DEPRECATION")
+                pm.getPackageInfo(context.packageName, PackageManager.GET_SIGNATURES)
+            }
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                val currentSigningInfo = currentInfo.signingInfo ?: return false
+                val archiveSigningInfo = archiveInfo.signingInfo ?: return false
+
+                val currentSignatures = if (currentSigningInfo.hasMultipleSigners()) {
+                    currentSigningInfo.apkContentsSigners
+                } else {
+                    currentSigningInfo.signingCertificateHistory
+                }
+
+                val archiveSignatures = if (archiveSigningInfo.hasMultipleSigners()) {
+                    archiveSigningInfo.apkContentsSigners
+                } else {
+                    archiveSigningInfo.signingCertificateHistory
+                }
+
+                if (currentSignatures.isNullOrEmpty() || archiveSignatures.isNullOrEmpty()) return false
+                val currentHashes = currentSignatures.map { it.toByteArray().contentHashCode() }.toSet()
+                val archiveHashes = archiveSignatures.map { it.toByteArray().contentHashCode() }.toSet()
+                val matches = currentHashes.intersect(archiveHashes).isNotEmpty()
+                if (!matches) {
+                    android.util.Log.e("AppUpdateManager", "APK aláíró tanúsítvány nem egyezik a futó appéval!")
+                }
+                matches
+            } else {
+                @Suppress("DEPRECATION")
+                val currentSignatures = currentInfo.signatures
+                @Suppress("DEPRECATION")
+                val archiveSignatures = archiveInfo.signatures
+                if (currentSignatures.isNullOrEmpty() || archiveSignatures.isNullOrEmpty()) return false
+                val currentHashes = currentSignatures.map { it.toByteArray().contentHashCode() }.toSet()
+                val archiveHashes = archiveSignatures.map { it.toByteArray().contentHashCode() }.toSet()
+                val matches = currentHashes.intersect(archiveHashes).isNotEmpty()
+                if (!matches) {
+                    android.util.Log.e("AppUpdateManager", "APK aláíró tanúsítvány nem egyezik a futó appéval!")
+                }
+                matches
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("AppUpdateManager", "Hiba az APK ellenőrzésekor: ${e.message}")
+            false
+        }
+    }
+
     fun installApk(context: Context, apkFile: File): Boolean {
+        if (!verifyApkSignature(context, apkFile)) {
+            android.util.Log.e("AppUpdateManager", "Az APK aláírása vagy csomagneve nem egyezik a futó alkalmazással!")
+            apkFile.delete()
+            return false
+        }
         return try {
             val authority = "${context.packageName}.fileprovider"
             val apkUri = FileProvider.getUriForFile(context, authority, apkFile)

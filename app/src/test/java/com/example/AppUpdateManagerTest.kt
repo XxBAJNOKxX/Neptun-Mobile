@@ -91,4 +91,14 @@ class AppUpdateManagerTest {
         val name2 = AppUpdateManager.getSafeUpdateFileName("v1.0.0", "neptun-release.apk", "https://example.com/test")
         assertEquals("1.0.0_neptun-release", name2)
     }
+
+    @Test
+    fun `calculateSha256 computes expected hash for file`() {
+        val tempFile = java.io.File.createTempFile("sha_test", ".txt").apply {
+            writeText("hello world")
+            deleteOnExit()
+        }
+        val hash = updateManager.calculateSha256(tempFile)
+        assertEquals("b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9", hash)
+    }
 }
