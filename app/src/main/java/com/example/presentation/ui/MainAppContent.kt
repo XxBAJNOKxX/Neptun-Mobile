@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -294,6 +295,7 @@ private fun MainDashboard(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight()
+                    .navigationBarsPadding()
             ) {
                 DemoModeBanner(dataMode = dataMode, strings = strings)
                 androidx.compose.foundation.layout.Box(
