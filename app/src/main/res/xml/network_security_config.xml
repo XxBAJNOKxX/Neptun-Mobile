@@ -4,8 +4,6 @@
         <trust-anchors>
             <!-- Android system root certificates -->
             <certificates src="system" />
-            <!-- User installed certificates (e.g. for university VPNs, corporate certs, AdGuard) -->
-            <certificates src="user" />
             <!-- Modern institutional / GEANT root & intermediate certificates missing from older Android versions (e.g. Android 11) -->
             <certificates src="@raw/harica_tls_rsa_root_2021" />
             <certificates src="@raw/harica_tls_ecc_root_2021" />
@@ -17,4 +15,10 @@
             <certificates src="@raw/sectigo_ov_r36" />
         </trust-anchors>
     </base-config>
+    <debug-overrides>
+        <trust-anchors>
+            <!-- User installed certificates only allowed in debug builds -->
+            <certificates src="user" />
+        </trust-anchors>
+    </debug-overrides>
 </network-security-config>
