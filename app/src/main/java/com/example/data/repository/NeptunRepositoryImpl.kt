@@ -24,6 +24,8 @@ import com.example.domain.model.SubjectGrade
 import com.example.domain.repository.NeptunRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -108,13 +110,22 @@ class NeptunRepositoryImpl(
             if (isDemo) {
                 prefsManager.setDataMode(DataMode.DEMO)
                 prefsManager.clearSessionExpired()
-                refreshCalendar()
-                refreshGrades()
-                refreshMessages()
-                refreshFinances()
-                refreshExams()
-                refreshDegreeProgress()
-                refreshAcademicPeriods()
+                coroutineScope {
+                    val d1 = async { refreshCalendar() }
+                    val d2 = async { refreshGrades() }
+                    val d3 = async { refreshMessages() }
+                    val d4 = async { refreshFinances() }
+                    val d5 = async { refreshExams() }
+                    val d6 = async { refreshDegreeProgress() }
+                    val d7 = async { refreshAcademicPeriods() }
+                    d1.await()
+                    d2.await()
+                    d3.await()
+                    d4.await()
+                    d5.await()
+                    d6.await()
+                    d7.await()
+                }
                 prefsManager.updateLastSyncTime()
                 return@withContext Result.success(Unit)
             }
@@ -145,13 +156,26 @@ class NeptunRepositoryImpl(
                     e.printStackTrace()
                 }
             }
-            val calRes = refreshCalendar()
-            val grdRes = refreshGrades()
-            val msgRes = refreshMessages()
-            val finRes = refreshFinances()
-            val exmRes = refreshExams()
-            refreshDegreeProgress()
-            refreshAcademicPeriods()
+            val (calRes, grdRes, msgRes, finRes, exmRes) = coroutineScope {
+                val calDeferred = async { refreshCalendar() }
+                val grdDeferred = async { refreshGrades() }
+                val msgDeferred = async { refreshMessages() }
+                val finDeferred = async { refreshFinances() }
+                val exmDeferred = async { refreshExams() }
+                val degDeferred = async { refreshDegreeProgress() }
+                val acaDeferred = async { refreshAcademicPeriods() }
+
+                degDeferred.await()
+                acaDeferred.await()
+
+                listOf(
+                    calDeferred.await(),
+                    grdDeferred.await(),
+                    msgDeferred.await(),
+                    finDeferred.await(),
+                    exmDeferred.await()
+                )
+            }
             prefsManager.updateLastSyncTime()
             val anySucceeded = calRes.isSuccess || grdRes.isSuccess || msgRes.isSuccess || finRes.isSuccess || exmRes.isSuccess
             val finalToken = prefsManager.getAccessToken()
