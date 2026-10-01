@@ -9,6 +9,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -34,6 +35,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -49,6 +51,7 @@ import com.example.presentation.navigation.NavigationItem
 import com.example.presentation.ui.components.BiometricLockScreen
 import com.example.presentation.ui.components.InAppUpdateDialog
 import com.example.presentation.ui.components.NeptunBottomBar
+import com.example.presentation.ui.components.NeptunNavigationRail
 import com.example.presentation.ui.screens.DashboardScreen
 import com.example.presentation.ui.screens.FinancesScreen
 import com.example.presentation.ui.screens.GradesScreen
@@ -272,72 +275,42 @@ private fun MainDashboard(
         )
     }
 
-    androidx.compose.material3.Scaffold(
-        contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
-        bottomBar = {
-            Column {
-                if (dataMode != DataMode.REAL) {
-                    Surface(
-                        color = MaterialTheme.colorScheme.tertiaryContainer,
-                        shape = RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 14.dp, vertical = 6.dp),
-                            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-                            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Science,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onTertiaryContainer,
-                                modifier = Modifier.size(15.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = if (dataMode == DataMode.DEMO) {
-                                    strings.demoModeBanner
-                                } else {
-                                    strings.fallbackSampleDataBanner
-                                },
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onTertiaryContainer
-                            )
-                        }
+    val configuration = LocalConfiguration.current
+    val isExpanded = configuration.screenWidthDp >= 600
+
+    if (isExpanded) {
+        Row(modifier = Modifier.fillMaxSize()) {
+            NeptunNavigationRail(
+                currentDestination = currentDestination,
+                items = visibleItems,
+                unreadMessageCount = unreadMessageCount,
+                onNavigate = { item ->
+                    if (item in visibleItems) {
+                        currentDestination = item
                     }
                 }
-                NeptunBottomBar(
-                    currentDestination = currentDestination,
-                    items = visibleItems,
-                    unreadMessageCount = unreadMessageCount,
-                    onNavigate = { item ->
-                        if (item in visibleItems) {
-                            currentDestination = item
-                        }
-                    }
-                )
-            }
-        }
-    ) { innerPadding ->
-        androidx.compose.foundation.layout.Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-        ) {
-            Crossfade(
-                targetState = currentDestination,
-                label = "navigation_crossfade"
-            ) { destination ->
-                when (destination) {
-                    NavigationItem.HOME -> HomeTabRoute(
+            )
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+            ) {
+                DemoModeBanner(dataMode = dataMode, strings = strings)
+                androidx.compose.foundation.layout.Box(
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    DashboardNavContent(
+                        currentDestination = currentDestination,
+                        visibleItems = visibleItems,
+                        app = app,
                         appContainer = appContainer,
                         authState = authState,
                         dataMode = dataMode,
                         strings = strings,
+                        authViewModel = authViewModel,
+                        appUpdateViewModel = appUpdateViewModel,
+                        gradesInitialTab = gradesInitialTab,
+                        timetableInitialTab = timetableInitialTab,
                         onNavigate = { item ->
                             if (item in visibleItems) {
                                 currentDestination = item
@@ -360,37 +333,183 @@ private fun MainDashboard(
                             if (NavigationItem.TIMETABLE in visibleItems) {
                                 currentDestination = NavigationItem.TIMETABLE
                             }
-                        }
-                    )
-
-                    NavigationItem.TIMETABLE -> TimetableTabRoute(
-                        appContainer = appContainer,
-                        initialTab = timetableInitialTab,
-                        onResetInitialTab = { timetableInitialTab = 0 }
-                    )
-
-                    NavigationItem.GRADES -> GradesTabRoute(
-                        appContainer = appContainer,
-                        initialTab = gradesInitialTab,
-                        onResetInitialTab = { gradesInitialTab = 0 }
-                    )
-
-                    NavigationItem.MESSAGES -> MessagesTabRoute(
-                        appContainer = appContainer
-                    )
-
-                    NavigationItem.FINANCES -> FinancesTabRoute(
-                        appContainer = appContainer
-                    )
-
-                    NavigationItem.SETTINGS -> SettingsTabRoute(
-                        app = app,
-                        authViewModel = authViewModel,
-                        appUpdateViewModel = appUpdateViewModel,
-                        authState = authState
+                        },
+                        onResetTimetableInitialTab = { timetableInitialTab = 0 },
+                        onResetGradesInitialTab = { gradesInitialTab = 0 }
                     )
                 }
             }
+        }
+    } else {
+        androidx.compose.material3.Scaffold(
+            contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
+            bottomBar = {
+                Column {
+                    DemoModeBanner(dataMode = dataMode, strings = strings)
+                    NeptunBottomBar(
+                        currentDestination = currentDestination,
+                        items = visibleItems,
+                        unreadMessageCount = unreadMessageCount,
+                        onNavigate = { item ->
+                            if (item in visibleItems) {
+                                currentDestination = item
+                            }
+                        }
+                    )
+                }
+            }
+        ) { innerPadding ->
+            androidx.compose.foundation.layout.Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+            ) {
+                DashboardNavContent(
+                    currentDestination = currentDestination,
+                    visibleItems = visibleItems,
+                    app = app,
+                    appContainer = appContainer,
+                    authState = authState,
+                    dataMode = dataMode,
+                    strings = strings,
+                    authViewModel = authViewModel,
+                    appUpdateViewModel = appUpdateViewModel,
+                    gradesInitialTab = gradesInitialTab,
+                    timetableInitialTab = timetableInitialTab,
+                    onNavigate = { item ->
+                        if (item in visibleItems) {
+                            currentDestination = item
+                        }
+                    },
+                    onOpenExams = {
+                        gradesInitialTab = 1
+                        if (NavigationItem.GRADES in visibleItems) {
+                            currentDestination = NavigationItem.GRADES
+                        }
+                    },
+                    onOpenProgress = {
+                        gradesInitialTab = 2
+                        if (NavigationItem.GRADES in visibleItems) {
+                            currentDestination = NavigationItem.GRADES
+                        }
+                    },
+                    onOpenPeriods = {
+                        timetableInitialTab = 1
+                        if (NavigationItem.TIMETABLE in visibleItems) {
+                            currentDestination = NavigationItem.TIMETABLE
+                        }
+                    },
+                    onResetTimetableInitialTab = { timetableInitialTab = 0 },
+                    onResetGradesInitialTab = { gradesInitialTab = 0 }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DemoModeBanner(
+    dataMode: DataMode,
+    strings: com.example.core.i18n.AppStrings,
+    modifier: Modifier = Modifier
+) {
+    if (dataMode == DataMode.REAL) return
+    Surface(
+        color = MaterialTheme.colorScheme.tertiaryContainer,
+        shape = RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 6.dp),
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.Science,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                modifier = Modifier.size(15.dp)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = if (dataMode == DataMode.DEMO) {
+                    strings.demoModeBanner
+                } else {
+                    strings.fallbackSampleDataBanner
+                },
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onTertiaryContainer
+            )
+        }
+    }
+}
+
+@Composable
+private fun DashboardNavContent(
+    currentDestination: NavigationItem,
+    visibleItems: List<NavigationItem>,
+    app: NeptunApp,
+    appContainer: AppContainer,
+    authState: AuthUiState,
+    dataMode: DataMode,
+    strings: com.example.core.i18n.AppStrings,
+    authViewModel: AuthViewModel,
+    appUpdateViewModel: AppUpdateViewModel,
+    gradesInitialTab: Int,
+    timetableInitialTab: Int,
+    onNavigate: (NavigationItem) -> Unit,
+    onOpenExams: () -> Unit,
+    onOpenProgress: () -> Unit,
+    onOpenPeriods: () -> Unit,
+    onResetTimetableInitialTab: () -> Unit,
+    onResetGradesInitialTab: () -> Unit
+) {
+    Crossfade(
+        targetState = currentDestination,
+        label = "navigation_crossfade"
+    ) { destination ->
+        when (destination) {
+            NavigationItem.HOME -> HomeTabRoute(
+                appContainer = appContainer,
+                authState = authState,
+                dataMode = dataMode,
+                strings = strings,
+                onNavigate = onNavigate,
+                onOpenExams = onOpenExams,
+                onOpenProgress = onOpenProgress,
+                onOpenPeriods = onOpenPeriods
+            )
+
+            NavigationItem.TIMETABLE -> TimetableTabRoute(
+                appContainer = appContainer,
+                initialTab = timetableInitialTab,
+                onResetInitialTab = onResetTimetableInitialTab
+            )
+
+            NavigationItem.GRADES -> GradesTabRoute(
+                appContainer = appContainer,
+                initialTab = gradesInitialTab,
+                onResetInitialTab = onResetGradesInitialTab
+            )
+
+            NavigationItem.MESSAGES -> MessagesTabRoute(
+                appContainer = appContainer
+            )
+
+            NavigationItem.FINANCES -> FinancesTabRoute(
+                appContainer = appContainer
+            )
+
+            NavigationItem.SETTINGS -> SettingsTabRoute(
+                app = app,
+                authViewModel = authViewModel,
+                appUpdateViewModel = appUpdateViewModel,
+                authState = authState
+            )
         }
     }
 }
