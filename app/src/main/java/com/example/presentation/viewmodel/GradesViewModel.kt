@@ -90,7 +90,9 @@ class GradesViewModel(
                     grade.copy(termId = displayTerm, termName = displayTerm)
                 }
                 val terms = cleanedGrades.map { it.termId }.distinct().sortedDescending()
-                val currentTerm = _uiState.value.selectedTerm.ifEmpty {
+                val currentTerm = if (_uiState.value.selectedTerm in terms) {
+                    _uiState.value.selectedTerm
+                } else {
                     terms.firstOrNull() ?: "2026/27/1"
                 }
                 recalculateState(cleanedGrades, terms, currentTerm)

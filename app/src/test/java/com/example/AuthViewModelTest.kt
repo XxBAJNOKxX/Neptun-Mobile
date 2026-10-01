@@ -1,0 +1,159 @@
+package com.example
+
+import com.example.domain.model.University
+import com.example.presentation.viewmodel.AuthViewModel
+import com.example.test.FakeAuthRepository
+import com.example.test.FakeNeptunRepository
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Rule
+import org.junit.Test
+import org.junit.rules.TestWatcher
+import org.junit.runner.Description
+
+@OptIn(ExperimentalCoroutinesApi::class)
+class MainDispatcherRule(
+    val testDispatcher: TestDispatcher = StandardTestDispatcher()
+) : TestWatcher() {
+    override fun starting(description: Description) {
+        Dispatchers.setMain(testDispatcher)
+    }
+    override fun finished(description: Description) {
+        Dispatchers.resetMain()
+    }
+}
+
+@OptIn(ExperimentalCoroutinesApi::class)
+class AuthViewModelTest {
+
+    @get:Rule
+    val mainDispatcherRule = MainDispatcherRule()
+
+    private lateinit var authRepository: FakeAuthRepository
+    private lateinit var neptunRepository: FakeNeptunRepository
+    private lateinit var viewModel: AuthViewModel
+
+    @Before
+    fun setUp() {
+        authRepository = FakeAuthRepository()
+        neptunRepository = FakeNeptunRepository()
+        viewModel = AuthViewModel(authRepository, neptunRepository)
+    }
+
+    @Test
+    fun `initial data load sets universities and matched saved university`() = runTest {
+        mainDispatcherRule.testDispatcher.scheduler.advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(3, state.universities.size)
+        assertEquals("bme", state.selectedUniversity?.id)
+        assertEquals("TEST01", state.neptunCode)
+        assertTrue(state.isOfflineModeAvailable)
+    }
+
+    @Test
+    fun `search query filters universities list`() = runTest {
+        mainDispatcherRule.testDispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.onSearchQueryChange("Eötvös")
+        val state = viewModel.uiState.value
+        assertEquals("Eötvös", state.searchQuery)
+        assertEquals(1, state.filteredUniversities.size)
+        assertEquals("elte", state.filteredUniversities.first().id)
+
+        // Clear filter
+        viewModel.onSearchQueryChange("")
+        assertEquals(3, viewModel.uiState.value.filteredUniversities.size)
+    }
+
+    @Test
+    fun `selecting university updates selectedUniversity and saves it`() = runTest {
+        mainDispatcherRule.testDispatcher.scheduler.advanceUntilIdle()
+
+        val corvinus = University("corvinus", "Budapesti Corvinus Egyetem", "Corvinus", "Budapest", "https://neptun.uni-corvinus.hu")
+        viewModel.onSelectUniversity(corvinus)
+
+        val state = viewModel.uiState.value
+        assertEquals("corvinus", state.selectedUniversity?.id)
+        assertEquals("corvinus", authRepository.storedUniId)
+    }
+
+    @Test
+    fun `input credentials changes neptunCode and password`() = runTest {
+        mainDispatcherRule.testDispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.onNeptunCodeChange("TEST99")
+        viewModel.onPasswordChange("secretPass123")
+
+        val state = viewModel.uiState.value
+        assertEquals("TEST99", state.neptunCode)
+        assertEquals("secretPass123", state.password)
+    }
+
+    @Test
+    fun `quickDemoFill populates demo credentials`() = runTest {
+        viewModel.quickDemoFill()
+
+        val state = viewModel.uiState.value
+        assertEquals("DEMO01", state.neptunCode)
+        assertEquals("demo", state.password)
+    }
+
+    @Test
+    fun `successful login updates credentials state`() = runTest {
+        mainDispatcherRule.testDispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.onNeptunCodeChange("USER01")
+        viewModel.onPasswordChange("Pass123")
+        viewModel.login()
+
+        mainDispatcherRule.testDispatcher.scheduler.advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertNotNull(state.credentials)
+        assertEquals("USER01", state.credentials?.neptunCode)
+        assertTrue(state.credentials?.isLoggedIn == true)
+        assertFalse(state.isLoading)
+        assertNull(state.errorMessage)
+    }
+
+    @Test
+    fun `logout clears active credentials`() = runTest {
+        mainDispatcherRule.testDispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.onNeptunCodeChange("USER01")
+        viewModel.onPasswordChange("Pass123")
+        viewModel.login()
+        mainDispatcherRule.testDispatcher.scheduler.advanceUntilIdle()
+        assertNotNull(viewModel.uiState.value.credentials)
+
+        viewModel.logout()
+        mainDispatcherRule.testDispatcher.scheduler.advanceUntilIdle()
+        assertNull(viewModel.uiState.value.credentials)
+    }
+
+    @Test
+    fun `continueOffline enters offline mode with stored credentials`() = runTest {
+        mainDispatcherRule.testDispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.continueOffline()
+        mainDispatcherRule.testDispatcher.scheduler.advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertNotNull(state.credentials)
+        assertEquals("OFFLINE01", state.credentials?.neptunCode)
+    }
+}
