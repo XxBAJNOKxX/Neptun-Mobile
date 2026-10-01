@@ -27,6 +27,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -41,6 +42,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.NeptunApp
 import com.example.core.crash.CrashReporter
+import com.example.core.di.AppContainer
 import com.example.core.export.IcsExporter
 import com.example.core.security.DataMode
 import com.example.presentation.navigation.NavigationItem
@@ -55,6 +57,7 @@ import com.example.presentation.ui.screens.MessagesScreen
 import com.example.presentation.ui.screens.SettingsScreen
 import com.example.presentation.ui.screens.TimetableScreen
 import com.example.presentation.viewmodel.AppUpdateViewModel
+import com.example.presentation.viewmodel.AuthUiState
 import com.example.presentation.viewmodel.AuthViewModel
 import com.example.presentation.viewmodel.DashboardViewModel
 import com.example.presentation.viewmodel.FinancesViewModel
@@ -63,6 +66,7 @@ import com.example.presentation.viewmodel.MessagesViewModel
 import com.example.presentation.viewmodel.SettingsViewModel
 import com.example.presentation.viewmodel.TimetableViewModel
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -200,58 +204,11 @@ private fun MainDashboard(
     val context = LocalContext.current
     val strings = com.example.core.i18n.currentStrings()
     val appContainer = app.appContainer
-    val coroutineScope = rememberCoroutineScope()
     val authState by authViewModel.uiState.collectAsStateWithLifecycle()
 
-    val timetableViewModel: TimetableViewModel = viewModel(
-        factory = TimetableViewModel.provideFactory(
-            neptunRepository = appContainer.neptunRepository,
-            alarmScheduler = appContainer.alarmScheduler,
-            prefsManager = appContainer.prefsManager
-        )
-    )
-
-    val gradesViewModel: GradesViewModel = viewModel(
-        factory = GradesViewModel.provideFactory(
-            neptunRepository = appContainer.neptunRepository,
-            calculateAveragesUseCase = appContainer.calculateAveragesUseCase,
-            prefsManager = appContainer.prefsManager
-        )
-    )
-
-    val messagesViewModel: MessagesViewModel = viewModel(
-        factory = MessagesViewModel.provideFactory(
-            neptunRepository = appContainer.neptunRepository
-        )
-    )
-
-    val financesViewModel: FinancesViewModel = viewModel(
-        factory = FinancesViewModel.provideFactory(
-            neptunRepository = appContainer.neptunRepository
-        )
-    )
-
-    val dashboardViewModel: DashboardViewModel = viewModel(
-        factory = DashboardViewModel.provideFactory(
-            neptunRepository = appContainer.neptunRepository,
-            calculateAveragesUseCase = appContainer.calculateAveragesUseCase
-        )
-    )
-
-    val settingsViewModel: SettingsViewModel = viewModel(
-        factory = SettingsViewModel.provideFactory(
-            prefsManager = appContainer.prefsManager,
-            authRepository = appContainer.authRepository,
-            neptunRepository = appContainer.neptunRepository
-        )
-    )
-
-    val timetableState by timetableViewModel.uiState.collectAsStateWithLifecycle()
-    val gradesState by gradesViewModel.uiState.collectAsStateWithLifecycle()
-    val messagesState by messagesViewModel.uiState.collectAsStateWithLifecycle()
-    val financesState by financesViewModel.uiState.collectAsStateWithLifecycle()
-    val dashboardState by dashboardViewModel.uiState.collectAsStateWithLifecycle()
-    val settingsState by settingsViewModel.uiState.collectAsStateWithLifecycle()
+    val unreadMessageCount by remember(appContainer.neptunRepository) {
+        appContainer.neptunRepository.getMessages().map { msgs -> msgs.count { !it.isRead } }
+    }.collectAsStateWithLifecycle(initialValue = 0)
 
     val dataMode by appContainer.prefsManager.dataModeFlow.collectAsStateWithLifecycle()
     val sessionExpired by appContainer.prefsManager.sessionExpiredFlow.collectAsStateWithLifecycle()
@@ -270,6 +227,9 @@ private fun MainDashboard(
     var currentDestination by rememberSaveable {
         mutableStateOf(startDestination)
     }
+
+    var gradesInitialTab by rememberSaveable { mutableIntStateOf(0) }
+    var timetableInitialTab by rememberSaveable { mutableIntStateOf(0) }
 
     // Ha a jelenlegi oldalt épp elrejtették, váltsunk a kezdőképernyőre
     LaunchedEffect(visibleItems) {
@@ -353,7 +313,7 @@ private fun MainDashboard(
                 NeptunBottomBar(
                     currentDestination = currentDestination,
                     items = visibleItems,
-                    unreadMessageCount = messagesState.unreadCount,
+                    unreadMessageCount = unreadMessageCount,
                     onNavigate = { item ->
                         if (item in visibleItems) {
                             currentDestination = item
@@ -363,150 +323,295 @@ private fun MainDashboard(
             }
         }
     ) { innerPadding ->
-            androidx.compose.foundation.layout.Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-            ) {
-                Crossfade(
-                    targetState = currentDestination,
-                    label = "navigation_crossfade"
-                ) { destination ->
-                    when (destination) {
-                        NavigationItem.HOME -> DashboardScreen(
-                            uiState = dashboardState,
-                            studentName = authState.credentials?.studentName ?: strings.studentDefaultName,
-                            universityName = authState.credentials?.universityName ?: "",
-                            trainingProgram = authState.credentials?.trainingProgram ?: "",
-                            isDemoData = authState.credentials?.neptunCode.equals("DEMO01", ignoreCase = true) || (authState.credentials == null && dataMode != DataMode.REAL),
-                            onNavigate = { item ->
-                                if (item in visibleItems) {
-                                    currentDestination = item
-                                }
-                            },
-                            onOpenExams = {
-                                gradesViewModel.selectTab(1)
-                                if (NavigationItem.GRADES in visibleItems) {
-                                    currentDestination = NavigationItem.GRADES
-                                }
-                            },
-                            onOpenProgress = {
-                                gradesViewModel.selectTab(2)
-                                if (NavigationItem.GRADES in visibleItems) {
-                                    currentDestination = NavigationItem.GRADES
-                                }
-                            },
-                            onOpenPeriods = {
-                                timetableViewModel.selectTab(1)
-                                if (NavigationItem.TIMETABLE in visibleItems) {
-                                    currentDestination = NavigationItem.TIMETABLE
-                                }
-                            },
-                            onRefresh = dashboardViewModel::refresh
-                        )
-
-                        NavigationItem.TIMETABLE -> TimetableScreen(
-                            uiState = timetableState,
-                            onDaySelect = timetableViewModel::selectDay,
-                            onPreviousWeek = timetableViewModel::previousWeek,
-                            onNextWeek = timetableViewModel::nextWeek,
-                            onCurrentWeek = timetableViewModel::currentWeek,
-                            onToggleWeekView = timetableViewModel::toggleWeekView,
-                            onRefresh = timetableViewModel::refreshCalendar,
-                            onScheduleReminder = timetableViewModel::scheduleClassReminder,
-                            onTabSelect = timetableViewModel::selectTab,
-                            onPeriodFilterChange = timetableViewModel::setPeriodFilter,
-                            onRefreshPeriods = timetableViewModel::refreshAcademicPeriods
-                        )
-
-                        NavigationItem.GRADES -> GradesScreen(
-                            uiState = gradesState,
-                            onSelectTerm = gradesViewModel::selectTerm,
-                            onOpenGhostDialog = gradesViewModel::openGhostMarkDialog,
-                            onCloseGhostDialog = gradesViewModel::closeGhostMarkDialog,
-                            onSetGhostGrade = gradesViewModel::setGhostGrade,
-                            onResetAllGhostGrades = gradesViewModel::resetAllGhostGrades,
-                            onTabSelect = gradesViewModel::selectTab,
-                            onExamFilterChange = gradesViewModel::setExamFilter,
-                            onRefresh = gradesViewModel::refreshGrades,
-                            onRefreshExams = gradesViewModel::refreshExams,
-                            onRefreshProgress = gradesViewModel::refreshDegreeProgress
-                        )
-
-                        NavigationItem.MESSAGES -> MessagesScreen(
-                            uiState = messagesState,
-                            onToggleUnreadFilter = messagesViewModel::toggleUnreadFilter,
-                            onSearchQueryChange = messagesViewModel::onSearchQueryChange,
-                            onOpenMessage = messagesViewModel::openMessage,
-                            onCloseMessage = messagesViewModel::closeMessage,
-                            onReloadMessage = messagesViewModel::reloadSelectedMessageContent,
-                            onRefresh = messagesViewModel::refreshMessages
-                        )
-
-                        NavigationItem.FINANCES -> FinancesScreen(
-                            uiState = financesState,
-                            onFilterSelect = financesViewModel::setFilter,
-                            onRefresh = financesViewModel::refreshFinances
-                        )
-
-                        NavigationItem.SETTINGS -> SettingsScreen(
-                            credentials = authState.credentials,
-                            themeSettings = settingsState.themeSettings,
-                            notificationPreferences = settingsState.notificationPreferences,
-                            personalization = settingsState.personalization,
-                            isSyncing = settingsState.isSyncing,
-                            syncSuccessMessage = settingsState.syncSuccessMessage,
-                            updateCheckState = settingsState.updateCheckState,
-                            updateChannel = settingsState.updateChannel,
-                            isClearingCache = settingsState.isClearingCache,
-                            cacheClearedMessage = settingsState.cacheClearedMessage,
-                            currentLanguage = settingsState.currentLanguage,
-                            supportedLanguages = settingsState.supportedLanguages,
-                            isChangingLanguage = settingsState.isChangingLanguage,
-                            languageMessage = settingsState.languageMessage,
-                            onLanguageSelect = settingsViewModel::selectLanguage,
-                            onThemeModeChange = settingsViewModel::setThemeMode,
-                            onDynamicColorToggle = settingsViewModel::setDynamicColor,
-                            onAccentColorSelect = settingsViewModel::setAccentColor,
-                            onNotifyClassesChange = settingsViewModel::setNotifyClasses,
-                            onNotifyGradesChange = settingsViewModel::setNotifyGrades,
-                            onNotifyMessagesChange = settingsViewModel::setNotifyMessages,
-                            onNotifyFinancesChange = settingsViewModel::setNotifyFinances,
-                            onQuietHoursEnabledChange = settingsViewModel::setQuietHoursEnabled,
-                            onQuietHoursWindowChange = settingsViewModel::setQuietHoursWindow,
-                            onStartScreenChange = settingsViewModel::setStartScreen,
-                            onShowWeekendChange = settingsViewModel::setShowWeekend,
-                            onHiddenPagesChange = settingsViewModel::setHiddenPages,
-                            onTargetCreditsChange = settingsViewModel::setTargetCredits,
-                            onBiometricLockChange = settingsViewModel::setBiometricLockEnabled,
-                            onUpdateChannelChange = settingsViewModel::setUpdateChannel,
-                            onExportIcs = {
-                                coroutineScope.launch {
-                                    exportTimetableAsIcs(app)
-                                }
-                            },
-                            onClearCache = {
-                                settingsViewModel.clearCachedData()
-                                com.example.core.update.AppUpdateManager.clearUpdateCache(context)
-                            },
-                            onSimulateClassNotification = { settingsViewModel.simulateClassNotification(context) },
-                            onSimulateMessageNotification = { settingsViewModel.simulateMessageNotification(context) },
-                            onSimulateGradeNotification = { settingsViewModel.simulateGradeNotification(context) },
-                            onSimulateFinanceNotification = { settingsViewModel.simulateFinanceNotification(context) },
-                            onCheckForUpdates = {
-                                settingsViewModel.checkForUpdates()
-                                appUpdateViewModel.checkForUpdatesOnLaunch()
-                            },
-                            onLogoutClick = { authViewModel.logout(clearLocalData = true) },
-                            onManualSync = {
-                                settingsViewModel.triggerManualSync()
+        androidx.compose.foundation.layout.Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+        ) {
+            Crossfade(
+                targetState = currentDestination,
+                label = "navigation_crossfade"
+            ) { destination ->
+                when (destination) {
+                    NavigationItem.HOME -> HomeTabRoute(
+                        appContainer = appContainer,
+                        authState = authState,
+                        dataMode = dataMode,
+                        strings = strings,
+                        onNavigate = { item ->
+                            if (item in visibleItems) {
+                                currentDestination = item
                             }
-                        )
-                    }
+                        },
+                        onOpenExams = {
+                            gradesInitialTab = 1
+                            if (NavigationItem.GRADES in visibleItems) {
+                                currentDestination = NavigationItem.GRADES
+                            }
+                        },
+                        onOpenProgress = {
+                            gradesInitialTab = 2
+                            if (NavigationItem.GRADES in visibleItems) {
+                                currentDestination = NavigationItem.GRADES
+                            }
+                        },
+                        onOpenPeriods = {
+                            timetableInitialTab = 1
+                            if (NavigationItem.TIMETABLE in visibleItems) {
+                                currentDestination = NavigationItem.TIMETABLE
+                            }
+                        }
+                    )
+
+                    NavigationItem.TIMETABLE -> TimetableTabRoute(
+                        appContainer = appContainer,
+                        initialTab = timetableInitialTab,
+                        onResetInitialTab = { timetableInitialTab = 0 }
+                    )
+
+                    NavigationItem.GRADES -> GradesTabRoute(
+                        appContainer = appContainer,
+                        initialTab = gradesInitialTab,
+                        onResetInitialTab = { gradesInitialTab = 0 }
+                    )
+
+                    NavigationItem.MESSAGES -> MessagesTabRoute(
+                        appContainer = appContainer
+                    )
+
+                    NavigationItem.FINANCES -> FinancesTabRoute(
+                        appContainer = appContainer
+                    )
+
+                    NavigationItem.SETTINGS -> SettingsTabRoute(
+                        app = app,
+                        authViewModel = authViewModel,
+                        appUpdateViewModel = appUpdateViewModel,
+                        authState = authState
+                    )
                 }
             }
         }
     }
+}
+
+@Composable
+private fun HomeTabRoute(
+    appContainer: AppContainer,
+    authState: AuthUiState,
+    dataMode: DataMode,
+    strings: com.example.core.i18n.AppStrings,
+    onNavigate: (NavigationItem) -> Unit,
+    onOpenExams: () -> Unit,
+    onOpenProgress: () -> Unit,
+    onOpenPeriods: () -> Unit
+) {
+    val dashboardViewModel: DashboardViewModel = viewModel(
+        factory = DashboardViewModel.provideFactory(
+            neptunRepository = appContainer.neptunRepository,
+            calculateAveragesUseCase = appContainer.calculateAveragesUseCase
+        )
+    )
+    val dashboardState by dashboardViewModel.uiState.collectAsStateWithLifecycle()
+
+    DashboardScreen(
+        uiState = dashboardState,
+        studentName = authState.credentials?.studentName ?: strings.studentDefaultName,
+        universityName = authState.credentials?.universityName ?: "",
+        trainingProgram = authState.credentials?.trainingProgram ?: "",
+        isDemoData = authState.credentials?.neptunCode.equals("DEMO01", ignoreCase = true) || (authState.credentials == null && dataMode != DataMode.REAL),
+        onNavigate = onNavigate,
+        onOpenExams = onOpenExams,
+        onOpenProgress = onOpenProgress,
+        onOpenPeriods = onOpenPeriods,
+        onRefresh = dashboardViewModel::refresh
+    )
+}
+
+@Composable
+private fun TimetableTabRoute(
+    appContainer: AppContainer,
+    initialTab: Int,
+    onResetInitialTab: () -> Unit
+) {
+    val timetableViewModel: TimetableViewModel = viewModel(
+        factory = TimetableViewModel.provideFactory(
+            neptunRepository = appContainer.neptunRepository,
+            alarmScheduler = appContainer.alarmScheduler,
+            prefsManager = appContainer.prefsManager
+        )
+    )
+    LaunchedEffect(initialTab) {
+        if (initialTab != 0) {
+            timetableViewModel.selectTab(initialTab)
+            onResetInitialTab()
+        }
+    }
+    val timetableState by timetableViewModel.uiState.collectAsStateWithLifecycle()
+
+    TimetableScreen(
+        uiState = timetableState,
+        onDaySelect = timetableViewModel::selectDay,
+        onPreviousWeek = timetableViewModel::previousWeek,
+        onNextWeek = timetableViewModel::nextWeek,
+        onCurrentWeek = timetableViewModel::currentWeek,
+        onToggleWeekView = timetableViewModel::toggleWeekView,
+        onRefresh = timetableViewModel::refreshCalendar,
+        onScheduleReminder = timetableViewModel::scheduleClassReminder,
+        onTabSelect = timetableViewModel::selectTab,
+        onPeriodFilterChange = timetableViewModel::setPeriodFilter,
+        onRefreshPeriods = timetableViewModel::refreshAcademicPeriods
+    )
+}
+
+@Composable
+private fun GradesTabRoute(
+    appContainer: AppContainer,
+    initialTab: Int,
+    onResetInitialTab: () -> Unit
+) {
+    val gradesViewModel: GradesViewModel = viewModel(
+        factory = GradesViewModel.provideFactory(
+            neptunRepository = appContainer.neptunRepository,
+            calculateAveragesUseCase = appContainer.calculateAveragesUseCase,
+            prefsManager = appContainer.prefsManager
+        )
+    )
+    LaunchedEffect(initialTab) {
+        if (initialTab != 0) {
+            gradesViewModel.selectTab(initialTab)
+            onResetInitialTab()
+        }
+    }
+    val gradesState by gradesViewModel.uiState.collectAsStateWithLifecycle()
+
+    GradesScreen(
+        uiState = gradesState,
+        onSelectTerm = gradesViewModel::selectTerm,
+        onOpenGhostDialog = gradesViewModel::openGhostMarkDialog,
+        onCloseGhostDialog = gradesViewModel::closeGhostMarkDialog,
+        onSetGhostGrade = gradesViewModel::setGhostGrade,
+        onResetAllGhostGrades = gradesViewModel::resetAllGhostGrades,
+        onTabSelect = gradesViewModel::selectTab,
+        onExamFilterChange = gradesViewModel::setExamFilter,
+        onRefresh = gradesViewModel::refreshGrades,
+        onRefreshExams = gradesViewModel::refreshExams,
+        onRefreshProgress = gradesViewModel::refreshDegreeProgress
+    )
+}
+
+@Composable
+private fun MessagesTabRoute(
+    appContainer: AppContainer
+) {
+    val messagesViewModel: MessagesViewModel = viewModel(
+        factory = MessagesViewModel.provideFactory(
+            neptunRepository = appContainer.neptunRepository
+        )
+    )
+    val messagesState by messagesViewModel.uiState.collectAsStateWithLifecycle()
+
+    MessagesScreen(
+        uiState = messagesState,
+        onToggleUnreadFilter = messagesViewModel::toggleUnreadFilter,
+        onSearchQueryChange = messagesViewModel::onSearchQueryChange,
+        onOpenMessage = messagesViewModel::openMessage,
+        onCloseMessage = messagesViewModel::closeMessage,
+        onReloadMessage = messagesViewModel::reloadSelectedMessageContent,
+        onRefresh = messagesViewModel::refreshMessages
+    )
+}
+
+@Composable
+private fun FinancesTabRoute(
+    appContainer: AppContainer
+) {
+    val financesViewModel: FinancesViewModel = viewModel(
+        factory = FinancesViewModel.provideFactory(
+            neptunRepository = appContainer.neptunRepository
+        )
+    )
+    val financesState by financesViewModel.uiState.collectAsStateWithLifecycle()
+
+    FinancesScreen(
+        uiState = financesState,
+        onFilterSelect = financesViewModel::setFilter,
+        onRefresh = financesViewModel::refreshFinances
+    )
+}
+
+@Composable
+private fun SettingsTabRoute(
+    app: NeptunApp,
+    authViewModel: AuthViewModel,
+    appUpdateViewModel: AppUpdateViewModel,
+    authState: AuthUiState
+) {
+    val context = LocalContext.current
+    val appContainer = app.appContainer
+    val coroutineScope = rememberCoroutineScope()
+
+    val settingsViewModel: SettingsViewModel = viewModel(
+        factory = SettingsViewModel.provideFactory(
+            prefsManager = appContainer.prefsManager,
+            authRepository = appContainer.authRepository,
+            neptunRepository = appContainer.neptunRepository
+        )
+    )
+    val settingsState by settingsViewModel.uiState.collectAsStateWithLifecycle()
+
+    SettingsScreen(
+        credentials = authState.credentials,
+        themeSettings = settingsState.themeSettings,
+        notificationPreferences = settingsState.notificationPreferences,
+        personalization = settingsState.personalization,
+        isSyncing = settingsState.isSyncing,
+        syncSuccessMessage = settingsState.syncSuccessMessage,
+        updateCheckState = settingsState.updateCheckState,
+        updateChannel = settingsState.updateChannel,
+        isClearingCache = settingsState.isClearingCache,
+        cacheClearedMessage = settingsState.cacheClearedMessage,
+        currentLanguage = settingsState.currentLanguage,
+        supportedLanguages = settingsState.supportedLanguages,
+        isChangingLanguage = settingsState.isChangingLanguage,
+        languageMessage = settingsState.languageMessage,
+        onLanguageSelect = settingsViewModel::selectLanguage,
+        onThemeModeChange = settingsViewModel::setThemeMode,
+        onDynamicColorToggle = settingsViewModel::setDynamicColor,
+        onAccentColorSelect = settingsViewModel::setAccentColor,
+        onNotifyClassesChange = settingsViewModel::setNotifyClasses,
+        onNotifyGradesChange = settingsViewModel::setNotifyGrades,
+        onNotifyMessagesChange = settingsViewModel::setNotifyMessages,
+        onNotifyFinancesChange = settingsViewModel::setNotifyFinances,
+        onQuietHoursEnabledChange = settingsViewModel::setQuietHoursEnabled,
+        onQuietHoursWindowChange = settingsViewModel::setQuietHoursWindow,
+        onStartScreenChange = settingsViewModel::setStartScreen,
+        onShowWeekendChange = settingsViewModel::setShowWeekend,
+        onHiddenPagesChange = settingsViewModel::setHiddenPages,
+        onTargetCreditsChange = settingsViewModel::setTargetCredits,
+        onBiometricLockChange = settingsViewModel::setBiometricLockEnabled,
+        onUpdateChannelChange = settingsViewModel::setUpdateChannel,
+        onExportIcs = {
+            coroutineScope.launch {
+                exportTimetableAsIcs(app)
+            }
+        },
+        onClearCache = {
+            settingsViewModel.clearCachedData()
+            com.example.core.update.AppUpdateManager.clearUpdateCache(context)
+        },
+        onSimulateClassNotification = { settingsViewModel.simulateClassNotification(context) },
+        onSimulateMessageNotification = { settingsViewModel.simulateMessageNotification(context) },
+        onSimulateGradeNotification = { settingsViewModel.simulateGradeNotification(context) },
+        onSimulateFinanceNotification = { settingsViewModel.simulateFinanceNotification(context) },
+        onCheckForUpdates = {
+            settingsViewModel.checkForUpdates()
+            appUpdateViewModel.checkForUpdatesOnLaunch()
+        },
+        onLogoutClick = { authViewModel.logout(clearLocalData = true) },
+        onManualSync = settingsViewModel::triggerManualSync
+    )
+}
 
 /** Az órarend exportálása .ics fájlba és megosztási szándék indítása. */
 private suspend fun exportTimetableAsIcs(app: NeptunApp) {
