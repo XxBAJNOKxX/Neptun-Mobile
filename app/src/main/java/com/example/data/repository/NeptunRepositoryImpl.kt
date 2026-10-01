@@ -201,10 +201,7 @@ class NeptunRepositoryImpl(
             val existing = database.messagesDao().getAllMessages().first()
             if (existing.any { it.id in mockIds }) {
                 val realOnly = existing.filterNot { it.id in mockIds }
-                database.messagesDao().clearAll()
-                if (realOnly.isNotEmpty()) {
-                    database.messagesDao().insertMessages(realOnly)
-                }
+                database.messagesDao().replaceMessages(realOnly)
             }
         } catch (_: Exception) {
         }
@@ -366,8 +363,7 @@ class NeptunRepositoryImpl(
             val eventsToInsert = MockNeptunDataSource.getMockCalendarEvents()
             prefsManager.setDataMode(DataMode.DEMO)
             prefsManager.clearSessionExpired()
-            database.calendarDao().clearAll()
-            database.calendarDao().insertEvents(eventsToInsert.map { CalendarEventEntity.fromDomain(it) })
+            database.calendarDao().replaceEvents(eventsToInsert.map { CalendarEventEntity.fromDomain(it) })
             _calendarEventsFlow.value = eventsToInsert
             prefsManager.saveCalendarEvents(eventsToInsert)
             return@withContext Result.success(Unit)
@@ -430,8 +426,7 @@ class NeptunRepositoryImpl(
             prefsManager.setDataMode(DataMode.REAL)
             if (eventsToInsert.isNotEmpty()) {
                 prefsManager.clearSessionExpired()
-                database.calendarDao().clearAll()
-                database.calendarDao().insertEvents(eventsToInsert.map { CalendarEventEntity.fromDomain(it) })
+                database.calendarDao().replaceEvents(eventsToInsert.map { CalendarEventEntity.fromDomain(it) })
                 _calendarEventsFlow.value = eventsToInsert
                 prefsManager.saveCalendarEvents(eventsToInsert)
                 return@withContext Result.success(Unit)
@@ -452,8 +447,7 @@ class NeptunRepositoryImpl(
             val gradesToInsert = MockNeptunDataSource.getMockGrades()
             prefsManager.setDataMode(DataMode.DEMO)
             prefsManager.clearSessionExpired()
-            database.gradesDao().clearAll()
-            database.gradesDao().insertGrades(gradesToInsert.map { SubjectGradeEntity.fromDomain(it) })
+            database.gradesDao().replaceGrades(gradesToInsert.map { SubjectGradeEntity.fromDomain(it) })
             return@withContext Result.success(Unit)
         }
 
@@ -511,8 +505,13 @@ class NeptunRepositoryImpl(
             prefsManager.setDataMode(DataMode.REAL)
             if (gradesToInsert.isNotEmpty()) {
                 prefsManager.clearSessionExpired()
-                database.gradesDao().clearAll()
-                database.gradesDao().insertGrades(gradesToInsert.map { SubjectGradeEntity.fromDomain(it) })
+                val existingGrades = database.gradesDao().getAllGrades().first()
+                val ghostMap = existingGrades.mapNotNull { if (it.ghostGrade != null) it.id to it.ghostGrade else null }.toMap()
+                val entitiesToSave = gradesToInsert.map { grade ->
+                    val ghost = ghostMap[grade.id]
+                    SubjectGradeEntity.fromDomain(if (ghost != null) grade.copy(ghostGrade = ghost) else grade)
+                }
+                database.gradesDao().replaceGrades(entitiesToSave)
                 return@withContext Result.success(Unit)
             } else {
                 Log.w("NeptunRepo", "Üres jegylista érkezett a szervertől, meglévő adatok megőrzése.")
@@ -531,8 +530,7 @@ class NeptunRepositoryImpl(
             val messagesToInsert = MockNeptunDataSource.getMockMessages()
             prefsManager.setDataMode(DataMode.DEMO)
             prefsManager.clearSessionExpired()
-            database.messagesDao().clearAll()
-            database.messagesDao().insertMessages(messagesToInsert.map { NeptunMessageEntity.fromDomain(it) })
+            database.messagesDao().replaceMessages(messagesToInsert.map { NeptunMessageEntity.fromDomain(it) })
             return@withContext Result.success(Unit)
         }
 
@@ -614,9 +612,8 @@ class NeptunRepositoryImpl(
             }
             if (entitiesToSave.isNotEmpty()) {
                 prefsManager.clearSessionExpired()
-                database.messagesDao().clearAll()
                 prefsManager.setDataMode(DataMode.REAL)
-                database.messagesDao().insertMessages(entitiesToSave)
+                database.messagesDao().replaceMessages(entitiesToSave)
                 if (existingEntities.isEmpty() || !prefsManager.isBaselineDone("messages")) {
                     val tracker = com.example.core.notification.NotifiedItemsTracker(prefsManager)
                     tracker.recordKnownItems(
@@ -645,8 +642,7 @@ class NeptunRepositoryImpl(
             val financesToInsert = MockNeptunDataSource.getMockFinances()
             prefsManager.setDataMode(DataMode.DEMO)
             prefsManager.clearSessionExpired()
-            database.financesDao().clearAll()
-            database.financesDao().insertFinances(financesToInsert.map { FinanceItemEntity.fromDomain(it) })
+            database.financesDao().replaceFinances(financesToInsert.map { FinanceItemEntity.fromDomain(it) })
             return@withContext Result.success(Unit)
         }
 
@@ -704,8 +700,7 @@ class NeptunRepositoryImpl(
             prefsManager.setDataMode(DataMode.REAL)
             if (financesToInsert.isNotEmpty()) {
                 prefsManager.clearSessionExpired()
-                database.financesDao().clearAll()
-                database.financesDao().insertFinances(financesToInsert.map { FinanceItemEntity.fromDomain(it) })
+                database.financesDao().replaceFinances(financesToInsert.map { FinanceItemEntity.fromDomain(it) })
                 return@withContext Result.success(Unit)
             } else {
                 Log.w("NeptunRepo", "Üres pénzügyi lista érkezett a szervertől, meglévő adatok megőrzése.")
@@ -724,8 +719,7 @@ class NeptunRepositoryImpl(
             val examsToInsert = MockNeptunDataSource.getMockExams()
             prefsManager.setDataMode(DataMode.DEMO)
             prefsManager.clearSessionExpired()
-            database.examsDao().clearAll()
-            database.examsDao().insertExams(examsToInsert.map { ExamItemEntity.fromDomain(it) })
+            database.examsDao().replaceExams(examsToInsert.map { ExamItemEntity.fromDomain(it) })
             return@withContext Result.success(Unit)
         }
 
@@ -783,8 +777,7 @@ class NeptunRepositoryImpl(
             prefsManager.setDataMode(DataMode.REAL)
             if (examsToInsert.isNotEmpty()) {
                 prefsManager.clearSessionExpired()
-                database.examsDao().clearAll()
-                database.examsDao().insertExams(examsToInsert.map { ExamItemEntity.fromDomain(it) })
+                database.examsDao().replaceExams(examsToInsert.map { ExamItemEntity.fromDomain(it) })
                 return@withContext Result.success(Unit)
             } else {
                 Log.w("NeptunRepo", "Üres vizsgalista érkezett a szervertől, meglévő adatok megőrzése.")

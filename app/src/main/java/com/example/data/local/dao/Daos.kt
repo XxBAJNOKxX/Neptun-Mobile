@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import com.example.data.local.entity.CalendarEventEntity
 import com.example.data.local.entity.ExamItemEntity
 import com.example.data.local.entity.FinanceItemEntity
@@ -21,6 +22,14 @@ interface CalendarDao {
 
     @Query("DELETE FROM calendar_events")
     suspend fun clearAll()
+
+    @Transaction
+    suspend fun replaceEvents(events: List<CalendarEventEntity>) {
+        clearAll()
+        if (events.isNotEmpty()) {
+            insertEvents(events)
+        }
+    }
 }
 
 @Dao
@@ -39,6 +48,14 @@ interface GradesDao {
 
     @Query("DELETE FROM subject_grades")
     suspend fun clearAll()
+
+    @Transaction
+    suspend fun replaceGrades(grades: List<SubjectGradeEntity>) {
+        clearAll()
+        if (grades.isNotEmpty()) {
+            insertGrades(grades)
+        }
+    }
 }
 
 @Dao
@@ -57,6 +74,14 @@ interface MessagesDao {
 
     @Query("DELETE FROM neptun_messages")
     suspend fun clearAll()
+
+    @Transaction
+    suspend fun replaceMessages(messages: List<NeptunMessageEntity>) {
+        clearAll()
+        if (messages.isNotEmpty()) {
+            insertMessages(messages)
+        }
+    }
 }
 
 @Dao
@@ -69,6 +94,14 @@ interface FinancesDao {
 
     @Query("DELETE FROM finance_items")
     suspend fun clearAll()
+
+    @Transaction
+    suspend fun replaceFinances(items: List<FinanceItemEntity>) {
+        clearAll()
+        if (items.isNotEmpty()) {
+            insertFinances(items)
+        }
+    }
 }
 
 @Dao
@@ -81,4 +114,12 @@ interface ExamsDao {
 
     @Query("DELETE FROM exam_items")
     suspend fun clearAll()
+
+    @Transaction
+    suspend fun replaceExams(items: List<ExamItemEntity>) {
+        clearAll()
+        if (items.isNotEmpty()) {
+            insertExams(items)
+        }
+    }
 }
