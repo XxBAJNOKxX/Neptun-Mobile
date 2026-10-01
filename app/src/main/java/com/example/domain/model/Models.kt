@@ -1,7 +1,9 @@
 package com.example.domain.model
 
+import androidx.compose.runtime.Immutable
 import kotlinx.serialization.Serializable
 
+@Immutable
 @Serializable
 data class University(
     val id: String,
@@ -11,6 +13,7 @@ data class University(
     val neptunUrl: String
 )
 
+@Immutable
 @Serializable
 data class NeptunLanguage(
     val code: String,
@@ -60,6 +63,7 @@ data class NeptunLanguage(
     }
 }
 
+@Immutable
 data class StudentCredentials(
     val neptunCode: String,
     val universityId: String,
@@ -90,6 +94,7 @@ enum class CourseType(val displayName: String) {
     }
 }
 
+@Immutable
 @Serializable
 data class CalendarEvent(
     val id: String,
@@ -129,6 +134,7 @@ data class CalendarEvent(
         get() = !isHolidayOrBreak && !(startHour == 0 && startMinute == 0 && endHour == 0 && endMinute == 0)
 }
 
+@Immutable
 data class SubjectGrade(
     val id: String,
     val termId: String, // e.g. "2025/26/1"
@@ -148,6 +154,7 @@ data class SubjectGrade(
         get() = (effectiveGrade ?: 0) >= 2
 }
 
+@Immutable
 data class GradeCalculation(
     val termId: String,
     val totalCreditsEnrolled: Int,
@@ -159,6 +166,7 @@ data class GradeCalculation(
     val ghostCount: Int
 )
 
+@Immutable
 data class NeptunMessage(
     val id: String,
     val subject: String,
@@ -176,6 +184,7 @@ enum class FinanceStatus(val displayName: String) {
     OVERDUE("Késedelmes")
 }
 
+@Immutable
 data class Neptun2FASession(
     val neptunCode: String,
     val key: String,
@@ -195,6 +204,7 @@ enum class TwoFactorMethod(val displayName: String) {
 }
 
 /** Vizsgaelem a Neptun vizsgalista oldaláról. */
+@Immutable
 data class ExamItem(
     val id: String,
     val subjectName: String,
@@ -225,6 +235,7 @@ data class ExamItem(
         }
 }
 
+@Immutable
 @kotlinx.serialization.Serializable
 data class CurriculumTemplateItem(
     val id: String,
@@ -238,6 +249,7 @@ data class CurriculumTemplateItem(
     val isCompleted: Boolean = false
 )
 
+@Immutable
 @kotlinx.serialization.Serializable
 data class DegreeProgress(
     val completedCredits: Int = 0,
@@ -267,6 +279,7 @@ data class DegreeProgress(
         get() = (progressFraction * 100).toInt()
 }
 
+@Immutable
 @kotlinx.serialization.Serializable
 data class AcademicPeriod(
     val id: String,
@@ -350,6 +363,7 @@ data class AcademicPeriod(
     }
 }
 
+@Immutable
 data class FinanceItem(
     val id: String,
     val title: String,
