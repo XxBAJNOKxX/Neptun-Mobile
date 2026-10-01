@@ -1,15 +1,15 @@
 package com.example.presentation.navigation
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Grading
+import androidx.compose.material.icons.automirrored.outlined.Grading
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.Grading
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Mail
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.CalendarMonth
-import androidx.compose.material.icons.outlined.Grading
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Mail
 import androidx.compose.material.icons.outlined.Person
@@ -32,8 +32,8 @@ enum class NavigationItem(
     ),
     GRADES(
         title = "Jegyek",
-        selectedIcon = Icons.Filled.Grading,
-        unselectedIcon = Icons.Outlined.Grading
+        selectedIcon = Icons.AutoMirrored.Filled.Grading,
+        unselectedIcon = Icons.AutoMirrored.Outlined.Grading
     ),
     MESSAGES(
         title = "Üzenetek",

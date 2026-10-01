@@ -19,11 +19,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.Grading
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Event
-import androidx.compose.material.icons.filled.Grading
 import androidx.compose.material.icons.filled.Mail
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Schedule
@@ -190,7 +190,7 @@ fun DashboardScreen(
                         modifier = Modifier.weight(1f)
                     )
                     QuickStatCard(
-                        icon = Icons.Default.Grading,
+                        icon = Icons.AutoMirrored.Filled.Grading,
                         label = if (strings.languageCode == "hu") "Legutóbbi\njegy" else if (strings.languageCode == "de") "Letzte\nNote" else "Latest\nGrade",
                         value = uiState.latestGrades.firstOrNull()?.grade?.toString() ?: "–",
                         tint = NeptunGreen,
