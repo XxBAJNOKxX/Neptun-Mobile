@@ -25,7 +25,7 @@ import com.example.data.local.entity.SubjectGradeEntity
         FinanceItemEntity::class,
         ExamItemEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class NeptunDatabase : RoomDatabase() {
@@ -47,6 +47,19 @@ abstract class NeptunDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_calendar_events_dayOfWeek_startHour_startMinute ON calendar_events (dayOfWeek, startHour, startMinute)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_calendar_events_dateString ON calendar_events (dateString)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_subject_grades_termId ON subject_grades (termId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_subject_grades_subjectCode ON subject_grades (subjectCode)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_neptun_messages_sendDate ON neptun_messages (sendDate)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_neptun_messages_isRead ON neptun_messages (isRead)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_exam_items_examDate_startTime ON exam_items (examDate, startTime)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_finance_items_dueDate ON finance_items (dueDate)")
+            }
+        }
+
         fun getInstance(context: Context): NeptunDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -54,10 +67,8 @@ abstract class NeptunDatabase : RoomDatabase() {
                     NeptunDatabase::class.java,
                     "neptun_mobile.db"
                 )
-                    .addMigrations(MIGRATION_2_3)
-                    // A szerveradatok gyorsítótárból újratölthetők, így a sémaváltásnál
-                    // a destruktív migráció elfogadható (a helyi jegy- szellemjegyek elveszhetnek).
-                    .fallbackToDestructiveMigration()
+                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4)
+                    .fallbackToDestructiveMigrationOnDowngrade(true)
                     .build()
                 INSTANCE = instance
                 instance

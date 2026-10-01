@@ -1,6 +1,7 @@
 package com.example.data.local.entity
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.example.domain.model.CalendarEvent
 import com.example.domain.model.CourseType
@@ -10,7 +11,13 @@ import com.example.domain.model.FinanceStatus
 import com.example.domain.model.NeptunMessage
 import com.example.domain.model.SubjectGrade
 
-@Entity(tableName = "calendar_events")
+@Entity(
+    tableName = "calendar_events",
+    indices = [
+        Index(value = ["dayOfWeek", "startHour", "startMinute"], name = "index_calendar_events_dayOfWeek_startHour_startMinute"),
+        Index(value = ["dateString"], name = "index_calendar_events_dateString")
+    ]
+)
 data class CalendarEventEntity(
     @PrimaryKey val id: String,
     val subjectName: String,
@@ -67,7 +74,13 @@ data class CalendarEventEntity(
     }
 }
 
-@Entity(tableName = "subject_grades")
+@Entity(
+    tableName = "subject_grades",
+    indices = [
+        Index(value = ["termId"], name = "index_subject_grades_termId"),
+        Index(value = ["subjectCode"], name = "index_subject_grades_subjectCode")
+    ]
+)
 data class SubjectGradeEntity(
     @PrimaryKey val id: String,
     val termId: String,
@@ -120,7 +133,13 @@ data class SubjectGradeEntity(
     }
 }
 
-@Entity(tableName = "neptun_messages")
+@Entity(
+    tableName = "neptun_messages",
+    indices = [
+        Index(value = ["sendDate"], name = "index_neptun_messages_sendDate"),
+        Index(value = ["isRead"], name = "index_neptun_messages_isRead")
+    ]
+)
 data class NeptunMessageEntity(
     @PrimaryKey val id: String,
     val subject: String,
@@ -156,7 +175,12 @@ data class NeptunMessageEntity(
     }
 }
 
-@Entity(tableName = "exam_items")
+@Entity(
+    tableName = "exam_items",
+    indices = [
+        Index(value = ["examDate", "startTime"], name = "index_exam_items_examDate_startTime")
+    ]
+)
 data class ExamItemEntity(
     @PrimaryKey val id: String,
     val subjectName: String,
@@ -204,7 +228,12 @@ data class ExamItemEntity(
     }
 }
 
-@Entity(tableName = "finance_items")
+@Entity(
+    tableName = "finance_items",
+    indices = [
+        Index(value = ["dueDate"], name = "index_finance_items_dueDate")
+    ]
+)
 data class FinanceItemEntity(
     @PrimaryKey val id: String,
     val title: String,
