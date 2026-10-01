@@ -497,7 +497,7 @@ fun LoginScreen(
                     HorizontalDivider()
 
                     LazyColumn(modifier = Modifier.fillMaxWidth()) {
-                        items(uiState.filteredUniversities) { uni ->
+                        items(uiState.filteredUniversities, key = { it.id }) { uni ->
                             val isSelected = uiState.selectedUniversity?.id == uni.id
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
@@ -581,7 +581,7 @@ fun LoginScreen(
                     HorizontalDivider()
 
                     LazyColumn(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
-                        items(uiState.supportedLanguages) { lang ->
+                        items(uiState.supportedLanguages, key = { it.code }) { lang ->
                             val isSelected = lang.lcid == uiState.currentLanguage.lcid || lang.code.equals(uiState.currentLanguage.code, ignoreCase = true)
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,

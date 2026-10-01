@@ -190,7 +190,7 @@ fun FinancesScreen(
                     }
                 }
             } else {
-                items(uiState.filteredFinances) { item ->
+                items(uiState.filteredFinances, key = { it.id }) { item ->
                     FinanceItemCard(
                         item = item,
                         formattedAmount = "${numberFormat.format(item.amountHuf)} Ft"

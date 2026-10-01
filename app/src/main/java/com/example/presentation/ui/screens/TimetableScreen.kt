@@ -422,7 +422,7 @@ fun TimetableScreen(
                             EmptyDayNotice(message = strings.noClassesThisDay)
                         }
                     } else {
-                        items(dayEvents) { event ->
+                        items(dayEvents, key = { it.id }) { event ->
                             TimetableEventCard(
                                 event = event,
                                 isOngoing = event.id == uiState.ongoingEvent?.id,
@@ -464,7 +464,7 @@ fun TimetableScreen(
                             .padding(horizontal = 16.dp, vertical = 8.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        items(eventsForDay) { event ->
+                        items(eventsForDay, key = { it.id }) { event ->
                             TimetableEventCard(
                                 event = event,
                                 isOngoing = event.id == uiState.ongoingEvent?.id,

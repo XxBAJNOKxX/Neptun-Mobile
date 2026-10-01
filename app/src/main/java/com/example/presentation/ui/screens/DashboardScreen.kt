@@ -275,7 +275,7 @@ fun DashboardScreen(
                     }
                 }
             } else {
-                items(uiState.todayClasses) { event ->
+                items(uiState.todayClasses, key = { it.id }) { event ->
                     DashboardClassRow(event = event)
                 }
             }

@@ -293,7 +293,7 @@ fun GradesScreen(
             }
 
             // Subject Cards
-            items(uiState.termGrades) { subject ->
+            items(uiState.termGrades, key = { it.id }) { subject ->
                 SubjectGradeCard(
                     subject = subject,
                     onOpenGhostDialog = { onOpenGhostDialog(subject) }
@@ -1020,7 +1020,7 @@ private fun ExamsTabContent(
                     }
                 }
             } else {
-                items(filteredExams) { exam ->
+                items(filteredExams, key = { it.id }) { exam ->
                     ExamCard(exam = exam)
                 }
             }
@@ -1410,7 +1410,7 @@ private fun DegreeProgressTabContent(
                         )
                     }
 
-                    items(progress.templates) { template ->
+                    items(progress.templates, key = { it.id }) { template ->
                         CurriculumTemplateCard(template = template)
                     }
                 }

@@ -200,7 +200,7 @@ fun MessagesScreen(
                     ) {
                         item { Spacer(modifier = Modifier.height(4.dp)) }
 
-                        items(uiState.filteredMessages) { msg ->
+                        items(uiState.filteredMessages, key = { it.id }) { msg ->
                             MessageCard(
                                 message = msg,
                                 onClick = { onOpenMessage(msg) }
