@@ -42,6 +42,7 @@ import com.example.core.security.BiometricLockHelper
 @Composable
 fun BiometricLockScreen(
     onUnlock: () -> Unit,
+    onLogout: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -134,19 +135,17 @@ fun BiometricLockScreen(
                             onSuccess = onUnlock,
                             onError = { message = it }
                         )
-                    } else {
-                        onUnlock()
                     }
                 },
-                enabled = biometricAvailable != null
+                enabled = activity != null && biometricAvailable == true
             ) {
                 Text(strings.biometricUnlockBtn)
             }
 
-            if (biometricAvailable == false) {
+            if (onLogout != null) {
                 Spacer(modifier = Modifier.height(8.dp))
-                TextButton(onClick = onUnlock) {
-                    Text(strings.updateDialogLater)
+                TextButton(onClick = onLogout) {
+                    Text(strings.logout)
                 }
             }
         }

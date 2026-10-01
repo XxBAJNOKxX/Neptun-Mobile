@@ -177,7 +177,10 @@ fun MainAppContent() {
         var lockUnlocked by rememberSaveable { mutableStateOf(false) }
 
         if (personalization.biometricLockEnabled && !lockUnlocked) {
-            BiometricLockScreen(onUnlock = { lockUnlocked = true })
+            BiometricLockScreen(
+                onUnlock = { lockUnlocked = true },
+                onLogout = { authViewModel.logout() }
+            )
         } else {
             MainDashboard(
                 app = app,

@@ -6,15 +6,18 @@ import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 
 /**
- * Biometrikus (ujjlenyomat / arcfelismerés) zár kezelése.
+ * Biometrikus (ujjlenyomat / arcfelismerés) és eszköz-hitelesítés (PIN / minta / jelszó) zár kezelése.
  */
 object BiometricLockHelper {
 
-    /** Elérhető-e bármilyen gyenge biometrikus hitelesítés az eszközön. */
+    private const val AUTHENTICATORS_WITH_CREDENTIAL =
+        BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL
+
+    /** Elérhető-e biometrikus vagy eszköz-hitelesítés (PIN / minta / jelszó) az eszközön. */
     fun canAuthenticate(activity: FragmentActivity): Boolean {
         val manager = BiometricManager.from(activity)
-        return manager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_WEAK) ==
-            BiometricManager.BIOMETRIC_SUCCESS
+        return manager.canAuthenticate(AUTHENTICATORS_WITH_CREDENTIAL) == BiometricManager.BIOMETRIC_SUCCESS ||
+            manager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_WEAK) == BiometricManager.BIOMETRIC_SUCCESS
     }
 
     fun showPrompt(
@@ -24,6 +27,11 @@ object BiometricLockHelper {
         onSuccess: () -> Unit,
         onError: (String) -> Unit
     ) {
+        val manager = BiometricManager.from(activity)
+        val supportsDeviceCredential = manager.canAuthenticate(
+            AUTHENTICATORS_WITH_CREDENTIAL
+        ) == BiometricManager.BIOMETRIC_SUCCESS
+
         val executor = ContextCompat.getMainExecutor(activity)
         val prompt = BiometricPrompt(
             activity,
@@ -38,12 +46,18 @@ object BiometricLockHelper {
                 }
             }
         )
-        val info = BiometricPrompt.PromptInfo.Builder()
+
+        val builder = BiometricPrompt.PromptInfo.Builder()
             .setTitle(title)
             .setSubtitle(subtitle)
-            .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_WEAK)
-            .setNegativeButtonText("Mégse")
-            .build()
-        prompt.authenticate(info)
+
+        if (supportsDeviceCredential) {
+            builder.setAllowedAuthenticators(AUTHENTICATORS_WITH_CREDENTIAL)
+        } else {
+            builder.setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_WEAK)
+                .setNegativeButtonText("Mégse")
+        }
+
+        prompt.authenticate(builder.build())
     }
 }
