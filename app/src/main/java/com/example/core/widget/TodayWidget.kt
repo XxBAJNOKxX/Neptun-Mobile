@@ -22,6 +22,8 @@ import androidx.glance.layout.Column
 import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
 import androidx.glance.layout.fillMaxSize
+import androidx.compose.ui.graphics.Color
+import androidx.glance.color.ColorProvider
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.height
 import androidx.glance.layout.padding
@@ -29,12 +31,13 @@ import androidx.glance.layout.width
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
-import androidx.glance.unit.ColorProvider
 import com.example.MainActivity
-import com.example.R
+import com.example.core.security.EncryptedPreferencesManager
 import com.example.data.local.NeptunDatabase
 import com.example.domain.model.CalendarEvent
 import com.example.domain.usecase.GetTodayClassesUseCase
+import com.example.ui.theme.AppAccentColor
+import com.example.ui.theme.ThemeSettings
 import kotlinx.coroutines.flow.first
 
 /**
@@ -54,8 +57,14 @@ class TodayWidget : GlanceAppWidget() {
         val classes = loadTodayClasses(context)
         val openAppIntent = Intent(context, MainActivity::class.java)
         val strings = com.example.core.i18n.AppStringsProvider.getForContext(context)
+        val themeSettings = try {
+            EncryptedPreferencesManager(context).loadThemeSettings()
+        } catch (e: Exception) {
+            ThemeSettings()
+        }
+        val accent = themeSettings.accentColor
         provideContent {
-            TodayWidgetContent(strings, classes, openAppIntent)
+            TodayWidgetContent(strings, classes, openAppIntent, accent)
         }
     }
 
@@ -80,12 +89,38 @@ class TodayWidgetReceiver : GlanceAppWidgetReceiver() {
 private fun TodayWidgetContent(
     strings: com.example.core.i18n.AppStrings,
     classes: List<CalendarEvent>,
-    openAppIntent: Intent
+    openAppIntent: Intent,
+    accent: AppAccentColor = AppAccentColor.BLUE
 ) {
+    val widgetBackground = ColorProvider(
+        day = Color(0xFFFFFFFF),
+        night = Color(0xFF151E2E)
+    )
+    val widgetOnBackground = ColorProvider(
+        day = Color(0xFF0F172A),
+        night = Color(0xFFE2E8F0)
+    )
+    val widgetAccent = ColorProvider(
+        day = accent.lightColorScheme.primary,
+        night = accent.darkColorScheme.primary
+    )
+    val widgetMuted = ColorProvider(
+        day = Color(0xFF64748B),
+        night = Color(0xFF94A3B8)
+    )
+    val widgetChipBg = ColorProvider(
+        day = accent.lightColorScheme.primaryContainer,
+        night = accent.darkColorScheme.primaryContainer
+    )
+    val widgetChipFg = ColorProvider(
+        day = accent.lightColorScheme.onPrimaryContainer,
+        night = accent.darkColorScheme.onPrimaryContainer
+    )
+
     Column(
         modifier = GlanceModifier
             .fillMaxSize()
-            .background(ColorProvider(R.color.widget_background))
+            .background(widgetBackground)
             .cornerRadius(20.dp)
             .clickable(actionStartActivity(openAppIntent))
             .padding(12.dp)
@@ -98,7 +133,7 @@ private fun TodayWidgetContent(
             Text(
                 "Neptun",
                 style = TextStyle(
-                    color = ColorProvider(R.color.widget_accent),
+                    color = widgetAccent,
                     fontWeight = FontWeight.Bold,
                     fontSize = 13.sp
                 )
@@ -107,7 +142,7 @@ private fun TodayWidgetContent(
             Text(
                 "· ${strings.widgetTodayClasses}",
                 style = TextStyle(
-                    color = ColorProvider(R.color.widget_muted),
+                    color = widgetMuted,
                     fontSize = 13.sp
                 )
             )
@@ -119,7 +154,7 @@ private fun TodayWidgetContent(
             Text(
                 strings.widgetNoMoreClasses,
                 style = TextStyle(
-                    color = ColorProvider(R.color.widget_on_background),
+                    color = widgetOnBackground,
                     fontSize = 13.sp
                 )
             )
@@ -133,14 +168,14 @@ private fun TodayWidgetContent(
                     // Idő "chip" – az app kártyáinak stílusa
                     Box(
                         modifier = GlanceModifier
-                            .background(ColorProvider(R.color.widget_chip_bg))
+                            .background(widgetChipBg)
                             .cornerRadius(8.dp)
                             .padding(horizontal = 6.dp, vertical = 3.dp)
                     ) {
                         Text(
                             "%02d:%02d".format(event.startHour, event.startMinute),
                             style = TextStyle(
-                                color = ColorProvider(R.color.widget_chip_fg),
+                                color = widgetChipFg,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 11.sp
                             )
@@ -151,7 +186,7 @@ private fun TodayWidgetContent(
                         Text(
                             event.subjectName,
                             style = TextStyle(
-                                color = ColorProvider(R.color.widget_on_background),
+                                color = widgetOnBackground,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 12.sp
                             ),
@@ -161,7 +196,7 @@ private fun TodayWidgetContent(
                             listOf(event.courseType.getLocalizedName(strings), event.room.takeIf { it.isNotBlank() } ?: "-")
                                 .joinToString(" · "),
                             style = TextStyle(
-                                color = ColorProvider(R.color.widget_muted),
+                                color = widgetMuted,
                                 fontSize = 10.sp
                             ),
                             maxLines = 1
@@ -174,7 +209,7 @@ private fun TodayWidgetContent(
                 Text(
                     strings.widgetMoreClassesCount(actual.size - 3),
                     style = TextStyle(
-                        color = ColorProvider(R.color.widget_muted),
+                        color = widgetMuted,
                         fontSize = 10.sp
                     )
                 )
