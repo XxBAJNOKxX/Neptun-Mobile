@@ -133,6 +133,7 @@ class AuthRepositoryImpl(
                 prefsManager.setAccessToken(authResult.accessToken)
                 authResult.refreshToken?.let { prefsManager.setRefreshToken(it) }
                 authResult.deviceCookie?.let { prefsManager.setDeviceCookie(trimmedCode, it) }
+                authResult.sessionCookie?.let { prefsManager.setSessionCookie(it) }
                 authResult.studentTrainingId?.let { prefsManager.setStudentTrainingId(it) }
                 prefsManager.setIsModernApi(authResult.isModernApi)
                 prefsManager.setBaseUrl(authResult.normalizedBaseUrl)
@@ -195,6 +196,7 @@ class AuthRepositoryImpl(
                 prefsManager.setAccessToken(authResult.accessToken)
                 authResult.refreshToken?.let { prefsManager.setRefreshToken(it) }
                 authResult.deviceCookie?.let { prefsManager.setDeviceCookie(session.neptunCode, it) }
+                authResult.sessionCookie?.let { prefsManager.setSessionCookie(it) }
                 authResult.studentTrainingId?.let { prefsManager.setStudentTrainingId(it) }
                 prefsManager.setIsModernApi(authResult.isModernApi)
                 prefsManager.setBaseUrl(authResult.normalizedBaseUrl)

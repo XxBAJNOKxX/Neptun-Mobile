@@ -249,17 +249,26 @@ class NeptunRepositoryImpl(
                 }
             }
 
-            // 2. 1. szintű megújítás (GetNewTokens a meglévő vagy refresh tokennel)
+            // 2. 1. szintű megújítás (GetNewTokens a meglévő vagy refresh tokennel, sessionCookie-val és deviceCookie-val)
             val tokenToRefresh = prefsManager.getRefreshToken().takeIf { it.isNotBlank() } ?: freshToken
-            if (freshModern && tokenToRefresh.isNotBlank()) {
+            val sessionCookie = prefsManager.getSessionCookie()
+            if (freshModern && (tokenToRefresh.isNotBlank() || sessionCookie.isNotBlank())) {
                 try {
-                    val refreshed = neptunApiClient.refreshAccessToken(freshBaseUrl, tokenToRefresh)
-                    if (refreshed != null && refreshed.first.isNotBlank()) {
-                        prefsManager.setAccessToken(refreshed.first)
-                        refreshed.second?.let { prefsManager.setRefreshToken(it) }
+                    val refreshed = neptunApiClient.refreshAccessToken(
+                        baseUrl = freshBaseUrl,
+                        tokenOrRefreshToken = tokenToRefresh.ifBlank { freshToken },
+                        sessionCookie = sessionCookie,
+                        deviceCookie = freshDeviceCookie,
+                        username = creds.neptunCode
+                    )
+                    if (refreshed != null && refreshed.accessToken.isNotBlank()) {
+                        prefsManager.setAccessToken(refreshed.accessToken)
+                        refreshed.refreshToken?.let { prefsManager.setRefreshToken(it) }
+                        refreshed.sessionCookie?.let { prefsManager.setSessionCookie(it) }
+                        refreshed.deviceCookie?.let { prefsManager.setDeviceCookie(creds.neptunCode, it) }
                         prefsManager.clearSessionExpired()
                         Log.d("NeptunRepo", "Token megújítva GetNewTokens végponttal")
-                        return@withLock refreshed.first
+                        return@withLock refreshed.accessToken
                     }
                 } catch (e: Exception) {
                     Log.w("NeptunRepo", "GetNewTokens sikertelen: ${e.message}")
@@ -281,6 +290,7 @@ class NeptunRepositoryImpl(
                             prefsManager.setBaseUrl(renewResult.normalizedBaseUrl)
                             prefsManager.setIsModernApi(renewResult.isModernApi)
                             renewResult.refreshToken?.let { prefsManager.setRefreshToken(it) }
+                            renewResult.sessionCookie?.let { prefsManager.setSessionCookie(it) }
                             renewResult.deviceCookie?.let { prefsManager.setDeviceCookie(creds.neptunCode, it) }
                             renewResult.studentTrainingId?.let { prefsManager.setStudentTrainingId(it) }
                             prefsManager.clearSessionExpired()
@@ -308,6 +318,7 @@ class NeptunRepositoryImpl(
                             prefsManager.setBaseUrl(authRes.normalizedBaseUrl)
                             prefsManager.setIsModernApi(authRes.isModernApi)
                             authRes.refreshToken?.let { prefsManager.setRefreshToken(it) }
+                            authRes.sessionCookie?.let { prefsManager.setSessionCookie(it) }
                             authRes.deviceCookie?.let { prefsManager.setDeviceCookie(creds.neptunCode, it) }
                             authRes.studentTrainingId?.let { prefsManager.setStudentTrainingId(it) }
                             prefsManager.clearSessionExpired()
