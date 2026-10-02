@@ -117,16 +117,16 @@ jobs:
       - name: Grant Execute Permission for Gradlew
         run: chmod +x gradlew
 
-      - name: Restore Keystore for Consistent Signing
+      - name: Ensure Fixed Debug Keystore for Consistent Signing
         run: |
           mkdir -p ~/.android
           if [ -n "${{ secrets.DEBUG_KEYSTORE_BASE64 }}" ]; then
             echo "${{ secrets.DEBUG_KEYSTORE_BASE64 }}" | base64 -d > debug.keystore
+          fi
+          if [ -f debug.keystore ]; then
             cp debug.keystore app/debug.keystore
             cp debug.keystore ~/.android/debug.keystore
-            echo "Successfully restored consistent debug.keystore to root, app/, and ~/.android/"
-          else
-            echo "DEBUG_KEYSTORE_BASE64 secret not set; using default keystore"
+            echo "Successfully restored fixed debug.keystore to root, app/, and ~/.android/"
           fi
 
       - name: Determine App Version & Generate Release Notes
@@ -196,10 +196,9 @@ jobs:
           ${CLEAN_CHANGES}
 
           ---
-          ### 📥 Telepítési Útmutató:
-          1. Töltsd le a **\`neptun-mobile-${VERSION_NAME}.apk\`** fájlt az alábbi csatolmányok közül.
-          2. Nyisd meg a letöltött fájlt a telefonodon a telepítéshez.
-          3. *(Szükség esetén engedélyezd a böngésződnek az ismeretlen forrásból származó alkalmazások telepítését).*
+          ### 📥 Letölthető Telepítőfájlok (APK):
+          * **Release változat:** \`NeptunMobile-${VERSION_NAME}-release.apk\` *(hivatalos éles változat)*
+          * **Debug változat:** \`NeptunMobile-${VERSION_NAME}-debug.apk\` *(teszteléshez és mintaadatokhoz)*
 
           💡 *Verzió kód: \`${VERSION_CODE}\` | Csatorna: \`${CHANNEL_NAME}\`*
           EOF
@@ -226,10 +225,15 @@ jobs:
       - name: Prepare Release Artifacts
         run: |
           mkdir -p release-artifacts
-          cp app/build/outputs/apk/debug/app-debug.apk release-artifacts/neptun-mobile-${{ steps.versioning.outputs.VERSION_NAME }}.apk
-          cp app/build/outputs/apk/debug/app-debug.apk release-artifacts/app-debug.apk
+          if [ -f app/build/outputs/apk/debug/app-debug.apk ]; then
+            cp app/build/outputs/apk/debug/app-debug.apk release-artifacts/NeptunMobile-${{ steps.versioning.outputs.VERSION_NAME }}-debug.apk
+            cp app/build/outputs/apk/debug/app-debug.apk release-artifacts/neptun-mobile-${{ steps.versioning.outputs.VERSION_NAME }}-debug.apk
+            cp app/build/outputs/apk/debug/app-debug.apk release-artifacts/app-debug.apk
+          fi
           if [ -f app/build/outputs/apk/release/app-release.apk ]; then
+            cp app/build/outputs/apk/release/app-release.apk release-artifacts/NeptunMobile-${{ steps.versioning.outputs.VERSION_NAME }}-release.apk
             cp app/build/outputs/apk/release/app-release.apk release-artifacts/neptun-mobile-${{ steps.versioning.outputs.VERSION_NAME }}-release.apk
+            cp app/build/outputs/apk/release/app-release.apk release-artifacts/app-release.apk
           fi
 
       - name: Upload APK Artifacts
@@ -248,9 +252,7 @@ jobs:
           name: ${{ steps.versioning.outputs.RELEASE_TITLE }}
           body_path: /tmp/release_notes.md
           files: |
-            release-artifacts/neptun-mobile-${{ steps.versioning.outputs.VERSION_NAME }}.apk
-            release-artifacts/app-debug.apk
-            release-artifacts/neptun-mobile-${{ steps.versioning.outputs.VERSION_NAME }}-release.apk
+            release-artifacts/*.apk
           draft: false
           prerelease: ${{ steps.versioning.outputs.IS_PRERELEASE == 'true' }}
         env:

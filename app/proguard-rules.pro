@@ -43,3 +43,10 @@
 # --- Domain modellek (konstruktor reflexió különböző könyvtárakból) ---
 -keep class com.example.domain.model.** { *; }
 -keep class com.example.data.local.entity.** { *; }
+
+# --- Strip debug and verbose logs in release ---
+-assumenosideeffects class android.util.Log {
+    public static boolean isLoggable(java.lang.String, int);
+    public static int v(...);
+    public static int d(...);
+}

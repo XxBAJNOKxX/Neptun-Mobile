@@ -1,5 +1,4 @@
 <resources>
-    <string name="app_name">Neptun Mobile</string>
     <string name="nav_dashboard">Kezdőlap</string>
     <string name="nav_timetable">Órarend</string>
     <string name="nav_grades">Jegyek</string>

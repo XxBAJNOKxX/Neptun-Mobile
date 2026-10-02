@@ -1,5 +1,4 @@
 <resources>
-    <string name="app_name">Neptun Mobile</string>
     <string name="nav_dashboard">Dashboard</string>
     <string name="nav_timetable">Timetable</string>
     <string name="nav_grades">Grades</string>

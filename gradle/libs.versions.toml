@@ -45,6 +45,7 @@ workRuntime = "2.10.1"
 kotlinxSerializationJson = "1.7.3"
 glanceAppwidget = "1.1.1"
 biometric = "1.1.0"
+leakcanary = "2.14"
 
 
 [libraries]
@@ -107,6 +108,7 @@ kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-
 retrofit-converter-kotlinx-serialization = { group = "com.squareup.retrofit2", name = "converter-kotlinx-serialization", version.ref = "retrofit" }
 androidx-glance-appwidget = { group = "androidx.glance", name = "glance-appwidget", version.ref = "glanceAppwidget" }
 androidx-biometric = { group = "androidx.biometric", name = "biometric", version.ref = "biometric" }
+leakcanary-android = { group = "com.squareup.leakcanary", name = "leakcanary-android", version.ref = "leakcanary" }
 
 
 [plugins]

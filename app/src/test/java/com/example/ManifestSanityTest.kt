@@ -60,4 +60,22 @@ class ManifestSanityTest {
         )
         assertTrue("A ClassAlarmReceiver nem exportálható kifelé!", !info.exported)
     }
+
+    @Test
+    fun `file provider is registered with dynamic authority`() {
+        val providers = context.packageManager.getPackageInfo(
+            context.packageName,
+            PackageManager.GET_PROVIDERS
+        ).providers ?: emptyArray()
+
+        val fileProvider = providers.firstOrNull { it.name == "androidx.core.content.FileProvider" }
+        assertNotNull("A FileProvider-nek regisztrálva kell lennie a Manifestben!", fileProvider)
+        assertEquals(
+            "A FileProvider authority-nek a futásidejű csomagnévhez kell illeszkednie!",
+            "${context.packageName}.fileprovider",
+            fileProvider?.authority
+        )
+        assertTrue("A FileProvider nem lehet exportált!", !fileProvider!!.exported)
+        assertTrue("A FileProvider-nek engedélyeznie kell az átadott URI jogosultságokat!", fileProvider.grantUriPermissions)
+    }
 }

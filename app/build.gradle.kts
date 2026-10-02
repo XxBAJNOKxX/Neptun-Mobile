@@ -73,10 +73,16 @@ android {
       isCrunchPngs = false
       isMinifyEnabled = true
       isShrinkResources = true
+      isDebuggable = false
+      resValue("string", "app_name", "Neptun Mobile")
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
       signingConfig = signingConfigs.getByName("release")
     }
-    debug { signingConfig = signingConfigs.getByName("debug") }
+    debug {
+      applicationIdSuffix = ".debug"
+      resValue("string", "app_name", "NeptunMobile Debug")
+      signingConfig = signingConfigs.getByName("debug")
+    }
   }
   compileOptions {
     sourceCompatibility = JavaVersion.VERSION_11
@@ -85,6 +91,7 @@ android {
   buildFeatures {
     compose = true
     buildConfig = true
+    resValues = true
   }
   lint {
     // KSP2 + AGP lint analízis ismert összeomlása (eszközhiba, nem kódhiba):
@@ -170,5 +177,27 @@ dependencies {
   androidTestImplementation(libs.androidx.runner)
   debugImplementation(libs.androidx.compose.ui.test.manifest)
   debugImplementation(libs.androidx.compose.ui.tooling)
+  debugImplementation(libs.leakcanary.android)
   "ksp"(libs.androidx.room.compiler)
+}
+
+val releaseDirProvider = layout.projectDirectory.dir("src/release")
+tasks.register("verifyReleaseCleanness") {
+  description = "Verifies that release source set and stubs do not contain any demo data or debug tools"
+  group = "verification"
+  val targetDir = releaseDirProvider.asFile
+  doLast {
+    val forbiddenPatterns = listOf("BMEVIIIM01", "Demó Hallgató", "demo-token", "IB025", "cal_1")
+    if (targetDir.exists()) {
+      targetDir.walkTopDown().filter { it.isFile && it.extension == "kt" }.forEach { file ->
+        val text = file.readText()
+        forbiddenPatterns.forEach { pattern ->
+          if (text.contains(pattern, ignoreCase = true)) {
+            throw GradleException("Release tisztasági hiba: '$pattern' tiltott demó adat található a ${file.name} fájlban!")
+          }
+        }
+      }
+    }
+    println("Release tisztaság ellenőrizve: semmilyen demó adat nem található a release forráskészletben.")
+  }
 }
