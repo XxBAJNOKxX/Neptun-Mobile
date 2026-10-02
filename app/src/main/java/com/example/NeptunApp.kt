@@ -14,6 +14,7 @@ class NeptunApp : Application() {
     override fun onCreate() {
         super.onCreate()
         CrashReporter.install(this)
+        com.example.core.debug.DebugFeatures.init(this)
         appContainer = DefaultAppContainer(this)
         NotificationHelper.createNotificationChannels(this)
         try {

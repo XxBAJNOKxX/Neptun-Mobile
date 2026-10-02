@@ -1622,6 +1622,8 @@ fun SettingsScreen(
                 }
             }
 
+            com.example.core.debug.DebugFeatures.DevMenuSection(modifier = Modifier.padding(top = 16.dp))
+
             // Sync and Logout Actions Card
             Card(
                 shape = RoundedCornerShape(20.dp),
