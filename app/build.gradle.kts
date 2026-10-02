@@ -180,3 +180,24 @@ dependencies {
   debugImplementation(libs.leakcanary.android)
   "ksp"(libs.androidx.room.compiler)
 }
+
+val releaseDirProvider = layout.projectDirectory.dir("src/release")
+tasks.register("verifyReleaseCleanness") {
+  description = "Verifies that release source set and stubs do not contain any demo data or debug tools"
+  group = "verification"
+  val targetDir = releaseDirProvider.asFile
+  doLast {
+    val forbiddenPatterns = listOf("BMEVIIIM01", "Demó Hallgató", "demo-token", "IB025", "cal_1")
+    if (targetDir.exists()) {
+      targetDir.walkTopDown().filter { it.isFile && it.extension == "kt" }.forEach { file ->
+        val text = file.readText()
+        forbiddenPatterns.forEach { pattern ->
+          if (text.contains(pattern, ignoreCase = true)) {
+            throw GradleException("Release tisztasági hiba: '$pattern' tiltott demó adat található a ${file.name} fájlban!")
+          }
+        }
+      }
+    }
+    println("Release tisztaság ellenőrizve: semmilyen demó adat nem található a release forráskészletben.")
+  }
+}
