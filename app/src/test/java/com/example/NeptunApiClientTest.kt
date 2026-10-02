@@ -428,6 +428,86 @@ class NeptunApiClientTest {
     }
 
     @Test
+    fun testExtractSessionCookieAndDeviceCookie() {
+        val headers = listOf(
+            "devicecookie-VEVTVDAx=dummyDeviceCookieValue123; path=/; secure; HttpOnly; SameSite=None",
+            "12345678-1234-1234-1234-123456789abc=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.dummy.sig; path=/; secure; HttpOnly; SameSite=None",
+            ".AspNetCore.Session=mockSession; path=/; HttpOnly"
+        )
+        val sessionCookie = client.extractSessionCookie(headers)
+        assertNotNull(sessionCookie)
+        assertEquals("12345678-1234-1234-1234-123456789abc=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.dummy.sig", sessionCookie)
+
+        val deviceCookie = client.extractDeviceCookie(headers)
+        assertNotNull(deviceCookie)
+        assertEquals("dummyDeviceCookieValue123", deviceCookie)
+
+        val refreshToken = client.extractRefreshToken(sessionCookie!!)
+        assertEquals("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.dummy.sig", refreshToken)
+    }
+
+    @Test
+    fun testExtractOuterLoginUrlVariants() {
+        val base = "https://neptun.elte.hu"
+
+        // 1. Full outerlogin URL
+        val html1 = """<a href="https://hallgato1.neptun.elte.hu/hallgato/outerlogin.aspx?GUID=11111111-2222-3333-4444-555555555555">Belépés</a>"""
+        val res1 = client.extractOuterLoginUrl(html1, base)
+        assertEquals("https://hallgato1.neptun.elte.hu/hallgato/outerlogin.aspx?GUID=11111111-2222-3333-4444-555555555555", res1)
+
+        // 2. Relative outerlogin path
+        val html2 = """<a href="/hallgato/outerlogin.aspx?GUID=22222222-3333-4444-5555-666666666666">Belépés</a>"""
+        val res2 = client.extractOuterLoginUrl(html2, base)
+        assertEquals("https://hallgato1.neptun.elte.hu/hallgato/outerlogin.aspx?GUID=22222222-3333-4444-5555-666666666666", res2)
+
+        // 3. window.location redirect
+        val html3 = """<script>window.location.replace('/hallgato/login.aspx?GUID=33333333-4444-5555-6666-777777777777');</script>"""
+        val res3 = client.extractOuterLoginUrl(html3, base)
+        assertEquals("https://hallgato1.neptun.elte.hu/hallgato/login.aspx?GUID=33333333-4444-5555-6666-777777777777", res3)
+
+        // 4. Raw GUID embedded in HTML
+        val html4 = """<input type="hidden" name="NeptunGuid" value="GUID=44444444-5555-6666-7777-888888888888" />"""
+        val res4 = client.extractOuterLoginUrl(html4, base)
+        assertEquals("https://hallgato1.neptun.elte.hu/hallgato/login.aspx?GUID=44444444-5555-6666-7777-888888888888", res4)
+
+        // 5. Meta refresh
+        val html5 = """<meta http-equiv="refresh" content="0; url=/hallgato/outerlogin.aspx?GUID=55555555-6666-7777-8888-999999999999">"""
+        val res5 = client.extractOuterLoginUrl(html5, base)
+        assertEquals("https://hallgato1.neptun.elte.hu/hallgato/outerlogin.aspx?GUID=55555555-6666-7777-8888-999999999999", res5)
+    }
+
+    @Test
+    fun testParseFormActionAndResolveUrl() {
+        val formHtml = """
+            <form id="FormToNeptun" action="/ToNeptunWeb/ToNeptunHWeb" method="post">
+                <input type="hidden" name="NeptunWebType" value="HWeb" />
+            </form>
+        """.trimIndent()
+        val action = client.parseFormAction(formHtml, "FormToNeptun")
+        assertEquals("/ToNeptunWeb/ToNeptunHWeb", action)
+
+        val resolved = client.resolveUrl(action!!, "https://neptun.elte.hu")
+        assertEquals("https://neptun.elte.hu/ToNeptunWeb/ToNeptunHWeb", resolved)
+    }
+
+    @Test
+    fun testTokenRefreshResultContract() {
+        val refreshResult = com.example.data.network.TokenRefreshResult(
+            accessToken = "new-access-token",
+            refreshToken = "new-refresh-token",
+            sessionCookie = "guid=jwt",
+            deviceCookie = "devCookie"
+        )
+        val (first, second) = refreshResult
+        assertEquals("new-access-token", first)
+        assertEquals("new-refresh-token", second)
+        assertEquals("new-access-token", refreshResult.first)
+        assertEquals("new-refresh-token", refreshResult.second)
+        assertEquals("guid=jwt", refreshResult.sessionCookie)
+        assertEquals("devCookie", refreshResult.deviceCookie)
+    }
+
+    @Test
     fun testSystemMessageSenderNormalization() {
         assertEquals("Rendszerüzenet", com.example.core.util.SystemMessageHelper.normalizeSenderName("SYSTEM USER"))
         assertEquals("Rendszerüzenet", com.example.core.util.SystemMessageHelper.normalizeSenderName("SYSTEM"))
