@@ -69,8 +69,8 @@ class AuthRepositoryImpl(
             return@withContext Result.failure(IllegalArgumentException("A jelszó mező nem lehet üres!"))
         }
 
-        // Demo mód: mintaadatokkal való kipróbálás (DEMO jelöléssel jelölve a UI-ban)
-        if (trimmedCode == "DEMO01" || trimmedPassword.equals("demo", ignoreCase = true) || trimmedPassword.equals("jelszo", ignoreCase = true)) {
+        // Demo mód: mintaadatokkal való kipróbálás (kizárólag debug változatban engedélyezett)
+        if (com.example.core.debug.DebugFeatures.isDemoAllowed && (trimmedCode == "DEMO01" || trimmedPassword.equals("demo", ignoreCase = true) || trimmedPassword.equals("jelszo", ignoreCase = true))) {
             prefsManager.saveCredentials(
                 neptunCode = trimmedCode,
                 password = trimmedPassword,

@@ -403,26 +403,28 @@ fun LoginScreen(
 
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    // Quick Demo Credentials Fill
-                    OutlinedButton(
-                        onClick = onQuickDemoFill,
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(44.dp)
-                            .testTag("quick_demo_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Key,
-                            contentDescription = strings.quickDemoCredentials,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = strings.quickDemoCredentials,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Medium
-                        )
+                    // Quick Demo Credentials Fill (kizárólag debug változatban jelenik meg)
+                    if (com.example.core.debug.DebugFeatures.isDemoAllowed) {
+                        OutlinedButton(
+                            onClick = onQuickDemoFill,
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(44.dp)
+                                .testTag("quick_demo_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Key,
+                                contentDescription = strings.quickDemoCredentials,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = strings.quickDemoCredentials,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
                     }
 
                     if (uiState.isOfflineModeAvailable) {

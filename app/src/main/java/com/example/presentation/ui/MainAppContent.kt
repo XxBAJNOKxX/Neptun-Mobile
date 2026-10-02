@@ -416,6 +416,7 @@ private fun DemoModeBanner(
     modifier: Modifier = Modifier
 ) {
     if (dataMode == DataMode.REAL) return
+    if (!com.example.core.debug.DebugFeatures.isDemoAllowed && dataMode == DataMode.DEMO) return
     Surface(
         color = MaterialTheme.colorScheme.tertiaryContainer,
         shape = RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp),
