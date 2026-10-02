@@ -18,12 +18,6 @@ object MockNeptunDataSource {
     fun getMockMessages(): List<NeptunMessage> = emptyList()
     fun getMockFinances(): List<FinanceItem> = emptyList()
     fun getMockExams(): List<ExamItem> = emptyList()
-    fun getMockDegreeProgress(): DegreeProgress = DegreeProgress(
-        totalCreditsNeeded = 0,
-        completedCredits = 0,
-        inProgressCredits = 0,
-        weightedAverage = 0.0,
-        creditIndex = 0.0
-    )
+    fun getMockDegreeProgress(): DegreeProgress = DegreeProgress()
     fun getMockAcademicPeriods(): List<AcademicPeriod> = emptyList()
 }
