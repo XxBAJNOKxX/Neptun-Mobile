@@ -2,15 +2,18 @@ package com.example
 
 import com.example.core.update.AppUpdateManager
 import com.example.core.update.ReleaseAsset
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertTrue
+import org.junit.Assert.*
+import org.junit.Before
 import org.junit.Test
 
 class AppUpdateManagerTest {
 
     private val updateManager = AppUpdateManager()
+
+    @Before
+    fun setUp() {
+        AppUpdateManager.clearApiCache()
+    }
 
     @Test
     fun `isNewerVersion returns true when stable version is newer than dev version`() {
@@ -41,46 +44,59 @@ class AppUpdateManagerTest {
     }
 
     @Test
+    fun `isNewerVersion handles debug suffix with build numbers correctly`() {
+        // Magasabb build szám -> újabb
+        assertTrue(updateManager.isNewerVersion("v0.1.0-debug+106", "0.1.0-debug+105"))
+        assertFalse(updateManager.isNewerVersion("v0.1.0-debug+105", "0.1.0-debug+106"))
+        assertFalse(updateManager.isNewerVersion("v0.1.0-debug+105", "0.1.0-debug+105"))
+
+        // Stabil release újabb, mint az azonos számú debug build
+        assertTrue(updateManager.isNewerVersion("v0.1.0", "0.1.0-debug+105"))
+        assertFalse(updateManager.isNewerVersion("v0.1.0-debug+105", "0.1.0"))
+    }
+
+    @Test
     fun `selectBestAsset chooses debug APK for debug app`() {
         val assets = listOf(
-            ReleaseAsset(name = "neptun-mobile-0.2.33-dev-release.apk", downloadUrl = "https://example.com/release.apk"),
-            ReleaseAsset(name = "app-debug.apk", downloadUrl = "https://example.com/app-debug.apk"),
-            ReleaseAsset(name = "neptun-mobile-0.2.33-dev.apk", downloadUrl = "https://example.com/dev.apk")
+            ReleaseAsset(name = "NeptunMobile-0.2.0-release.apk", downloadUrl = "https://example.com/release.apk"),
+            ReleaseAsset(name = "NeptunMobile-0.2.0-debug.apk", downloadUrl = "https://example.com/debug.apk")
         )
 
         val chosen = AppUpdateManager.selectBestAsset(assets, isCurrentAppDebug = true)
         assertNotNull(chosen)
-        assertEquals("app-debug.apk", chosen?.name)
+        assertEquals("NeptunMobile-0.2.0-debug.apk", chosen?.name)
     }
 
     @Test
     fun `selectBestAsset chooses release APK for release app`() {
         val assets = listOf(
-            ReleaseAsset(name = "app-debug.apk", downloadUrl = "https://example.com/app-debug.apk"),
-            ReleaseAsset(name = "neptun-mobile-0.2.33-dev-release.apk", downloadUrl = "https://example.com/release.apk"),
-            ReleaseAsset(name = "neptun-mobile-0.2.33-dev.apk", downloadUrl = "https://example.com/dev.apk")
+            ReleaseAsset(name = "NeptunMobile-0.2.0-debug.apk", downloadUrl = "https://example.com/debug.apk"),
+            ReleaseAsset(name = "NeptunMobile-0.2.0-release.apk", downloadUrl = "https://example.com/release.apk")
         )
 
         val chosen = AppUpdateManager.selectBestAsset(assets, isCurrentAppDebug = false)
         assertNotNull(chosen)
-        assertEquals("neptun-mobile-0.2.33-dev-release.apk", chosen?.name)
+        assertEquals("NeptunMobile-0.2.0-release.apk", chosen?.name)
     }
 
     @Test
-    fun `selectBestAsset falls back to any APK if preferred flavor not found`() {
+    fun `selectBestAsset never offers debug APK to release app and returns null`() {
         val assetsOnlyDebug = listOf(
+            ReleaseAsset(name = "NeptunMobile-0.2.0-debug.apk", downloadUrl = "https://example.com/debug.apk"),
             ReleaseAsset(name = "app-debug.apk", downloadUrl = "https://example.com/app-debug.apk")
         )
         val chosenForRelease = AppUpdateManager.selectBestAsset(assetsOnlyDebug, isCurrentAppDebug = false)
-        assertNotNull(chosenForRelease)
-        assertEquals("app-debug.apk", chosenForRelease?.name)
+        assertNull("A release app soha nem kaphat debug APK-t!", chosenForRelease)
+    }
 
+    @Test
+    fun `selectBestAsset never offers release APK to debug app and returns null`() {
         val assetsOnlyRelease = listOf(
+            ReleaseAsset(name = "NeptunMobile-0.2.0-release.apk", downloadUrl = "https://example.com/release.apk"),
             ReleaseAsset(name = "app-release.apk", downloadUrl = "https://example.com/app-release.apk")
         )
         val chosenForDebug = AppUpdateManager.selectBestAsset(assetsOnlyRelease, isCurrentAppDebug = true)
-        assertNotNull(chosenForDebug)
-        assertEquals("app-release.apk", chosenForDebug?.name)
+        assertNull("A debug app soha nem kaphat release APK-t!", chosenForDebug)
     }
 
     @Test

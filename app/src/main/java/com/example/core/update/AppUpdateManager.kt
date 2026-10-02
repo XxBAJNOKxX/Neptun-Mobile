@@ -61,7 +61,8 @@ class AppUpdateManager(
 
     suspend fun checkForUpdates(
         channel: UpdateChannel = UpdateChannel.STABLE,
-        isDebugApp: Boolean = isCurrentAppDebug()
+        isDebugApp: Boolean = isCurrentAppDebug(),
+        forceRefresh: Boolean = false
     ): UpdateInfo? = withContext(Dispatchers.IO) {
         val repo = BuildConfig.GITHUB_REPO
         try {
@@ -71,77 +72,116 @@ class AppUpdateManager(
                 "https://api.github.com/repos/$repo/releases"
             }
 
-            val request = Request.Builder()
-                .url(url)
-                .header("Accept", "application/vnd.github.v3+json")
-                .header("User-Agent", "NeptunMobileApp")
-                .build()
+            val cached = apiCache[url]
+            val isCacheValid = !forceRefresh && cached != null && (System.currentTimeMillis() - cached.timestamp < CACHE_TTL_MS)
 
-            client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return@withContext null
+            val body: String = if (isCacheValid) {
+                cached!!.body
+            } else {
+                val requestBuilder = Request.Builder()
+                    .url(url)
+                    .header("Accept", "application/vnd.github.v3+json")
+                    .header("User-Agent", "NeptunMobileApp")
 
-                val body = response.body?.string() ?: return@withContext null
-                val releaseObj: JSONObject = if (channel == UpdateChannel.DEV) {
-                    val jsonArray = JSONArray(body)
-                    if (jsonArray.length() == 0) return@withContext null
+                if (cached?.etag != null) {
+                    requestBuilder.header("If-None-Match", cached.etag)
+                }
 
-                    var bestRelease: JSONObject? = null
-                    var bestParsedVersion: ParsedVersion? = null
+                val response = client.newCall(requestBuilder.build()).execute()
+                response.use { resp ->
+                    when {
+                        resp.code == 304 && cached != null -> {
+                            // Tartalom nem változott, ETag egyezik; frissítjük az érvényességet
+                            apiCache[url] = cached.copy(timestamp = System.currentTimeMillis())
+                            cached.body
+                        }
+                        resp.code == 403 || resp.code == 429 -> {
+                            // Rate limit túllépve
+                            android.util.Log.w("AppUpdateManager", "GitHub API rate limit elérve (HTTP ${resp.code})")
+                            cached?.body ?: return@withContext null
+                        }
+                        !resp.isSuccessful -> {
+                            return@withContext null
+                        }
+                        else -> {
+                            val freshBody = resp.body?.string() ?: return@withContext null
+                            val etag = resp.header("ETag")
+                            apiCache[url] = CachedApiResponse(freshBody, etag, System.currentTimeMillis())
+                            freshBody
+                        }
+                    }
+                }
+            }
 
-                    for (i in 0 until jsonArray.length()) {
-                        val item = jsonArray.optJSONObject(i) ?: continue
-                        val tag = item.optString("tag_name", "").trim()
-                        if (tag.isEmpty()) continue
+            val releaseObj: JSONObject = if (channel == UpdateChannel.DEV) {
+                val jsonArray = JSONArray(body)
+                if (jsonArray.length() == 0) return@withContext null
 
-                        val assets = item.optJSONArray("assets")
-                        var hasApk = false
-                        if (assets != null) {
-                            for (j in 0 until assets.length()) {
-                                if (assets.optJSONObject(j)?.optString("name", "")?.endsWith(".apk", ignoreCase = true) == true) {
-                                    hasApk = true
+                var bestRelease: JSONObject? = null
+                var bestParsedVersion: ParsedVersion? = null
+
+                for (i in 0 until jsonArray.length()) {
+                    val item = jsonArray.optJSONObject(i) ?: continue
+                    val tag = item.optString("tag_name", "").trim()
+                    if (tag.isEmpty()) continue
+
+                    val assets = item.optJSONArray("assets")
+                    var hasMatchingApk = false
+                    if (assets != null) {
+                        for (j in 0 until assets.length()) {
+                            val assetObj = assets.optJSONObject(j) ?: continue
+                            val assetName = assetObj.optString("name", "")
+                            if (assetName.endsWith(".apk", ignoreCase = true)) {
+                                if (isDebugApp && assetName.contains("debug", ignoreCase = true)) {
+                                    hasMatchingApk = true
+                                    break
+                                } else if (!isDebugApp && assetName.contains("release", ignoreCase = true) && !assetName.contains("debug", ignoreCase = true)) {
+                                    hasMatchingApk = true
                                     break
                                 }
                             }
                         }
-                        if (!hasApk) continue
-
-                        val parsed = ParsedVersion.parse(tag)
-                        if (bestParsedVersion == null || parsed.isNewerThan(bestParsedVersion)) {
-                            bestParsedVersion = parsed
-                            bestRelease = item
-                        }
                     }
+                    if (!hasMatchingApk) continue
 
-                    bestRelease ?: jsonArray.getJSONObject(0)
-                } else {
-                    JSONObject(body)
+                    val parsed = ParsedVersion.parse(tag)
+                    if (bestParsedVersion == null || parsed.isNewerThan(bestParsedVersion)) {
+                        bestParsedVersion = parsed
+                        bestRelease = item
+                    }
                 }
 
-                val tagName = releaseObj.optString("tag_name", "").trim()
-                val htmlUrl = releaseObj.optString("html_url", "https://github.com/$repo/releases")
-                val releaseNotes = releaseObj.optString("body", "").trim()
-
-                val assets = releaseObj.optJSONArray("assets")
-                val chosenAsset = selectBestApkAsset(assets, isCurrentAppDebug = isDebugApp)
-                val apkDownloadUrl = chosenAsset?.optString("browser_download_url")
-                val assetName = chosenAsset?.optString("name", "") ?: ""
-                val expectedSizeBytes = chosenAsset?.optLong("size", 0L) ?: 0L
-
-                val targetDownloadUrl = apkDownloadUrl ?: htmlUrl
-                val currentVersion = BuildConfig.VERSION_NAME
-                val isNewer = isNewerVersion(tagName, currentVersion)
-
-                UpdateInfo(
-                    isUpdateAvailable = isNewer,
-                    currentVersion = currentVersion,
-                    latestVersion = tagName.removePrefix("v"),
-                    downloadUrl = targetDownloadUrl,
-                    releaseNotes = releaseNotes,
-                    tagName = tagName,
-                    assetName = assetName,
-                    expectedSizeBytes = expectedSizeBytes
-                )
+                bestRelease ?: return@withContext null
+            } else {
+                JSONObject(body)
             }
+
+            val tagName = releaseObj.optString("tag_name", "").trim()
+            val htmlUrl = releaseObj.optString("html_url", "https://github.com/$repo/releases")
+            val releaseNotes = releaseObj.optString("body", "").trim()
+
+            val assets = releaseObj.optJSONArray("assets")
+            val chosenAsset = selectBestApkAsset(assets, isCurrentAppDebug = isDebugApp)
+                ?: return@withContext null
+
+            val apkDownloadUrl = chosenAsset.optString("browser_download_url")
+            val assetName = chosenAsset.optString("name", "")
+            val expectedSizeBytes = chosenAsset.optLong("size", 0L)
+
+            val targetDownloadUrl = if (apkDownloadUrl.isNotBlank()) apkDownloadUrl else htmlUrl
+            val currentVersion = BuildConfig.VERSION_NAME
+            val isNewer = isNewerVersion(tagName, currentVersion)
+
+            UpdateInfo(
+                isUpdateAvailable = isNewer,
+                currentVersion = currentVersion,
+                latestVersion = tagName.removePrefix("v"),
+                downloadUrl = targetDownloadUrl,
+                releaseNotes = releaseNotes,
+                tagName = tagName,
+                assetName = assetName,
+                expectedSizeBytes = expectedSizeBytes
+            )
         } catch (e: Exception) {
             null
         }
@@ -414,38 +454,74 @@ class AppUpdateManager(
         return lVer.isNewerThan(cVer)
     }
 
-    private data class ParsedVersion(
+    data class ParsedVersion(
         val major: Int,
         val minor: Int,
         val patch: Int,
-        val isDev: Boolean
+        val isDebugOrDev: Boolean,
+        val buildNumber: Long = 0L
     ) {
         fun isNewerThan(other: ParsedVersion): Boolean {
             if (this.major != other.major) return this.major > other.major
             if (this.minor != other.minor) return this.minor > other.minor
             if (this.patch != other.patch) return this.patch > other.patch
-            if (this.isDev != other.isDev) {
-                return !this.isDev && other.isDev
+
+            // Ha a major.minor.patch megegyezik:
+            // 1. Ha mindkettő debug/dev, vagy eltér a build számuk:
+            if (this.isDebugOrDev == other.isDebugOrDev && (this.buildNumber > 0 || other.buildNumber > 0)) {
+                return this.buildNumber > other.buildNumber
             }
+
+            // 2. Ha az egyik release (végleges), a másik debug/dev:
+            // A végleges release stabilabb / újabb, mint az azonos számú debug/dev
+            if (this.isDebugOrDev != other.isDebugOrDev) {
+                return !this.isDebugOrDev && other.isDebugOrDev
+            }
+
             return false
         }
 
         companion object {
             fun parse(raw: String): ParsedVersion {
                 val clean = raw.removePrefix("v").trim()
-                val isDev = clean.contains("dev", ignoreCase = true)
-                val numbers = Regex("\\d+").findAll(clean).map { it.value.toInt() }.toList()
+                val isDebugOrDev = clean.contains("debug", ignoreCase = true) || clean.contains("dev", ignoreCase = true)
+
+                // Build szám keresése: pl. +105 vagy .105 vagy -105 a debug/dev után
+                val buildNumber = if (clean.contains("+")) {
+                    Regex("""\+(\d+)""").find(clean)?.groupValues?.get(1)?.toLongOrNull() ?: 0L
+                } else if (isDebugOrDev) {
+                    Regex("""(?:debug|dev)[.-]?(\d+)""", RegexOption.IGNORE_CASE).find(clean)?.groupValues?.get(1)?.toLongOrNull() ?: 0L
+                } else {
+                    0L
+                }
+
+                val versionPart = clean.substringBefore("-").substringBefore("+")
+                val numbers = Regex("""\d+""").findAll(versionPart).map { it.value.toInt() }.toList()
                 val major = numbers.getOrElse(0) { 0 }
                 val minor = numbers.getOrElse(1) { 0 }
                 val patch = numbers.getOrElse(2) { 0 }
-                return ParsedVersion(major, minor, patch, isDev)
+
+                return ParsedVersion(major, minor, patch, isDebugOrDev, buildNumber)
             }
         }
     }
 
     companion object {
+        data class CachedApiResponse(
+            val body: String,
+            val etag: String?,
+            val timestamp: Long
+        )
+
+        val apiCache = java.util.concurrent.ConcurrentHashMap<String, CachedApiResponse>()
+        const val CACHE_TTL_MS = 30 * 60 * 1000L // 30 perc
+
+        fun clearApiCache() {
+            apiCache.clear()
+        }
+
         fun isCurrentAppDebug(): Boolean {
-            return BuildConfig.DEBUG || BuildConfig.VERSION_NAME.contains("dev", ignoreCase = true)
+            return BuildConfig.DEBUG || BuildConfig.APPLICATION_ID.endsWith(".debug")
         }
 
         fun getSafeUpdateFileName(tagName: String, assetName: String, downloadUrl: String): String {
@@ -466,21 +542,17 @@ class AppUpdateManager(
             if (apkAssets.isEmpty()) return null
 
             return if (isCurrentAppDebug) {
-                // Priority for Debug app:
-                // 1. Exact match "app-debug.apk" or contains "debug"
-                // 2. Does NOT contain "release" (e.g. neptun-mobile-X-dev.apk)
-                // 3. Fallback to any APK
+                // Debug alkalmazás: KIZÁRÓLAG debug APK-t fogad el.
+                // Pl. NeptunMobile-0.2.0-debug.apk vagy app-debug.apk
                 apkAssets.firstOrNull { it.name.contains("debug", ignoreCase = true) }
-                    ?: apkAssets.firstOrNull { !it.name.contains("release", ignoreCase = true) }
-                    ?: apkAssets.firstOrNull()
             } else {
-                // Priority for Release/Stable app:
-                // 1. Contains "release" (e.g. neptun-mobile-X-release.apk or app-release.apk)
-                // 2. Does NOT contain "debug" (e.g. neptun-mobile-X.apk)
-                // 3. Fallback to any APK
-                apkAssets.firstOrNull { it.name.contains("release", ignoreCase = true) }
-                    ?: apkAssets.firstOrNull { !it.name.contains("debug", ignoreCase = true) }
-                    ?: apkAssets.firstOrNull()
+                // Release alkalmazás: KIZÁRÓLAG olyan release APK-t fogad el, ami NEM debug.
+                // Pl. NeptunMobile-0.2.0-release.apk vagy app-release.apk
+                apkAssets.firstOrNull {
+                    it.name.contains("release", ignoreCase = true) && !it.name.contains("debug", ignoreCase = true)
+                } ?: apkAssets.firstOrNull {
+                    !it.name.contains("debug", ignoreCase = true) && !it.name.contains("dev", ignoreCase = true)
+                }
             }
         }
 
