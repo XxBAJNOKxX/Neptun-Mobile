@@ -623,12 +623,34 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
         prefs.edit().putString(KEY_REFRESH_TOKEN, token).apply()
     }
 
-    fun getDeviceCookie(username: String): String {
-        return prefs.getString("${KEY_DEVICE_COOKIE}_${username.uppercase()}", "") ?: ""
+    fun getSessionCookie(): String {
+        return prefs.getString(KEY_SESSION_COOKIE, "") ?: ""
+    }
+
+    fun setSessionCookie(cookie: String) {
+        prefs.edit().putString(KEY_SESSION_COOKIE, cookie).apply()
+    }
+
+    fun clearSessionCookie() {
+        prefs.edit().remove(KEY_SESSION_COOKIE).apply()
+    }
+
+    fun getDeviceCookie(username: String = ""): String {
+        if (username.isNotBlank()) {
+            val userSpecific = prefs.getString("${KEY_DEVICE_COOKIE}_${username.uppercase()}", "") ?: ""
+            if (userSpecific.isNotBlank()) return userSpecific
+        }
+        return prefs.getString(KEY_DEVICE_COOKIE, "") ?: ""
     }
 
     fun setDeviceCookie(username: String, cookie: String) {
-        prefs.edit().putString("${KEY_DEVICE_COOKIE}_${username.uppercase()}", cookie).apply()
+        if (cookie.isBlank()) return
+        val editor = prefs.edit()
+        if (username.isNotBlank()) {
+            editor.putString("${KEY_DEVICE_COOKIE}_${username.uppercase()}", cookie)
+        }
+        editor.putString(KEY_DEVICE_COOKIE, cookie)
+        editor.apply()
     }
 
     fun isModernApi(): Boolean {
@@ -722,9 +744,9 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
         val savedPersonalization = loadPersonalization()
         val savedNotifQuiet = loadNotificationPreferences()
 
-        // Preserve already notified items and baselines so re-login or sync doesn't re-trigger notifications
+        // Preserve already notified items, baselines and device cookies so re-login or sync doesn't re-trigger notifications or 2FA
         val savedNotifiedEntries = prefs.all.filter { (k, _) ->
-            k.startsWith(KEY_NOTIFIED_PREFIX) || k.startsWith(KEY_NOTIFIED_BASELINE_PREFIX)
+            k.startsWith(KEY_NOTIFIED_PREFIX) || k.startsWith(KEY_NOTIFIED_BASELINE_PREFIX) || k.startsWith(KEY_DEVICE_COOKIE)
         }
 
         val editor = prefs.edit().clear()
@@ -799,6 +821,7 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
         private const val KEY_SESSION_TOKEN = "key_session_token"
         private const val KEY_ACCESS_TOKEN = "key_access_token"
         private const val KEY_REFRESH_TOKEN = "key_refresh_token"
+        private const val KEY_SESSION_COOKIE = "key_session_cookie"
         private const val KEY_DEVICE_COOKIE = "key_device_cookie"
         private const val KEY_IS_MODERN_API = "key_is_modern_api"
         private const val KEY_BASE_URL = "key_base_url"
