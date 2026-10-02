@@ -55,7 +55,8 @@ sealed class NeptunAuthResult {
         val trainingProgram: String,
         val isModernApi: Boolean,
         val normalizedBaseUrl: String,
-        val studentTrainingId: String? = null
+        val studentTrainingId: String? = null,
+        val sessionCookie: String? = null
     ) : NeptunAuthResult()
 
     data class TwoFactorRequired(
@@ -76,6 +77,16 @@ data class NeptunUserInfo(
     val studentTrainingId: String,
     val avatarPrintName: String?
 )
+
+data class TokenRefreshResult(
+    val accessToken: String,
+    val refreshToken: String?,
+    val sessionCookie: String? = null,
+    val deviceCookie: String? = null
+) {
+    val first: String get() = accessToken
+    val second: String? get() = refreshToken
+}
 
 class NeptunUnauthorizedException(message: String = "Munkamenet lejárt (401)") : Exception(message)
 
@@ -382,6 +393,98 @@ class NeptunApiClient {
         return cookies.entries
             .filter { it.value.isNotBlank() }
             .joinToString("; ") { "${it.key}=${it.value}" }
+    }
+
+    fun resolveUrl(url: String, baseUrl: String): String {
+        val trimmed = url.trim()
+        if (trimmed.startsWith("http://", ignoreCase = true) || trimmed.startsWith("https://", ignoreCase = true)) {
+            return trimmed
+        }
+        val cleanBase = normalizeBaseUrl(baseUrl)
+        val path = if (trimmed.startsWith("/")) trimmed else "/$trimmed"
+        return "$cleanBase$path"
+    }
+
+    fun parseFormAction(formHtml: String, formActionOrId: String? = null): String? {
+        val formRegex = Regex("""<form\b([^>]*)>""", RegexOption.IGNORE_CASE)
+        val forms = formRegex.findAll(formHtml).toList()
+        val matchingForm = if (!formActionOrId.isNullOrBlank()) {
+            forms.firstOrNull { it.groupValues[1].contains(formActionOrId, ignoreCase = true) }
+        } else {
+            forms.firstOrNull()
+        }
+        val attrs = matchingForm?.groupValues?.get(1) ?: return null
+        val actionRegex = Regex("""\baction\s*=\s*["']([^"']*)["']""", RegexOption.IGNORE_CASE)
+        return actionRegex.find(attrs)?.groupValues?.get(1)
+    }
+
+    fun extractOuterLoginUrl(html: String, baseUrl: String): String {
+        // 1. Full URL with outerlogin
+        val fullUrlMatch = Regex("""(https?://[^\s"'<>]*/outerlogin[^\s"'<>]*)""", RegexOption.IGNORE_CASE).find(html)
+        if (fullUrlMatch != null) {
+            return fullUrlMatch.groupValues[1]
+        }
+        // 2. Relative outerlogin path
+        val relUrlMatch = Regex("""['"](/[^'"]*outerlogin[^\s"'<>]*)['"]""", RegexOption.IGNORE_CASE).find(html)
+        if (relUrlMatch != null) {
+            val modernBase = if (baseUrl.contains("elte.hu", ignoreCase = true)) "https://hallgato1.neptun.elte.hu" else baseUrl
+            return resolveUrl(relUrlMatch.groupValues[1], modernBase)
+        }
+        // 3. window.location or location.replace with GUID
+        val winLocMatch = Regex("""(?:window\.location(?:\.href)?|location\.replace)\s*\(?['"]([^'"]+)['"]\)? """).find(html)
+        if (winLocMatch != null && winLocMatch.groupValues[1].contains("GUID", ignoreCase = true)) {
+            val modernBase = if (baseUrl.contains("elte.hu", ignoreCase = true)) "https://hallgato1.neptun.elte.hu" else baseUrl
+            return resolveUrl(winLocMatch.groupValues[1], modernBase)
+        }
+        // 4. Meta refresh
+        val metaMatch = Regex("""<meta[^>]+http-equiv=["']refresh["'][^>]+content=["'][^;]+;\s*url=([^"']+)["']""", RegexOption.IGNORE_CASE).find(html)
+        if (metaMatch != null && (metaMatch.groupValues[1].contains("outerlogin", ignoreCase = true) || metaMatch.groupValues[1].contains("GUID", ignoreCase = true))) {
+            val modernBase = if (baseUrl.contains("elte.hu", ignoreCase = true)) "https://hallgato1.neptun.elte.hu" else baseUrl
+            return resolveUrl(metaMatch.groupValues[1], modernBase)
+        }
+        // 5. Any GUID in the HTML fallback
+        val guidMatch = Regex("""(?:GUID|guid)=([a-fA-F0-9\-]{36}|[a-fA-F0-9]{32})""", RegexOption.IGNORE_CASE).find(html)
+        if (guidMatch != null) {
+            val modernBase = if (baseUrl.contains("elte.hu", ignoreCase = true)) "https://hallgato1.neptun.elte.hu" else baseUrl
+            return "$modernBase/hallgato/login.aspx?GUID=${guidMatch.groupValues[1]}"
+        }
+        return ""
+    }
+
+    fun extractDeviceCookie(cookieHeader: String): String? {
+        val regex = Regex("""devicecookie-[a-zA-Z0-9+/=]+=([a-zA-Z0-9+/=]+)""")
+        return regex.find(cookieHeader)?.groupValues?.getOrNull(1)
+    }
+
+    fun extractDeviceCookie(setCookieHeaders: List<String>): String? {
+        val regex = Regex("""devicecookie-[a-zA-Z0-9+/=]+=([a-zA-Z0-9+/=]+)""")
+        for (header in setCookieHeaders) {
+            val m = regex.find(header)
+            if (m != null) return m.groupValues[1]
+        }
+        return null
+    }
+
+    fun extractSessionCookie(cookieHeader: String): String? {
+        val regex = Regex("""([^=;\s,]+)=(eyJ[a-zA-Z0-9\-_\.]+)""")
+        val m = regex.find(cookieHeader)
+        return m?.let { "${it.groupValues[1]}=${it.groupValues[2]}" }
+    }
+
+    fun extractSessionCookie(setCookieHeaders: List<String>): String? {
+        val regex = Regex("""([^=;\s,]+)=(eyJ[a-zA-Z0-9\-_\.]+)""")
+        for (header in setCookieHeaders) {
+            val m = regex.find(header)
+            if (m != null) {
+                return "${m.groupValues[1]}=${m.groupValues[2]}"
+            }
+        }
+        return null
+    }
+
+    fun extractRefreshToken(cookieHeader: String): String? {
+        val regex = Regex("""[^=;\s,]+=(eyJ[a-zA-Z0-9\-_\.]+)""")
+        return regex.find(cookieHeader)?.groupValues?.getOrNull(1)
     }
 
     fun parseFormInputs(
@@ -828,37 +931,40 @@ class NeptunApiClient {
                 locationHeader = bridgeResp.header("Location") ?: ""
                 val modernCookies = bridgeResp.headers("Set-Cookie")
                 modernCookieMap = mergeCookies(cookies, parseCookiesFromHeaders(modernCookies)).toMutableMap()
-                if (locationHeader.isEmpty() && bridgeResp.code == 200) {
+                if (bridgeResp.code == 200 || locationHeader.isEmpty()) {
                     bridgeHtml = bridgeResp.body?.string().orEmpty()
                 }
             }
 
             if (locationHeader.contains("Account/Login", ignoreCase = true)) {
                 locationHeader = ""
+            } else if (locationHeader.isNotBlank()) {
+                locationHeader = resolveUrl(locationHeader, cleanBase)
             }
 
             // If it returned 200 instead of 302, inspect HTML or form submission
             if (locationHeader.isEmpty() && bridgeHtml.isNotEmpty()) {
-                val outerLoginMatch = Regex("""(https?://[^\s"'<>]*/outerlogin[^\s"'<>]*)""", RegexOption.IGNORE_CASE).find(bridgeHtml)
-                if (outerLoginMatch != null) {
-                    locationHeader = outerLoginMatch.groupValues[1]
-                } else {
+                locationHeader = extractOuterLoginUrl(bridgeHtml, cleanBase)
+                if (locationHeader.isEmpty()) {
                     val inputs = parseFormInputs(bridgeHtml, "FormToNeptun")
                     if (inputs.isNotEmpty()) {
+                        val formAction = parseFormAction(bridgeHtml, "FormToNeptun") ?: bridgeUrl
+                        val targetPostUrl = resolveUrl(formAction, cleanBase)
+
                         val formBuilder = FormBody.Builder()
-                            .add("NeptunWebType", inputs["NeptunWebType"] ?: "HWeb")
-                            .add("NeptunWebIndex", inputs["NeptunWebIndex"] ?: "")
                         val vToken = inputs["__RequestVerificationToken"] ?: ""
                         if (vToken.isNotEmpty()) {
                             formBuilder.add("__RequestVerificationToken", vToken)
                         }
+                        formBuilder.add("NeptunWebType", inputs["NeptunWebType"] ?: "HWeb")
+                        formBuilder.add("NeptunWebIndex", inputs["NeptunWebIndex"] ?: "")
                         for ((k, v) in inputs) {
                             if (k != "NeptunWebType" && k != "NeptunWebIndex" && k != "__RequestVerificationToken") {
                                 formBuilder.add(k, v)
                             }
                         }
                         val formReq = Request.Builder()
-                            .url(bridgeUrl)
+                            .url(targetPostUrl)
                             .post(formBuilder.build())
                             .addHeader("User-Agent", DEFAULT_USER_AGENT)
                             .addHeader("Referer", bridgeUrl)
@@ -872,10 +978,13 @@ class NeptunApiClient {
                             .build()
                         noRedirectClient.newCall(formReq).execute().use { formResp ->
                             val postLoc = formResp.header("Location") ?: ""
-                            if (!postLoc.contains("Account/Login", ignoreCase = true)) {
-                                locationHeader = postLoc
-                            }
+                            val postBody = formResp.body?.string().orEmpty()
                             modernCookieMap = mergeCookies(modernCookieMap, parseCookiesFromHeaders(formResp.headers("Set-Cookie"))).toMutableMap()
+                            if (postLoc.isNotEmpty() && !postLoc.contains("Account/Login", ignoreCase = true)) {
+                                locationHeader = resolveUrl(postLoc, cleanBase)
+                            } else if (postBody.isNotEmpty()) {
+                                locationHeader = extractOuterLoginUrl(postBody, cleanBase)
+                            }
                         }
                     }
                 }
@@ -892,26 +1001,27 @@ class NeptunApiClient {
                     modernCookieMap = mergeCookies(modernCookieMap, parseCookiesFromHeaders(homeResp.headers("Set-Cookie"))).toMutableMap()
                     homeResp.body?.string().orEmpty()
                 }
-                val m = Regex("""(https?://[^\s"'<>]*/outerlogin[^\s"'<>]*)""", RegexOption.IGNORE_CASE).find(homeHtml)
-                if (m != null) {
-                    locationHeader = m.groupValues[1]
-                } else {
+                locationHeader = extractOuterLoginUrl(homeHtml, cleanBase)
+                if (locationHeader.isEmpty()) {
                     val homeInputs = parseFormInputs(homeHtml, "FormToNeptun")
                     if (homeInputs.isNotEmpty()) {
+                        val formAction = parseFormAction(homeHtml, "FormToNeptun") ?: bridgeUrl
+                        val targetPostUrl = resolveUrl(formAction, cleanBase)
+
                         val formBuilder = FormBody.Builder()
-                            .add("NeptunWebType", homeInputs["NeptunWebType"] ?: "HWeb")
-                            .add("NeptunWebIndex", homeInputs["NeptunWebIndex"] ?: "")
                         val vToken = homeInputs["__RequestVerificationToken"] ?: ""
                         if (vToken.isNotEmpty()) {
                             formBuilder.add("__RequestVerificationToken", vToken)
                         }
+                        formBuilder.add("NeptunWebType", homeInputs["NeptunWebType"] ?: "HWeb")
+                        formBuilder.add("NeptunWebIndex", homeInputs["NeptunWebIndex"] ?: "")
                         for ((k, v) in homeInputs) {
                             if (k != "NeptunWebType" && k != "NeptunWebIndex" && k != "__RequestVerificationToken") {
                                 formBuilder.add(k, v)
                             }
                         }
                         val formReq = Request.Builder()
-                            .url(bridgeUrl)
+                            .url(targetPostUrl)
                             .post(formBuilder.build())
                             .addHeader("User-Agent", DEFAULT_USER_AGENT)
                             .addHeader("Referer", "$cleanBase/")
@@ -925,16 +1035,19 @@ class NeptunApiClient {
                             .build()
                         noRedirectClient.newCall(formReq).execute().use { formResp ->
                             val postLoc = formResp.header("Location") ?: ""
-                            if (!postLoc.contains("Account/Login", ignoreCase = true)) {
-                                locationHeader = postLoc
-                            }
+                            val postBody = formResp.body?.string().orEmpty()
                             modernCookieMap = mergeCookies(modernCookieMap, parseCookiesFromHeaders(formResp.headers("Set-Cookie"))).toMutableMap()
+                            if (postLoc.isNotEmpty() && !postLoc.contains("Account/Login", ignoreCase = true)) {
+                                locationHeader = resolveUrl(postLoc, cleanBase)
+                            } else if (postBody.isNotEmpty()) {
+                                locationHeader = extractOuterLoginUrl(postBody, cleanBase)
+                            }
                         }
                     }
                 }
             }
 
-            Log.d(tag, "exchangeAspSessionToModernToken locationHeader: $locationHeader")
+            Log.d(tag, "exchangeAspSessionToModernToken locationHeader: ${if (locationHeader.isNotBlank()) "FOUND" else "NOT_FOUND"}")
 
             if (locationHeader.isNotEmpty() && !locationHeader.contains("Account/Login", ignoreCase = true)) {
                 val outerResult = followOuterLoginAndGetToken(locationHeader, modernCookieMap, username)
@@ -992,8 +1105,10 @@ class NeptunApiClient {
 
         try {
             val uri = java.net.URI(outerLoginUrl)
-            modernBaseUrl = "${uri.scheme}://${uri.host}" + if (uri.port > 0 && uri.port != 80 && uri.port != 443) ":${uri.port}" else ""
-            val query = uri.query ?: ""
+            if (!uri.host.isNullOrBlank()) {
+                modernBaseUrl = "${uri.scheme ?: "https"}://${uri.host}" + if (uri.port > 0 && uri.port != 80 && uri.port != 443) ":${uri.port}" else ""
+            }
+            val query = uri.query ?: (if (outerLoginUrl.contains("?")) outerLoginUrl.substringAfter("?") else "")
             for (param in query.split("&")) {
                 val parts = param.split("=", limit = 2)
                 if (parts.size == 2) {
@@ -1009,7 +1124,14 @@ class NeptunApiClient {
         }
 
         if (guid.isEmpty()) {
-            return@withContext NeptunAuthResult.Failure("Nem sikerült GUID-ot kinyerni az outerlogin URL-ből: $outerLoginUrl")
+            val guidM = Regex("""(?:GUID|guid)=([a-fA-F0-9\-]{36}|[a-fA-F0-9]{32})""", RegexOption.IGNORE_CASE).find(outerLoginUrl)
+            if (guidM != null) {
+                guid = guidM.groupValues[1]
+            }
+        }
+
+        if (guid.isEmpty()) {
+            return@withContext NeptunAuthResult.Failure("Nem sikerült GUID-ot kinyerni az outerlogin URL-ből")
         }
 
         val outerLoginEndpoint = "$modernBaseUrl/api/Account/OuterLogin"
@@ -1037,6 +1159,11 @@ class NeptunApiClient {
             mergedCookieMap = mergeCookies(mergedCookieMap, parseCookiesFromHeaders(outerCookies))
         }
 
+        val sessionCookie = extractSessionCookie(outerCookies)
+            ?: mergedCookieMap.entries.firstOrNull { it.value.startsWith("eyJ") }?.let { "${it.key}=${it.value}" }
+        val devCookieValue = extractDeviceCookie(outerCookies)
+            ?: mergedCookieMap.entries.firstOrNull { it.key.startsWith("devicecookie-", ignoreCase = true) }?.value
+
         val outerJson = safeParseJsonObject(outerBody)
         val dataObj = outerJson?.get("data")?.jsonObject
         val accessToken = dataObj?.get("accessToken")?.jsonPrimitive?.contentOrNull
@@ -1045,6 +1172,7 @@ class NeptunApiClient {
         val refreshToken = dataObj?.get("refreshToken")?.jsonPrimitive?.contentOrNull
             ?: dataObj?.get("refresh_token")?.jsonPrimitive?.contentOrNull
             ?: outerJson?.get("refreshToken")?.jsonPrimitive?.contentOrNull
+            ?: sessionCookie?.let { extractRefreshToken(it) }
             ?: extractRefreshToken(cookieHeaderString(mergedCookieMap))
         val tokenUser = dataObj?.get("userName")?.jsonPrimitive?.contentOrNull ?: username
 
@@ -1069,12 +1197,13 @@ class NeptunApiClient {
         NeptunAuthResult.Success(
             accessToken = accessToken,
             refreshToken = refreshToken,
-            deviceCookie = cookieHeaderString(mergedCookieMap),
+            deviceCookie = devCookieValue ?: cookieHeaderString(mergedCookieMap),
             studentName = studentName,
             trainingProgram = trainingName,
             isModernApi = true,
             normalizedBaseUrl = modernBaseUrl,
-            studentTrainingId = trainingId
+            studentTrainingId = trainingId,
+            sessionCookie = sessionCookie
         )
     }
 
@@ -1295,16 +1424,22 @@ class NeptunApiClient {
                 .header("Referer", "$baseUrl/")
 
             if (savedDeviceCookie.isNotEmpty()) {
-                val b64User = Base64.encodeToString(username.toByteArray(), Base64.NO_WRAP)
-                reqBuilder.header("Cookie", "devicecookie-$b64User=$savedDeviceCookie")
+                val cookieVal = if (savedDeviceCookie.contains("devicecookie-", ignoreCase = true)) {
+                    savedDeviceCookie
+                } else {
+                    val b64User = Base64.encodeToString(username.toByteArray(), Base64.NO_WRAP)
+                    "devicecookie-$b64User=$savedDeviceCookie"
+                }
+                reqBuilder.header("Cookie", cookieVal)
             }
 
             val response = okHttpClient.newCall(reqBuilder.build()).execute()
             val responseBody = response.body?.string() ?: "{}"
 
-            val setCookieHeader = response.header("Set-Cookie") ?: ""
-            val extractedCookie = extractDeviceCookie(setCookieHeader)
-            val extractedRefreshToken = extractRefreshToken(setCookieHeader)
+            val setCookies = response.headers("Set-Cookie")
+            val extractedCookie = extractDeviceCookie(setCookies) ?: extractDeviceCookie(response.header("Set-Cookie").orEmpty())
+            val extractedSessionCookie = extractSessionCookie(setCookies) ?: extractSessionCookie(response.header("Set-Cookie").orEmpty())
+            val extractedRefreshToken = extractRefreshToken(setCookies.joinToString("; ")) ?: extractRefreshToken(response.header("Set-Cookie").orEmpty())
 
             if (responseBody.trim().startsWith("<")) {
                 // Fallback to ASP.NET Core login first, then legacy
@@ -1397,7 +1532,8 @@ class NeptunApiClient {
                     trainingProgram = trainingName,
                     isModernApi = true,
                     normalizedBaseUrl = baseUrl,
-                    studentTrainingId = trainingId
+                    studentTrainingId = trainingId,
+                    sessionCookie = extractedSessionCookie
                 )
             }
 
@@ -1460,19 +1596,47 @@ class NeptunApiClient {
         }
     }
 
-    suspend fun refreshAccessToken(baseUrl: String, tokenOrRefreshToken: String): Pair<String, String?>? = withContext(Dispatchers.IO) {
+    suspend fun refreshAccessToken(
+        baseUrl: String,
+        tokenOrRefreshToken: String,
+        sessionCookie: String = "",
+        deviceCookie: String = "",
+        username: String = ""
+    ): TokenRefreshResult? = withContext(Dispatchers.IO) {
         try {
-            val url = "$baseUrl/api/Account/GetNewTokens"
-            val req = Request.Builder()
+            val cleanBase = resolveApiBaseUrl(baseUrl)
+            val url = "$cleanBase/api/Account/GetNewTokens"
+
+            val cookiesList = mutableListOf<String>()
+            if (sessionCookie.isNotBlank()) {
+                cookiesList.add(sessionCookie)
+            }
+            if (deviceCookie.isNotBlank()) {
+                if (deviceCookie.contains("devicecookie-", ignoreCase = true)) {
+                    cookiesList.add(deviceCookie)
+                } else if (username.isNotBlank()) {
+                    val b64User = Base64.encodeToString(username.uppercase().toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
+                    cookiesList.add("devicecookie-$b64User=$deviceCookie")
+                } else {
+                    cookiesList.add(deviceCookie)
+                }
+            }
+
+            val reqBuilder = Request.Builder()
                 .url(url)
                 .post("{}".toRequestBody("application/json".toMediaType()))
                 .addHeader("Authorization", "Bearer $tokenOrRefreshToken")
                 .addHeader("Accept", "application/json, text/plain, */*")
                 .addHeader("Content-Type", "application/json")
                 .addHeader("User-Agent", DEFAULT_USER_AGENT)
-                .build()
+                .addHeader("Origin", cleanBase)
+                .addHeader("Referer", "$cleanBase/")
 
-            val resp = okHttpClient.newCall(req).execute()
+            if (cookiesList.isNotEmpty()) {
+                reqBuilder.addHeader("Cookie", cookiesList.joinToString("; "))
+            }
+
+            val resp = okHttpClient.newCall(reqBuilder.build()).execute()
             if (resp.isSuccessful) {
                 val body = resp.body?.string() ?: ""
                 val parsed = safeParseJsonObject(body)
@@ -1481,27 +1645,31 @@ class NeptunApiClient {
                     ?: dataObj?.get("token")?.jsonPrimitive?.contentOrNull
                     ?: parsed?.get("accessToken")?.jsonPrimitive?.contentOrNull
                     ?: parsed?.get("token")?.jsonPrimitive?.contentOrNull
+
+                val setCookies = resp.headers("Set-Cookie")
+                val newSessionCookie = extractSessionCookie(setCookies) ?: sessionCookie.takeIf { it.isNotBlank() }
+                val newDeviceCookie = extractDeviceCookie(setCookies) ?: deviceCookie.takeIf { it.isNotBlank() }
                 val newRefreshToken = dataObj?.get("refreshToken")?.jsonPrimitive?.contentOrNull
                     ?: dataObj?.get("refresh_token")?.jsonPrimitive?.contentOrNull
                     ?: parsed?.get("refreshToken")?.jsonPrimitive?.contentOrNull
+                    ?: newSessionCookie?.let { extractRefreshToken(it) }
+
                 if (!newAccessToken.isNullOrBlank()) {
-                    return@withContext Pair(newAccessToken, newRefreshToken)
+                    Log.d(tag, "refreshAccessToken: token refreshed successfully via GetNewTokens")
+                    return@withContext TokenRefreshResult(
+                        accessToken = newAccessToken,
+                        refreshToken = newRefreshToken,
+                        sessionCookie = newSessionCookie,
+                        deviceCookie = newDeviceCookie
+                    )
                 }
+            } else {
+                Log.w(tag, "refreshAccessToken: GetNewTokens returned HTTP ${resp.code}")
             }
         } catch (e: Exception) {
             Log.e(tag, "Refresh token error: ${e.message}")
         }
         null
-    }
-
-    private fun extractDeviceCookie(cookieHeader: String): String? {
-        val regex = Regex("""devicecookie-[a-zA-Z0-9+/=]+=([a-zA-Z0-9+/=]+)""")
-        return regex.find(cookieHeader)?.groupValues?.getOrNull(1)
-    }
-
-    private fun extractRefreshToken(cookieHeader: String): String? {
-        val regex = Regex("""[^=;\s,]+=(eyJ[a-zA-Z0-9\-_\.]+)""")
-        return regex.find(cookieHeader)?.groupValues?.getOrNull(1)
     }
 
     private suspend fun tryLegacyLogin(baseUrl: String, username: String, password: String): Boolean = withContext(Dispatchers.IO) {
