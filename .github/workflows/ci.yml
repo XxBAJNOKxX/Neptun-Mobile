@@ -199,6 +199,7 @@ jobs:
           ### 📥 Letölthető Telepítőfájlok (APK):
           * **Release változat:** \`NeptunMobile-${VERSION_NAME}-release.apk\` *(hivatalos éles változat)*
           * **Debug változat:** \`NeptunMobile-${VERSION_NAME}-debug.apk\` *(teszteléshez és mintaadatokhoz)*
+          * **Ellenőrző összegek:** \`SHA256SUMS.txt\`
 
           💡 *Verzió kód: \`${VERSION_CODE}\` | Csatorna: \`${CHANNEL_NAME}\`*
           EOF
@@ -225,16 +226,19 @@ jobs:
       - name: Prepare Release Artifacts
         run: |
           mkdir -p release-artifacts
+          # Elsődleges, egységes elnevezésű APK csomagok
           if [ -f app/build/outputs/apk/debug/app-debug.apk ]; then
             cp app/build/outputs/apk/debug/app-debug.apk release-artifacts/NeptunMobile-${{ steps.versioning.outputs.VERSION_NAME }}-debug.apk
-            cp app/build/outputs/apk/debug/app-debug.apk release-artifacts/neptun-mobile-${{ steps.versioning.outputs.VERSION_NAME }}-debug.apk
+            # Átmeneti alias régebbi verziók in-app frissítőjéhez (v0.3.0 kiadás után eltávolítható)
             cp app/build/outputs/apk/debug/app-debug.apk release-artifacts/app-debug.apk
           fi
           if [ -f app/build/outputs/apk/release/app-release.apk ]; then
             cp app/build/outputs/apk/release/app-release.apk release-artifacts/NeptunMobile-${{ steps.versioning.outputs.VERSION_NAME }}-release.apk
-            cp app/build/outputs/apk/release/app-release.apk release-artifacts/neptun-mobile-${{ steps.versioning.outputs.VERSION_NAME }}-release.apk
+            # Átmeneti alias régebbi verziók in-app frissítőjéhez (v0.3.0 kiadás után eltávolítható)
             cp app/build/outputs/apk/release/app-release.apk release-artifacts/app-release.apk
           fi
+          # SHA-256 ellenőrző összegek generálása
+          (cd release-artifacts && sha256sum *.apk > SHA256SUMS.txt)
 
       - name: Upload APK Artifacts
         uses: actions/upload-artifact@v4
@@ -242,6 +246,7 @@ jobs:
           name: apk-artifacts
           path: |
             release-artifacts/*.apk
+            release-artifacts/SHA256SUMS.txt
           if-no-files-found: ignore
 
       - name: Create GitHub Release
@@ -253,6 +258,7 @@ jobs:
           body_path: /tmp/release_notes.md
           files: |
             release-artifacts/*.apk
+            release-artifacts/SHA256SUMS.txt
           draft: false
           prerelease: ${{ steps.versioning.outputs.IS_PRERELEASE == 'true' }}
         env:
