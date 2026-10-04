@@ -26,6 +26,9 @@ interface AppStrings {
     val later: String
     val sessionExpiredTitle: String
     val sessionExpiredDesc: String
+    val quickReAuth: String
+    val enterPasswordForReAuth: String
+    val reAuthSuccess: String
     val shareTimetableChooser: String
     val delete: String
     val edit: String
@@ -507,6 +510,9 @@ class HungarianStrings : AppStrings {
     override val later = "Később"
     override val sessionExpiredTitle = "Lejárt a munkamenet"
     override val sessionExpiredDesc = "A Neptun szerver visszautasította a munkamenetet, és nem sikerült automatikusan megújítani. Kérlek, jelentkezz be újra a friss adatokért."
+    override val quickReAuth = "Gyors megújítás"
+    override val enterPasswordForReAuth = "Add meg a jelszavad a munkamenet megújításához"
+    override val reAuthSuccess = "Munkamenet sikeresen megújítva!"
     override val shareTimetableChooser = "Órarend megosztása"
     override val delete = "Törlés"
     override val edit = "Szerkesztés"
@@ -1000,6 +1006,9 @@ class EnglishStrings : AppStrings {
     override val later = "Later"
     override val sessionExpiredTitle = "Session Expired"
     override val sessionExpiredDesc = "The Neptun server rejected the session and it could not be refreshed automatically. Please log in again to fetch fresh data."
+    override val quickReAuth = "Quick renew"
+    override val enterPasswordForReAuth = "Enter your password to renew session"
+    override val reAuthSuccess = "Session renewed successfully!"
     override val shareTimetableChooser = "Share Timetable"
     override val delete = "Delete"
     override val edit = "Edit"
@@ -1490,6 +1499,9 @@ class GermanStrings : AppStrings {
     override val later = "Später"
     override val sessionExpiredTitle = "Sitzung abgelaufen"
     override val sessionExpiredDesc = "Der Neptun-Server hat die Sitzung abgelehnt und sie konnte nicht automatisch erneuert werden. Bitte melden Sie sich erneut an, um die Daten zu aktualisieren."
+    override val quickReAuth = "Schnell erneuern"
+    override val enterPasswordForReAuth = "Geben Sie Ihr Passwort ein, um die Sitzung zu erneuern"
+    override val reAuthSuccess = "Sitzung erfolgreich erneuert!"
     override val shareTimetableChooser = "Stundenplan teilen"
     override val delete = "Löschen"
     override val edit = "Bearbeiten"

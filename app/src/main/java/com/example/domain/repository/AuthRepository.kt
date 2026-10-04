@@ -36,5 +36,9 @@ interface AuthRepository {
     suspend fun setLanguage(language: com.example.domain.model.NeptunLanguage): Result<Unit>
     fun getSelectedLanguage(): Flow<com.example.domain.model.NeptunLanguage>
     fun getCachedSupportedLanguages(): Flow<List<com.example.domain.model.NeptunLanguage>>
+    fun getSavedPassword(): String
+    fun savePassword(password: String)
+    fun getSavedCredentials(): StudentCredentials?
+    fun clearSessionExpired()
 }
 

@@ -17,16 +17,28 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Science
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
+import com.example.presentation.ui.components.TwoFactorDialog
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -247,8 +259,8 @@ private fun MainDashboard(
         currentDestination = startDestination
     }
 
-    // Lejárt munkamenet jelzése
-    if (sessionExpired) {
+    // Lejárt munkamenet jelzése és gyors megújítás
+    if (sessionExpired && !authState.isQuickReAuthOpen && !authState.isTwoFactorRequired && !authState.isPasswordPromptRequired) {
         AlertDialog(
             onDismissRequest = { appContainer.prefsManager.clearSessionExpired() },
             title = { Text(strings.sessionExpiredTitle) },
@@ -256,23 +268,128 @@ private fun MainDashboard(
                 Text(strings.sessionExpiredDesc)
             },
             confirmButton = {
-                TextButton(
+                Button(
                     onClick = {
-                        appContainer.prefsManager.clearSessionExpired()
-                        // Nem töröljük a helyi adatokat szerveroldali munkamenet-lejáratkor!
-                        authViewModel.logout(clearLocalData = false)
+                        authViewModel.initiateQuickReAuth()
                     }
                 ) {
-                    Text(strings.loginTitle)
+                    Text(strings.quickReAuth)
+                }
+            },
+            dismissButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(
+                        onClick = {
+                            appContainer.prefsManager.clearSessionExpired()
+                            // Nem töröljük a helyi adatokat szerveroldali munkamenet-lejáratkor!
+                            authViewModel.logout(clearLocalData = false)
+                        }
+                    ) {
+                        Text(strings.logout)
+                    }
+                    TextButton(
+                        onClick = { appContainer.prefsManager.clearSessionExpired() }
+                    ) {
+                        Text(strings.later)
+                    }
+                }
+            }
+        )
+    }
+
+    // Gyors megújítás folyamatban (pl. jelszavas login kérés a Neptunhoz)
+    if (authState.isQuickReAuthOpen && authState.isLoading && !authState.isTwoFactorRequired && !authState.isPasswordPromptRequired) {
+        AlertDialog(
+            onDismissRequest = { },
+            title = { Text(strings.quickReAuth) },
+            text = {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier.fillMaxWidth().padding(8.dp)
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(32.dp))
+                    Text(strings.loggingIn)
+                }
+            },
+            confirmButton = {}
+        )
+    }
+
+    // Jelszó megadása szükséges gyors megújításhoz (ha a mentett jelszó nincs meg vagy hibás volt)
+    if (authState.isPasswordPromptRequired) {
+        var pwdInput by rememberSaveable { mutableStateOf("") }
+        var pwdVisible by rememberSaveable { mutableStateOf(false) }
+
+        AlertDialog(
+            onDismissRequest = {
+                authViewModel.cancelTwoFactor()
+            },
+            title = { Text(strings.quickReAuth) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(strings.enterPasswordForReAuth)
+                    OutlinedTextField(
+                        value = pwdInput,
+                        onValueChange = { pwdInput = it },
+                        label = { Text(strings.password) },
+                        singleLine = true,
+                        visualTransformation = if (pwdVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                        trailingIcon = {
+                            IconButton(onClick = { pwdVisible = !pwdVisible }) {
+                                Icon(
+                                    imageVector = if (pwdVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                    contentDescription = null
+                                )
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    if (authState.errorMessage != null) {
+                        Text(
+                            text = authState.errorMessage ?: "",
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { authViewModel.submitReAuthPassword(pwdInput) },
+                    enabled = pwdInput.isNotBlank() && !authState.isLoading
+                ) {
+                    if (authState.isLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                    } else {
+                        Text(strings.loginButton)
+                    }
                 }
             },
             dismissButton = {
                 TextButton(
-                    onClick = { appContainer.prefsManager.clearSessionExpired() }
+                    onClick = { authViewModel.cancelTwoFactor() }
                 ) {
-                    Text(strings.later)
+                    Text(strings.cancel)
                 }
             }
+        )
+    }
+
+    // 2FA dialógus felugrása a Dashboard felett
+    if (authState.isTwoFactorRequired) {
+        TwoFactorDialog(
+            uiState = authState,
+            strings = strings,
+            onTwoFactorCodeChange = { authViewModel.onTwoFactorCodeChange(it) },
+            onTwoFactorMethodChange = { authViewModel.onTwoFactorMethodChange(it) },
+            onRequestEmailCode = { authViewModel.requestEmailCode() },
+            onSubmitTwoFactor = { authViewModel.submitTwoFactor() },
+            onCancelTwoFactor = { authViewModel.cancelTwoFactor() }
         )
     }
 

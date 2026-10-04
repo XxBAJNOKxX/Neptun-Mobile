@@ -30,4 +30,5 @@ interface NeptunRepository {
     suspend fun markMessageAsRead(messageId: String)
     suspend fun getMessageContent(messageId: String): String
     suspend fun clearLocalData()
+    suspend fun keepAliveSession(): Boolean
 }

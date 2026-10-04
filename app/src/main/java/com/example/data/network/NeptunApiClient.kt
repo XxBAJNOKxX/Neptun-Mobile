@@ -88,6 +88,12 @@ data class TokenRefreshResult(
     val second: String? get() = refreshToken
 }
 
+data class PingSessionResult(
+    val isAlive: Boolean,
+    val isRedirectToLogin: Boolean,
+    val freshCookies: String? = null
+)
+
 class NeptunUnauthorizedException(message: String = "Munkamenet lejárt (401)") : Exception(message)
 
 class NeptunApiClient {
@@ -676,8 +682,12 @@ class NeptunApiClient {
                 statusCode = resp.code
                 locationHeader = resp.header("Location").orEmpty()
                 postCookies = resp.headers("Set-Cookie")
-                postBody = resp.body?.string().orEmpty()
-                Log.i(tag, "authenticateAspDotNet: POST returned code=$statusCode, location=$locationHeader")
+                val sanitizedLocation = if (locationHeader.contains("?")) {
+                    locationHeader.substringBefore("?") + "?[REDACTED]"
+                } else {
+                    locationHeader
+                }
+                Log.i(tag, "authenticateAspDotNet: POST returned code=$statusCode, location=$sanitizedLocation")
             }
         } catch (e: Exception) {
             Log.e(tag, "authenticateAspDotNet: POST $loginPageUrl FAILED with exception: ${e.javaClass.name}: ${e.message}", e)
@@ -1205,6 +1215,57 @@ class NeptunApiClient {
             studentTrainingId = trainingId,
             sessionCookie = sessionCookie
         )
+    }
+
+    /**
+     * Könnyűsúlyú kérés az ASP.NET szerver felé, amely frissíti az inaktivitási időkorlátot (sliding session timeout).
+     * Ha a válasz átirányít az Account/Login oldalra, akkor a munkamenet már lejárt.
+     */
+    suspend fun pingSession(
+        aspBaseUrl: String,
+        sessionCookie: String,
+        deviceCookie: String = ""
+    ): PingSessionResult = withContext(Dispatchers.IO) {
+        val combined = listOf(sessionCookie, deviceCookie).filter { it.isNotBlank() }.joinToString("; ")
+        if (combined.isBlank()) return@withContext PingSessionResult(isAlive = false, isRedirectToLogin = true)
+        try {
+            val cleanBase = normalizeBaseUrl(aspBaseUrl)
+            val bridgeUrl = "$cleanBase/ToNeptunWeb/ToNeptunHWeb"
+            val noRedirectClient = okHttpClient.newBuilder()
+                .followRedirects(false)
+                .followSslRedirects(false)
+                .build()
+
+            var cookieMap = parseCookiesFromHeaders(combined.split(";").map { it.trim() })
+            val req = Request.Builder()
+                .url(bridgeUrl)
+                .get()
+                .addHeader("User-Agent", DEFAULT_USER_AGENT)
+                .addHeader("Cookie", cookieHeaderString(cookieMap))
+                .build()
+
+            noRedirectClient.newCall(req).execute().use { resp ->
+                val location = resp.header("Location").orEmpty()
+                val setCookies = resp.headers("Set-Cookie")
+                val updatedCookieStr = if (setCookies.isNotEmpty()) {
+                    cookieMap = mergeCookies(cookieMap, parseCookiesFromHeaders(setCookies)).toMutableMap()
+                    cookieHeaderString(cookieMap)
+                } else null
+
+                if (location.contains("Account/Login", ignoreCase = true)) {
+                    PingSessionResult(isAlive = false, isRedirectToLogin = true)
+                } else {
+                    PingSessionResult(
+                        isAlive = resp.code in 200..399,
+                        isRedirectToLogin = false,
+                        freshCookies = updatedCookieStr
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            Log.d(tag, "pingSession transient failure: ${e.message}")
+            PingSessionResult(isAlive = false, isRedirectToLogin = false)
+        }
     }
 
     /**

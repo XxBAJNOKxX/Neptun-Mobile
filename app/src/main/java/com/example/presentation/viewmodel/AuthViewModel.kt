@@ -41,7 +41,9 @@ data class AuthUiState(
     val twoFactorCode: String = "",
     val twoFactorSuccessMessage: String? = null,
     val twoFactorErrorMessage: String? = null,
-    val isTwoFactorLoading: Boolean = false
+    val isTwoFactorLoading: Boolean = false,
+    val isQuickReAuthOpen: Boolean = false,
+    val isPasswordPromptRequired: Boolean = false
 )
 
 class AuthViewModel(
@@ -230,6 +232,8 @@ class AuthViewModel(
                 twoFactorSuccessMessage = null,
                 twoFactorErrorMessage = null,
                 isTwoFactorLoading = false,
+                isQuickReAuthOpen = false,
+                isPasswordPromptRequired = false,
                 errorMessage = null
             )
         }
@@ -400,10 +404,13 @@ class AuthViewModel(
 
                 result.fold(
                     onSuccess = { creds ->
+                        authRepository.clearSessionExpired()
                         _uiState.update {
                             it.copy(
                                 isTwoFactorLoading = false,
                                 isTwoFactorRequired = false,
+                                isQuickReAuthOpen = false,
+                                isPasswordPromptRequired = false,
                                 twoFactorSession = null,
                                 credentials = creds,
                                 twoFactorCode = "",
@@ -424,6 +431,181 @@ class AuthViewModel(
             }
         } else {
             login()
+        }
+    }
+
+    fun initiateQuickReAuth() {
+        val creds = authRepository.getSavedCredentials() ?: return
+        val savedPassword = authRepository.getSavedPassword()
+        val uniList = _uiState.value.universities
+        val uni = _uiState.value.selectedUniversity
+            ?: uniList.firstOrNull { it.id == creds.universityId }
+            ?: uniList.firstOrNull { it.neptunUrl.contains("elte.hu", ignoreCase = true) }
+            ?: University(creds.universityId, creds.universityName, creds.universityName, "Magyarország", creds.neptunUrl)
+
+        if (savedPassword.isNotBlank()) {
+            _uiState.update {
+                it.copy(
+                    selectedUniversity = uni,
+                    neptunCode = creds.neptunCode,
+                    password = "",
+                    isLoading = true,
+                    isQuickReAuthOpen = true,
+                    isPasswordPromptRequired = false,
+                    errorMessage = null
+                )
+            }
+            viewModelScope.launch {
+                val result = authRepository.login(
+                    university = uni,
+                    neptunCode = creds.neptunCode,
+                    password = savedPassword,
+                    twoFactorCode = ""
+                )
+                result.fold(
+                    onSuccess = { updatedCreds ->
+                        authRepository.clearSessionExpired()
+                        _uiState.update {
+                            it.copy(
+                                isLoading = false,
+                                credentials = updatedCreds,
+                                isTwoFactorRequired = false,
+                                twoFactorSession = null,
+                                isQuickReAuthOpen = false,
+                                isPasswordPromptRequired = false
+                            )
+                        }
+                        neptunRepository.syncAllData(updatedCreds.neptunCode, "")
+                    },
+                    onFailure = { error ->
+                        when (error) {
+                            is TwoFactorSessionRequiredException -> {
+                                val session = error.session
+                                val defaultMethod = if (!session.hasTotp || session.hasEmail) TwoFactorMethod.EMAIL else TwoFactorMethod.TOTP
+                                val isEmailReq = session.codePrefix.isNotEmpty() || session.phase.equals("RequestEmailCode", ignoreCase = true)
+                                _uiState.update {
+                                    it.copy(
+                                        isLoading = false,
+                                        isTwoFactorRequired = true,
+                                        twoFactorSession = session,
+                                        twoFactorMethod = defaultMethod,
+                                        isEmailCodeRequested = isEmailReq,
+                                        codePrefix = session.codePrefix,
+                                        twoFactorSuccessMessage = if (isEmailReq && session.codePrefix.isNotEmpty()) "Előtag: ${session.codePrefix}-" else null,
+                                        twoFactorErrorMessage = null
+                                    )
+                                }
+                                if (!isEmailReq) {
+                                    requestEmailCode()
+                                }
+                            }
+                            is TwoFactorRequiredException -> {
+                                _uiState.update {
+                                    it.copy(
+                                        isLoading = false,
+                                        isTwoFactorRequired = true,
+                                        twoFactorSession = null,
+                                        twoFactorMethod = TwoFactorMethod.TOTP
+                                    )
+                                }
+                            }
+                            else -> {
+                                _uiState.update {
+                                    it.copy(
+                                        isLoading = false,
+                                        isPasswordPromptRequired = true,
+                                        errorMessage = error.message
+                                    )
+                                }
+                            }
+                        }
+                    }
+                )
+            }
+        } else {
+            _uiState.update {
+                it.copy(
+                    selectedUniversity = uni,
+                    neptunCode = creds.neptunCode,
+                    isQuickReAuthOpen = true,
+                    isPasswordPromptRequired = true
+                )
+            }
+        }
+    }
+
+    fun submitReAuthPassword(pwd: String) {
+        val creds = authRepository.getSavedCredentials() ?: return
+        val uni = _uiState.value.selectedUniversity ?: return
+        _uiState.update {
+            it.copy(
+                password = "",
+                isPasswordPromptRequired = false,
+                isLoading = true,
+                errorMessage = null
+            )
+        }
+        viewModelScope.launch {
+            val result = authRepository.login(uni, creds.neptunCode, pwd, "")
+            result.fold(
+                onSuccess = { updatedCreds ->
+                    authRepository.savePassword(pwd)
+                    authRepository.clearSessionExpired()
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            credentials = updatedCreds,
+                            isTwoFactorRequired = false,
+                            isQuickReAuthOpen = false,
+                            isPasswordPromptRequired = false
+                        )
+                    }
+                    neptunRepository.syncAllData(updatedCreds.neptunCode, "")
+                },
+                onFailure = { error ->
+                    when (error) {
+                        is TwoFactorSessionRequiredException -> {
+                            authRepository.savePassword(pwd)
+                            val session = error.session
+                            val defaultMethod = if (!session.hasTotp || session.hasEmail) TwoFactorMethod.EMAIL else TwoFactorMethod.TOTP
+                            val isEmailReq = session.codePrefix.isNotEmpty() || session.phase.equals("RequestEmailCode", ignoreCase = true)
+                            _uiState.update {
+                                it.copy(
+                                    isLoading = false,
+                                    isTwoFactorRequired = true,
+                                    twoFactorSession = session,
+                                    twoFactorMethod = defaultMethod,
+                                    isEmailCodeRequested = isEmailReq,
+                                    codePrefix = session.codePrefix,
+                                    twoFactorSuccessMessage = if (isEmailReq && session.codePrefix.isNotEmpty()) "Előtag: ${session.codePrefix}-" else null
+                                )
+                            }
+                            if (!isEmailReq) {
+                                requestEmailCode()
+                            }
+                        }
+                        is TwoFactorRequiredException -> {
+                            _uiState.update {
+                                it.copy(
+                                    isLoading = false,
+                                    isTwoFactorRequired = true,
+                                    twoFactorSession = null,
+                                    twoFactorMethod = TwoFactorMethod.TOTP
+                                )
+                            }
+                        }
+                        else -> {
+                            _uiState.update {
+                                it.copy(
+                                    isLoading = false,
+                                    isPasswordPromptRequired = true,
+                                    errorMessage = error.message ?: "Hibás jelszó!"
+                                )
+                            }
+                        }
+                    }
+                }
+            )
         }
     }
 

@@ -99,7 +99,6 @@ class AuthRepositoryImpl(
             return@withContext Result.success(creds)
         }
 
-        // Real network authentication via NeptunApiClient
         val deviceCookie = prefsManager.getDeviceCookie(trimmedCode)
         val authResult = neptunApiClient.authenticate(
             rawUrl = university.neptunUrl,
@@ -114,6 +113,12 @@ class AuthRepositoryImpl(
                 Result.failure(TwoFactorRequiredException(authResult.twoFactorToken))
             }
             is NeptunAuthResult.TwoFactorSessionRequired -> {
+                if (!authResult.session.baseUrl.contains("rest", ignoreCase = true) &&
+                    !university.neptunUrl.contains("rest", ignoreCase = true)) {
+                    if (trimmedPassword.isNotBlank() && trimmedPassword != "******") {
+                        prefsManager.setPassword(trimmedPassword)
+                    }
+                }
                 Result.failure(TwoFactorSessionRequiredException(authResult.session))
             }
             is NeptunAuthResult.Success -> {
@@ -182,9 +187,10 @@ class AuthRepositoryImpl(
                 )
 
                 val loginUrl = session.baseUrl.ifEmpty { uni.neptunUrl.ifEmpty { authResult.normalizedBaseUrl } }
+                val passwordToSave = if (authResult.isModernApi) "" else prefsManager.getPassword()
                 prefsManager.saveCredentials(
                     neptunCode = session.neptunCode,
-                    password = "",
+                    password = passwordToSave,
                     universityId = uni.id,
                     universityName = uni.name,
                     neptunUrl = loginUrl,
@@ -226,6 +232,7 @@ class AuthRepositoryImpl(
     }
 
     override suspend fun logout() = withContext(Dispatchers.IO) {
+        com.example.core.work.SessionKeepAliveWorker.cancelPeriodicKeepAlive(context)
         prefsManager.clear()
     }
 
@@ -311,4 +318,12 @@ class AuthRepositoryImpl(
     override fun getCachedSupportedLanguages(): Flow<List<com.example.domain.model.NeptunLanguage>> {
         return prefsManager.supportedLanguagesFlow
     }
+
+    override fun getSavedPassword(): String = prefsManager.getPassword()
+
+    override fun savePassword(password: String) = prefsManager.setPassword(password)
+
+    override fun getSavedCredentials(): StudentCredentials? = prefsManager.loadCredentials()
+
+    override fun clearSessionExpired() = prefsManager.clearSessionExpired()
 }

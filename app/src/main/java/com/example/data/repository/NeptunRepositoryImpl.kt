@@ -280,10 +280,11 @@ class NeptunRepositoryImpl(
                          freshBaseUrl.contains("neptun.elte.hu", ignoreCase = true) ||
                          creds.neptunUrl.contains("neptun.elte.hu", ignoreCase = true)
 
-            if (isElte && freshDeviceCookie.isNotBlank()) {
+            val combinedCookies = listOf(sessionCookie, freshDeviceCookie).filter { it.isNotBlank() }.joinToString("; ")
+            if (isElte && combinedCookies.isNotBlank()) {
                 try {
                     val aspBaseUrl = normalizeAspBaseUrl(freshLoginUrl.ifEmpty { creds.neptunUrl })
-                    val renewResult = neptunApiClient.renewSessionWithCookies(aspBaseUrl, freshDeviceCookie, creds.neptunCode)
+                    val renewResult = neptunApiClient.renewSessionWithCookies(aspBaseUrl, combinedCookies, creds.neptunCode)
                     when (renewResult) {
                         is NeptunAuthResult.Success -> {
                             prefsManager.setAccessToken(renewResult.accessToken)
@@ -363,6 +364,49 @@ class NeptunRepositoryImpl(
             "${uri.scheme}://${uri.host}"
         } catch (e: Exception) {
             neptunApiClient.normalizeBaseUrl(loginUrl)
+        }
+    }
+
+    override suspend fun keepAliveSession(): Boolean = withContext(Dispatchers.IO) {
+        val creds = prefsManager.loadCredentials() ?: return@withContext false
+        if (!creds.isLoggedIn || creds.neptunCode.equals("DEMO01", ignoreCase = true)) {
+            return@withContext false
+        }
+
+        val baseUrl = prefsManager.getBaseUrl().ifEmpty { creds.neptunUrl }
+        val loginUrl = prefsManager.getLoginUrl().ifEmpty { creds.neptunUrl }
+        val isElte = loginUrl.contains("neptun.elte.hu", ignoreCase = true) ||
+                     baseUrl.contains("neptun.elte.hu", ignoreCase = true) ||
+                     creds.neptunUrl.contains("neptun.elte.hu", ignoreCase = true)
+
+        val sessionCookie = prefsManager.getSessionCookie()
+        val deviceCookie = prefsManager.getDeviceCookie(creds.neptunCode)
+
+        if (isElte) {
+            val aspBaseUrl = normalizeAspBaseUrl(loginUrl.ifEmpty { creds.neptunUrl })
+            val pingRes = neptunApiClient.pingSession(aspBaseUrl, sessionCookie, deviceCookie)
+            if (pingRes.isAlive) {
+                Log.d("NeptunRepo", "Keep-alive ping sikeres ELTE szerver felé")
+                pingRes.freshCookies?.let { fresh ->
+                    prefsManager.setSessionCookie(fresh)
+                }
+                ensureValidToken(forceRefresh = false)
+                return@withContext true
+            } else if (pingRes.isRedirectToLogin) {
+                Log.w("NeptunRepo", "Keep-alive ping jelezte: ELTE session lejárt a szerveren")
+                prefsManager.markSessionExpired()
+                return@withContext false
+            } else {
+                Log.d("NeptunRepo", "Keep-alive ping átmeneti hiba, munkamenet nem lejártnak tekintett")
+                return@withContext false
+            }
+        } else {
+            val token = ensureValidToken(forceRefresh = true)
+            if (token.isBlank()) {
+                prefsManager.markSessionExpired()
+                return@withContext false
+            }
+            return@withContext true
         }
     }
 
