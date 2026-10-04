@@ -507,7 +507,9 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
         neptunUrl: String,
         studentName: String = "Teszt Hallgató",
         sessionToken: String = "",
-        trainingProgram: String = "Egyetemi Képzés"
+        trainingProgram: String = "Egyetemi Képzés",
+        sessionKeepAlive: Boolean = false,
+        requiresInteractiveReauth: Boolean = false
     ) {
         val editor = prefs.edit()
             .putString(KEY_NEPTUN_CODE, neptunCode)
@@ -523,6 +525,8 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
             .putString(KEY_SESSION_TOKEN, sessionToken)
             .putString(KEY_ACCESS_TOKEN, sessionToken)
             .putString(KEY_TRAINING_PROGRAM, trainingProgram)
+            .putBoolean(KEY_SESSION_KEEP_ALIVE, sessionKeepAlive)
+            .putBoolean(KEY_REQUIRES_INTERACTIVE_REAUTH, requiresInteractiveReauth)
             .putBoolean(KEY_IS_LOGGED_IN, true)
             .putLong(KEY_LAST_SYNC, System.currentTimeMillis())
 
@@ -535,6 +539,9 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
 
         _credentialsFlow.value = loadCredentials()
     }
+
+    fun isSessionKeepAliveEnabled(): Boolean = prefs.getBoolean(KEY_SESSION_KEEP_ALIVE, false)
+    fun isInteractiveReauthRequired(): Boolean = prefs.getBoolean(KEY_REQUIRES_INTERACTIVE_REAUTH, false)
 
     fun updateStudentInfo(
         studentName: String? = null,
@@ -564,6 +571,8 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
         val studentName = prefs.getString(KEY_STUDENT_NAME, "Hallgató") ?: "Hallgató"
         val trainingProgram = prefs.getString(KEY_TRAINING_PROGRAM, "Mérnökinformatikus BSc") ?: "Mérnökinformatikus BSc"
         val lastSync = prefs.getLong(KEY_LAST_SYNC, 0L)
+        val sessionKeepAlive = prefs.getBoolean(KEY_SESSION_KEEP_ALIVE, false)
+        val requiresInteractiveReauth = prefs.getBoolean(KEY_REQUIRES_INTERACTIVE_REAUTH, false)
 
         return StudentCredentials(
             neptunCode = neptunCode,
@@ -573,7 +582,9 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
             studentName = studentName,
             trainingProgram = trainingProgram,
             isLoggedIn = isLoggedIn,
-            lastSyncTime = lastSync
+            lastSyncTime = lastSync,
+            sessionKeepAlive = sessionKeepAlive,
+            requiresInteractiveReauth = requiresInteractiveReauth
         )
     }
 
@@ -850,6 +861,8 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
         private const val KEY_HIDDEN_PAGES = "key_hidden_pages"
         private const val KEY_DATA_MODE = "key_data_mode"
         private const val KEY_SESSION_EXPIRED = "key_session_expired"
+        private const val KEY_SESSION_KEEP_ALIVE = "key_session_keep_alive"
+        private const val KEY_REQUIRES_INTERACTIVE_REAUTH = "key_requires_interactive_reauth"
         private const val KEY_APP_LANGUAGE_CODE = "key_app_language_code"
         private const val KEY_APP_LANGUAGE_NAME = "key_app_language_name"
         private const val KEY_APP_LANGUAGE_LCID = "key_app_language_lcid"

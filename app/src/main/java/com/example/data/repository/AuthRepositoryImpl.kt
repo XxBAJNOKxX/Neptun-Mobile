@@ -132,8 +132,15 @@ class AuthRepositoryImpl(
                     neptunUrl = loginUrl,
                     studentName = authResult.studentName,
                     sessionToken = authResult.accessToken,
-                    trainingProgram = authResult.trainingProgram
+                    trainingProgram = authResult.trainingProgram,
+                    sessionKeepAlive = university.sessionKeepAlive,
+                    requiresInteractiveReauth = university.requiresInteractiveReauth
                 )
+                if (university.sessionKeepAlive) {
+                    com.example.core.work.SessionKeepAliveWorker.schedulePeriodicKeepAlive(context)
+                } else {
+                    com.example.core.work.SessionKeepAliveWorker.cancelPeriodicKeepAlive(context)
+                }
                 prefsManager.setLoginUrl(loginUrl)
                 prefsManager.setAccessToken(authResult.accessToken)
                 authResult.refreshToken?.let { prefsManager.setRefreshToken(it) }

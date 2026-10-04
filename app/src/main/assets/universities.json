@@ -109,7 +109,9 @@
     "name": "Eötvös Loránd Tudományegyetem",
     "shortName": "ELTE",
     "city": "Magyarország",
-    "neptunUrl": "https://neptun.elte.hu/Account/Login"
+    "neptunUrl": "https://neptun.elte.hu/Account/Login",
+    "sessionKeepAlive": true,
+    "requiresInteractiveReauth": true
   },
   {
     "id": "eszterhzykro",

@@ -373,40 +373,34 @@ class NeptunRepositoryImpl(
             return@withContext false
         }
 
+        val requiresKeepAlive = prefsManager.isSessionKeepAliveEnabled() || creds.sessionKeepAlive
+        if (!requiresKeepAlive) {
+            Log.d("NeptunRepo", "Keep-alive kihagyva: a fiók intézménye (${creds.universityName}) nem igényli a heartbeat-et")
+            return@withContext true
+        }
+
         val baseUrl = prefsManager.getBaseUrl().ifEmpty { creds.neptunUrl }
         val loginUrl = prefsManager.getLoginUrl().ifEmpty { creds.neptunUrl }
-        val isElte = loginUrl.contains("neptun.elte.hu", ignoreCase = true) ||
-                     baseUrl.contains("neptun.elte.hu", ignoreCase = true) ||
-                     creds.neptunUrl.contains("neptun.elte.hu", ignoreCase = true)
-
         val sessionCookie = prefsManager.getSessionCookie()
         val deviceCookie = prefsManager.getDeviceCookie(creds.neptunCode)
 
-        if (isElte) {
-            val aspBaseUrl = normalizeAspBaseUrl(loginUrl.ifEmpty { creds.neptunUrl })
-            val pingRes = neptunApiClient.pingSession(aspBaseUrl, sessionCookie, deviceCookie)
-            if (pingRes.isAlive) {
-                Log.d("NeptunRepo", "Keep-alive ping sikeres ELTE szerver felé")
-                pingRes.freshCookies?.let { fresh ->
-                    prefsManager.setSessionCookie(fresh)
-                }
-                ensureValidToken(forceRefresh = false)
-                return@withContext true
-            } else if (pingRes.isRedirectToLogin) {
-                Log.w("NeptunRepo", "Keep-alive ping jelezte: ELTE session lejárt a szerveren")
-                prefsManager.markSessionExpired()
-                return@withContext false
-            } else {
-                Log.d("NeptunRepo", "Keep-alive ping átmeneti hiba, munkamenet nem lejártnak tekintett")
-                return@withContext false
+        val targetUrl = loginUrl.ifEmpty { baseUrl }
+        val aspBaseUrl = normalizeAspBaseUrl(targetUrl)
+        val pingRes = neptunApiClient.pingSession(aspBaseUrl, sessionCookie, deviceCookie)
+        if (pingRes.isAlive) {
+            Log.d("NeptunRepo", "Keep-alive ping sikeres szerver felé")
+            pingRes.freshCookies?.let { fresh ->
+                prefsManager.setSessionCookie(fresh)
             }
-        } else {
-            val token = ensureValidToken(forceRefresh = true)
-            if (token.isBlank()) {
-                prefsManager.markSessionExpired()
-                return@withContext false
-            }
+            ensureValidToken(forceRefresh = false)
             return@withContext true
+        } else if (pingRes.isRedirectToLogin) {
+            Log.w("NeptunRepo", "Keep-alive ping jelezte: session lejárt a szerveren")
+            prefsManager.markSessionExpired()
+            return@withContext false
+        } else {
+            Log.d("NeptunRepo", "Keep-alive ping átmeneti hiba, munkamenet nem lejártnak tekintett")
+            return@withContext false
         }
     }
 
