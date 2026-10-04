@@ -443,6 +443,7 @@ class AuthViewModel(
             ?: uniList.firstOrNull { it.neptunUrl.contains("elte.hu", ignoreCase = true) }
             ?: University(creds.universityId, creds.universityName, creds.universityName, "Magyarország", creds.neptunUrl)
 
+        val isInteractive = creds.requiresInteractiveReauth || uni.requiresInteractiveReauth
         if (savedPassword.isNotBlank()) {
             _uiState.update {
                 it.copy(
@@ -450,7 +451,7 @@ class AuthViewModel(
                     neptunCode = creds.neptunCode,
                     password = "",
                     isLoading = true,
-                    isQuickReAuthOpen = true,
+                    isQuickReAuthOpen = isInteractive,
                     isPasswordPromptRequired = false,
                     errorMessage = null
                 )

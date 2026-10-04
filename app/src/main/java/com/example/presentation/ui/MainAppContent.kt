@@ -259,8 +259,17 @@ private fun MainDashboard(
         currentDestination = startDestination
     }
 
-    // Lejárt munkamenet jelzése és gyors megújítás
-    if (sessionExpired && !authState.isQuickReAuthOpen && !authState.isTwoFactorRequired && !authState.isPasswordPromptRequired) {
+    val isInteractiveReauth = appContainer.prefsManager.isInteractiveReauthRequired()
+
+    // 2FA nélküli fióknál csendes újra-hitelesítés, ha a munkamenet lejár
+    LaunchedEffect(sessionExpired, isInteractiveReauth) {
+        if (sessionExpired && !isInteractiveReauth) {
+            authViewModel.initiateQuickReAuth()
+        }
+    }
+
+    // Lejárt munkamenet jelzése és gyors megújítás (kizárólag 2FA-s fióknál)
+    if (sessionExpired && isInteractiveReauth && !authState.isQuickReAuthOpen && !authState.isTwoFactorRequired && !authState.isPasswordPromptRequired) {
         AlertDialog(
             onDismissRequest = { appContainer.prefsManager.clearSessionExpired() },
             title = { Text(strings.sessionExpiredTitle) },
