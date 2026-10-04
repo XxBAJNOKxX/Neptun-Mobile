@@ -46,6 +46,7 @@ object CrashReporter {
         masked = Regex("Bearer\\s+[A-Za-z0-9\\-._~+/]+=*", RegexOption.IGNORE_CASE).replace(masked, "Bearer [REDACTED]")
         masked = Regex("([\"']?(?:password|pass|pwd|jelszo)[\"']?\\s*[:=]\\s*[\"']?)[^\"'\\s&,\n]+([\"']?)", RegexOption.IGNORE_CASE).replace(masked, "$1[REDACTED]$2")
         masked = Regex("([\"']?(?:accessToken|refreshToken|token|api_key|apiKey)[\"']?\\s*[:=]\\s*[\"']?)[^\"'\\s&,\n]+([\"']?)", RegexOption.IGNORE_CASE).replace(masked, "$1[REDACTED]$2")
+        masked = Regex("([\"']?(?:Key|twoFactorToken|twoFactorLoginToken|twoFactorCode|totpCode|emailCode|codePrefix|verificationToken)[\"']?\\s*[:=]\\s*[\"']?)[^\"'\\s&,\n]+([\"']?)", RegexOption.IGNORE_CASE).replace(masked, "$1[REDACTED]$2")
         masked = Regex("([\"']?(?:cookie|sessionId|NeptunSession|ASP\\.NET_SessionId)[\"']?\\s*[:=]\\s*[\"']?)[^\"'\\s&;,\n]+([\"']?)", RegexOption.IGNORE_CASE).replace(masked, "$1[REDACTED]$2")
         masked = Regex("([\"']?(?:user|username|neptunCode|login)[\"']?\\s*[:=]\\s*[\"']?)[A-Za-z0-9]{6}([\"']?)", RegexOption.IGNORE_CASE).replace(masked, "$1[REDACTED]$2")
         return masked

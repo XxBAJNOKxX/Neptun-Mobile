@@ -367,15 +367,19 @@ MjAwOS5lLXN6aWduby5odTAxBggrBgEFBQcwAoYlaHR0cDovL3d3dy5lLXN6aWdu
             null
         }
 
-        // 3. AndroidCAStore TrustManager (felhasználói tanúsítványok, pl. AdGuard, egyetemi VPN-ek esetén)
-        val userTm = try {
-            val caStore = KeyStore.getInstance("AndroidCAStore")
-            caStore.load(null, null)
-            val caTmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
-            caTmf.init(caStore)
-            caTmf.trustManagers.firstOrNull { it is X509TrustManager } as? X509TrustManager
-        } catch (e: Throwable) {
-            logD("AndroidCAStore not accessible or not supported in this environment: ${e.message}")
+        // 3. AndroidCAStore TrustManager (felhasználói tanúsítványok, kizárólag Debug módban, pl. proxy-teszteléshez)
+        val userTm = if (com.example.BuildConfig.DEBUG) {
+            try {
+                val caStore = KeyStore.getInstance("AndroidCAStore")
+                caStore.load(null, null)
+                val caTmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
+                caTmf.init(caStore)
+                caTmf.trustManagers.firstOrNull { it is X509TrustManager } as? X509TrustManager
+            } catch (e: Throwable) {
+                logD("AndroidCAStore not accessible or not supported in this environment: ${e.message}")
+                null
+            }
+        } else {
             null
         }
 
