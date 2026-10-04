@@ -80,12 +80,18 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
             // Csak és kizárólag Robolectric / JVM unit teszt környezetben engedélyezett, ahol nincs AndroidKeyStore daemon
             context.getSharedPreferences("neptun_secure_storage_test", Context.MODE_PRIVATE)
         } else {
-            // Éles Android eszközön soha nem engedünk titkosítatlan fallbacket: újrakíséreljük a tiszta inicializációt
+            android.util.Log.w("EncryptedPrefs", "Első inicializálás sikertelen: ${e.message}, újrapróbálás...")
             try {
-                context.deleteSharedPreferences("neptun_secure_storage")
+                // Újrapróbálkozás törlés nélkül (pl. átmeneti Keystore lock után app frissítéskor)
                 createEncryptedPrefs(context)
-            } catch (retryEx: Exception) {
-                throw SecurityException("A hardveres Keystore vagy titkosított tároló nem inicializálható: ${retryEx.message}", retryEx)
+            } catch (retryWithoutDeleteEx: Exception) {
+                android.util.Log.e("EncryptedPrefs", "Második kísérlet is sikertelen, tiszta inicializáció: ${retryWithoutDeleteEx.message}")
+                try {
+                    context.deleteSharedPreferences("neptun_secure_storage")
+                    createEncryptedPrefs(context)
+                } catch (retryEx: Exception) {
+                    throw SecurityException("A hardveres Keystore vagy titkosított tároló nem inicializálható: ${retryEx.message}", retryEx)
+                }
             }
         }
     }.also {
@@ -532,8 +538,6 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
 
         if (password.isNotBlank() && password != "******") {
             editor.putString(KEY_PASSWORD, password)
-        } else {
-            editor.remove(KEY_PASSWORD)
         }
         editor.apply()
 
