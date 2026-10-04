@@ -30,4 +30,13 @@ class CrashReporterTest {
         assertFalse(output.contains("abc123xyz"))
         assertTrue(output.contains("[REDACTED]"))
     }
+
+    @Test
+    fun `maskSensitiveData replaces 2FA keys, tokens and codes`() {
+        val input = "2FA state error: { \"Key\": \"3f8a91c2-98ab-43ef\", \"twoFactorCode\": \"654321\", \"codePrefix\": \"AZ-\" }"
+        val output = CrashReporter.maskSensitiveData(input)
+        assertFalse(output.contains("3f8a91c2-98ab-43ef"))
+        assertFalse(output.contains("654321"))
+        assertTrue(output.contains("[REDACTED]"))
+    }
 }

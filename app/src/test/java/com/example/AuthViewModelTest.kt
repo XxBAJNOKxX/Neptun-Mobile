@@ -1,5 +1,6 @@
 package com.example
 
+import com.example.domain.model.StudentCredentials
 import com.example.domain.model.University
 import com.example.presentation.viewmodel.AuthViewModel
 import com.example.test.FakeAuthRepository
@@ -155,5 +156,65 @@ class AuthViewModelTest {
         val state = viewModel.uiState.value
         assertNotNull(state.credentials)
         assertEquals("OFFLINE01", state.credentials?.neptunCode)
+    }
+
+    @Test
+    fun `initiateQuickReAuth with saved credentials and password logs in directly`() = runTest {
+        mainDispatcherRule.testDispatcher.scheduler.advanceUntilIdle()
+
+        authRepository.storedPassword = "savedSecretPassword"
+        authRepository.credentialsFlow.value = StudentCredentials(
+            neptunCode = "TEST01",
+            universityId = "bme",
+            universityName = "BME",
+            neptunUrl = "https://neptun.bme.hu",
+            studentName = "Teszt Hallgató",
+            trainingProgram = "BSc",
+            isLoggedIn = true,
+            lastSyncTime = System.currentTimeMillis()
+        )
+
+        viewModel.initiateQuickReAuth()
+        mainDispatcherRule.testDispatcher.scheduler.advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertNotNull(state.credentials)
+        assertEquals("TEST01", state.credentials?.neptunCode)
+        assertFalse(state.isPasswordPromptRequired)
+        assertFalse(state.isQuickReAuthOpen)
+    }
+
+    @Test
+    fun `initiateQuickReAuth without saved password prompts for password`() = runTest {
+        mainDispatcherRule.testDispatcher.scheduler.advanceUntilIdle()
+
+        authRepository.storedPassword = ""
+        authRepository.credentialsFlow.value = StudentCredentials(
+            neptunCode = "TEST01",
+            universityId = "bme",
+            universityName = "BME",
+            neptunUrl = "https://neptun.bme.hu",
+            studentName = "Teszt Hallgató",
+            trainingProgram = "BSc",
+            isLoggedIn = true,
+            lastSyncTime = System.currentTimeMillis()
+        )
+
+        viewModel.initiateQuickReAuth()
+        mainDispatcherRule.testDispatcher.scheduler.advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertTrue(state.isQuickReAuthOpen)
+        assertTrue(state.isPasswordPromptRequired)
+
+        // Now submit password
+        viewModel.submitReAuthPassword("enteredPass123")
+        mainDispatcherRule.testDispatcher.scheduler.advanceUntilIdle()
+
+        val finalState = viewModel.uiState.value
+        assertNotNull(finalState.credentials)
+        assertFalse(finalState.isPasswordPromptRequired)
+        assertFalse(finalState.isQuickReAuthOpen)
+        assertEquals("enteredPass123", authRepository.storedPassword)
     }
 }

@@ -112,6 +112,11 @@ class FakeAuthRepository : AuthRepository {
     }
     override fun getSelectedLanguage(): Flow<NeptunLanguage> = languageFlow.asStateFlow()
     override fun getCachedSupportedLanguages(): Flow<List<NeptunLanguage>> = supportedLanguagesFlow.asStateFlow()
+    var storedPassword: String = ""
+    override fun getSavedPassword(): String = storedPassword
+    override fun savePassword(password: String) { storedPassword = password }
+    override fun getSavedCredentials(): StudentCredentials? = credentialsFlow.value
+    override fun clearSessionExpired() {}
 }
 
 class FakeNeptunRepository : NeptunRepository {
@@ -161,4 +166,5 @@ class FakeNeptunRepository : NeptunRepository {
         financesFlow.value = emptyList()
         examsFlow.value = emptyList()
     }
+    override suspend fun keepAliveSession(): Boolean = true
 }
