@@ -96,7 +96,9 @@ data class PingSessionResult(
 
 class NeptunUnauthorizedException(message: String = "Munkamenet lejárt (401)") : Exception(message)
 
-class NeptunApiClient {
+class NeptunApiClient(
+    customClient: OkHttpClient? = null
+) {
 
     private val tag = "NeptunApiClient"
 
@@ -115,7 +117,7 @@ class NeptunApiClient {
      * és akadémiai (pl. ELTE / GEANT / HARICA) modern gyökértanúsítványokat is,
      * amelyek a régebbi Android rendszerekből (pl. Android 11) hiányozhatnak.
      */
-    private val okHttpClient: OkHttpClient = SslTrustHelper.configureOkHttpClient(
+    private val okHttpClient: OkHttpClient = customClient ?: SslTrustHelper.configureOkHttpClient(
         OkHttpClient.Builder()
             .connectTimeout(20, TimeUnit.SECONDS)
             .readTimeout(25, TimeUnit.SECONDS)
@@ -1251,8 +1253,10 @@ class NeptunApiClient {
                     cookieMap = mergeCookies(cookieMap, parseCookiesFromHeaders(setCookies)).toMutableMap()
                     cookieHeaderString(cookieMap)
                 } else null
+                val bodyStr = resp.body?.string().orEmpty()
 
-                if (location.contains("Account/Login", ignoreCase = true)) {
+                if (location.contains("Account/Login", ignoreCase = true) ||
+                    (bodyStr.contains("Account/Login", ignoreCase = true) && (bodyStr.contains("<form", ignoreCase = true) || bodyStr.contains("login", ignoreCase = true)))) {
                     PingSessionResult(isAlive = false, isRedirectToLogin = true)
                 } else {
                     PingSessionResult(
@@ -1944,7 +1948,7 @@ class NeptunApiClient {
     suspend fun getCalendarEvents(
         baseUrl: String,
         token: String,
-        trainingId: String?,
+        trainingId: String? = null,
         username: String,
         password: String,
         isModern: Boolean,
@@ -2276,10 +2280,16 @@ class NeptunApiClient {
                 }
 
                 val termsResp = okHttpClient.newCall(termsReqBuilder.build()).execute()
-                if (termsResp.code == 401) {
-                    Log.w(tag, "Terms endpoint returned 401, skipping terms list and using fallback")
-                } else if (termsResp.isSuccessful) {
-                    val termsBody = termsResp.body?.string() ?: ""
+                if (termsResp.code == 401 || termsResp.code == 403) {
+                    throw NeptunUnauthorizedException("${termsResp.code} Grades (Terms)")
+                }
+                val termsBody = termsResp.body?.string() ?: ""
+                val isTermsRedirect = termsResp.request.url.encodedPath.contains("Login", ignoreCase = true) ||
+                    (termsBody.trim().startsWith("<") && (termsBody.contains("Account/Login", ignoreCase = true) || termsBody.contains("Login2FA", ignoreCase = true)))
+                if (isTermsRedirect) {
+                    throw NeptunUnauthorizedException("Redirected to Login for Terms")
+                }
+                if (termsResp.isSuccessful) {
                     val termsData = safeParseJsonObject(termsBody)?.get("data")?.jsonArray
 
                     if (!termsData.isNullOrEmpty()) {
@@ -2344,17 +2354,15 @@ class NeptunApiClient {
                         }
 
                         val subResp = okHttpClient.newCall(subReqBuilder.build()).execute()
-                        if (subResp.code == 401) {
-                            Log.w(tag, "URL returned 401 in getGrades ($subjectsUrl), trying alternate URLs")
-                            continue
+                        if (subResp.code == 401 || subResp.code == 403) {
+                            throw NeptunUnauthorizedException("${subResp.code} Grades ($subjectsUrl)")
                         }
                         if (!subResp.isSuccessful) continue
                         val subBody = subResp.body?.string() ?: ""
                         val isRedirect = subResp.request.url.encodedPath.contains("Login", ignoreCase = true) ||
                             (subBody.trim().startsWith("<") && (subBody.contains("Account/Login", ignoreCase = true) || subBody.contains("Login2FA", ignoreCase = true)))
                         if (isRedirect) {
-                            Log.w(tag, "URL redirected to login in getGrades ($subjectsUrl), trying alternate URLs")
-                            continue
+                            throw NeptunUnauthorizedException("Redirected to Login for Grades")
                         }
                         val parsed = safeParseJson(subBody) ?: continue
                         val subjectsData = when {
@@ -2449,6 +2457,8 @@ class NeptunApiClient {
                             }
                             break
                         }
+                    } catch (e: NeptunUnauthorizedException) {
+                        throw e
                     } catch (e: Exception) {
                         Log.e(tag, "Failed URL $subjectsUrl: ${e.message}")
                     }
@@ -2802,6 +2812,8 @@ class NeptunApiClient {
                             if (cleaned.isNotBlank()) return@withContext cleaned
                         }
                     }
+                } catch (e: NeptunUnauthorizedException) {
+                    throw e
                 } catch (e: Exception) {
                     Log.d(tag, "Failed URL $url: ${e.message}")
                 }
