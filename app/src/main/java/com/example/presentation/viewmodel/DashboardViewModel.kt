@@ -138,6 +138,7 @@ class DashboardViewModel(
                 }
             }
         }
+        refresh()
     }
 
     fun refresh() {

@@ -123,7 +123,7 @@ class AuthRepositoryImpl(
             }
             is NeptunAuthResult.Success -> {
                 val loginUrl = university.neptunUrl.ifEmpty { authResult.normalizedBaseUrl }
-                val passwordToSave = if (authResult.isModernApi) "" else trimmedPassword
+                val passwordToSave = if (trimmedPassword.isNotBlank() && trimmedPassword != "******") trimmedPassword else prefsManager.getPassword()
                 prefsManager.saveCredentials(
                     neptunCode = trimmedCode,
                     password = passwordToSave,
@@ -132,8 +132,15 @@ class AuthRepositoryImpl(
                     neptunUrl = loginUrl,
                     studentName = authResult.studentName,
                     sessionToken = authResult.accessToken,
-                    trainingProgram = authResult.trainingProgram
+                    trainingProgram = authResult.trainingProgram,
+                    sessionKeepAlive = university.sessionKeepAlive,
+                    requiresInteractiveReauth = university.requiresInteractiveReauth
                 )
+                if (university.sessionKeepAlive) {
+                    com.example.core.work.SessionKeepAliveWorker.schedulePeriodicKeepAlive(context)
+                } else {
+                    com.example.core.work.SessionKeepAliveWorker.cancelPeriodicKeepAlive(context)
+                }
                 prefsManager.setLoginUrl(loginUrl)
                 prefsManager.setAccessToken(authResult.accessToken)
                 authResult.refreshToken?.let { prefsManager.setRefreshToken(it) }
@@ -187,7 +194,7 @@ class AuthRepositoryImpl(
                 )
 
                 val loginUrl = session.baseUrl.ifEmpty { uni.neptunUrl.ifEmpty { authResult.normalizedBaseUrl } }
-                val passwordToSave = if (authResult.isModernApi) "" else prefsManager.getPassword()
+                val passwordToSave = prefsManager.getPassword()
                 prefsManager.saveCredentials(
                     neptunCode = session.neptunCode,
                     password = passwordToSave,
@@ -196,8 +203,15 @@ class AuthRepositoryImpl(
                     neptunUrl = loginUrl,
                     studentName = authResult.studentName,
                     sessionToken = authResult.accessToken,
-                    trainingProgram = authResult.trainingProgram
+                    trainingProgram = authResult.trainingProgram,
+                    sessionKeepAlive = uni.sessionKeepAlive,
+                    requiresInteractiveReauth = uni.requiresInteractiveReauth
                 )
+                if (uni.sessionKeepAlive) {
+                    com.example.core.work.SessionKeepAliveWorker.schedulePeriodicKeepAlive(context)
+                } else {
+                    com.example.core.work.SessionKeepAliveWorker.cancelPeriodicKeepAlive(context)
+                }
                 prefsManager.setLoginUrl(loginUrl)
                 prefsManager.setAccessToken(authResult.accessToken)
                 authResult.refreshToken?.let { prefsManager.setRefreshToken(it) }

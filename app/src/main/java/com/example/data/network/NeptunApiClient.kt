@@ -96,7 +96,9 @@ data class PingSessionResult(
 
 class NeptunUnauthorizedException(message: String = "Munkamenet lejárt (401)") : Exception(message)
 
-class NeptunApiClient {
+class NeptunApiClient(
+    customClient: OkHttpClient? = null
+) {
 
     private val tag = "NeptunApiClient"
 
@@ -115,7 +117,7 @@ class NeptunApiClient {
      * és akadémiai (pl. ELTE / GEANT / HARICA) modern gyökértanúsítványokat is,
      * amelyek a régebbi Android rendszerekből (pl. Android 11) hiányozhatnak.
      */
-    private val okHttpClient: OkHttpClient = SslTrustHelper.configureOkHttpClient(
+    private val okHttpClient: OkHttpClient = customClient ?: SslTrustHelper.configureOkHttpClient(
         OkHttpClient.Builder()
             .connectTimeout(20, TimeUnit.SECONDS)
             .readTimeout(25, TimeUnit.SECONDS)
@@ -1251,8 +1253,10 @@ class NeptunApiClient {
                     cookieMap = mergeCookies(cookieMap, parseCookiesFromHeaders(setCookies)).toMutableMap()
                     cookieHeaderString(cookieMap)
                 } else null
+                val bodyStr = resp.body?.string().orEmpty()
 
-                if (location.contains("Account/Login", ignoreCase = true)) {
+                if (location.contains("Account/Login", ignoreCase = true) ||
+                    (bodyStr.contains("Account/Login", ignoreCase = true) && (bodyStr.contains("<form", ignoreCase = true) || bodyStr.contains("login", ignoreCase = true)))) {
                     PingSessionResult(isAlive = false, isRedirectToLogin = true)
                 } else {
                     PingSessionResult(
@@ -1944,7 +1948,7 @@ class NeptunApiClient {
     suspend fun getCalendarEvents(
         baseUrl: String,
         token: String,
-        trainingId: String?,
+        trainingId: String? = null,
         username: String,
         password: String,
         isModern: Boolean,
@@ -1977,7 +1981,7 @@ class NeptunApiClient {
             return@withContext events
         } catch (e: NeptunUnauthorizedException) {
             Log.w(tag, "Modern calendar unauthorized error: ${e.message}, checking fallbacks")
-            if (username.isNotEmpty() && password.isNotEmpty()) {
+            if (username.isNotEmpty() && password.isNotEmpty() && !baseUrl.contains("elte.hu", ignoreCase = true)) {
                 try {
                     val leg = getLegacyCalendarEvents(baseUrl, username, password)
                     if (leg.isNotEmpty()) return@withContext leg
@@ -1985,12 +1989,7 @@ class NeptunApiClient {
                     Log.w(tag, "Legacy calendar fallback failed: ${legacyEx.message}")
                 }
             }
-            // Ellenőrizzük, hogy a token globálisan érvénytelen-e
-            if (!isTokenValid(baseUrl, token, deviceCookie)) {
-                throw e
-            }
-            // Ha a token más végpontokon még működik, ne szakítsuk meg a folyamatot
-            return@withContext emptyList()
+            throw e
         } catch (e: Exception) {
             Log.e(tag, "Failed to get modern calendar events: ${e.message}")
             if (username.isNotEmpty() && password.isNotEmpty()) {
@@ -2166,6 +2165,8 @@ class NeptunApiClient {
                 )
             }
             return@withContext list
+        } catch (e: NeptunUnauthorizedException) {
+            throw e
         } catch (e: Exception) {
             Log.e(tag, "fetchModernCalendarEvents error: ${e.message}")
             return@withContext emptyList()
@@ -2279,10 +2280,16 @@ class NeptunApiClient {
                 }
 
                 val termsResp = okHttpClient.newCall(termsReqBuilder.build()).execute()
-                if (termsResp.code == 401) {
-                    Log.w(tag, "Terms endpoint returned 401, skipping terms list and using fallback")
-                } else if (termsResp.isSuccessful) {
-                    val termsBody = termsResp.body?.string() ?: ""
+                if (termsResp.code == 401 || termsResp.code == 403) {
+                    throw NeptunUnauthorizedException("${termsResp.code} Grades (Terms)")
+                }
+                val termsBody = termsResp.body?.string() ?: ""
+                val isTermsRedirect = termsResp.request.url.encodedPath.contains("Login", ignoreCase = true) ||
+                    (termsBody.trim().startsWith("<") && (termsBody.contains("Account/Login", ignoreCase = true) || termsBody.contains("Login2FA", ignoreCase = true)))
+                if (isTermsRedirect) {
+                    throw NeptunUnauthorizedException("Redirected to Login for Terms")
+                }
+                if (termsResp.isSuccessful) {
                     val termsData = safeParseJsonObject(termsBody)?.get("data")?.jsonArray
 
                     if (!termsData.isNullOrEmpty()) {
@@ -2347,17 +2354,15 @@ class NeptunApiClient {
                         }
 
                         val subResp = okHttpClient.newCall(subReqBuilder.build()).execute()
-                        if (subResp.code == 401) {
-                            Log.w(tag, "URL returned 401 in getGrades ($subjectsUrl), trying alternate URLs")
-                            continue
+                        if (subResp.code == 401 || subResp.code == 403) {
+                            throw NeptunUnauthorizedException("${subResp.code} Grades ($subjectsUrl)")
                         }
                         if (!subResp.isSuccessful) continue
                         val subBody = subResp.body?.string() ?: ""
                         val isRedirect = subResp.request.url.encodedPath.contains("Login", ignoreCase = true) ||
                             (subBody.trim().startsWith("<") && (subBody.contains("Account/Login", ignoreCase = true) || subBody.contains("Login2FA", ignoreCase = true)))
                         if (isRedirect) {
-                            Log.w(tag, "URL redirected to login in getGrades ($subjectsUrl), trying alternate URLs")
-                            continue
+                            throw NeptunUnauthorizedException("Redirected to Login for Grades")
                         }
                         val parsed = safeParseJson(subBody) ?: continue
                         val subjectsData = when {
@@ -2452,6 +2457,8 @@ class NeptunApiClient {
                             }
                             break
                         }
+                    } catch (e: NeptunUnauthorizedException) {
+                        throw e
                     } catch (e: Exception) {
                         Log.e(tag, "Failed URL $subjectsUrl: ${e.message}")
                     }
@@ -2501,8 +2508,8 @@ class NeptunApiClient {
                 allGrades
             }
         } catch (e: NeptunUnauthorizedException) {
-            Log.w(tag, "Modern grades unauthorized error: ${e.message}, checking legacy or token validity")
-            if (username.isNotEmpty() && password.isNotEmpty()) {
+            Log.w(tag, "Modern grades unauthorized error: ${e.message}")
+            if (username.isNotEmpty() && password.isNotEmpty() && !baseUrl.contains("elte.hu", ignoreCase = true)) {
                 try {
                     val leg = getLegacyGrades(baseUrl, username, password)
                     if (leg.isNotEmpty()) return@withContext leg
@@ -2510,10 +2517,7 @@ class NeptunApiClient {
                     Log.w(tag, "Legacy grades fallback failed: ${legacyEx.message}")
                 }
             }
-            if (!isTokenValid(baseUrl, token, deviceCookie)) {
-                throw e
-            }
-            return@withContext emptyList()
+            throw e
         } catch (e: Exception) {
             Log.e(tag, "Modern grades fetch error: ${e.message}")
             if (username.isNotEmpty() && password.isNotEmpty()) {
@@ -2739,6 +2743,14 @@ class NeptunApiClient {
                     val bodyStr = resp.body?.string() ?: ""
                     val code = resp.code
                     resp.close()
+                    if (code == 401 || code == 403) {
+                        throw NeptunUnauthorizedException("Unauthorized ($code) for message content")
+                    }
+                    val isRedirect = resp.request.url.encodedPath.contains("Login", ignoreCase = true) ||
+                        (bodyStr.trim().startsWith("<") && (bodyStr.contains("Account/Login", ignoreCase = true) || bodyStr.contains("Login2FA", ignoreCase = true)))
+                    if (isRedirect) {
+                        throw NeptunUnauthorizedException("Redirected to Login for message content")
+                    }
 
                     if (code !in 200..299 || bodyStr.isBlank()) continue
 
@@ -2800,6 +2812,8 @@ class NeptunApiClient {
                             if (cleaned.isNotBlank()) return@withContext cleaned
                         }
                     }
+                } catch (e: NeptunUnauthorizedException) {
+                    throw e
                 } catch (e: Exception) {
                     Log.d(tag, "Failed URL $url: ${e.message}")
                 }
@@ -3194,32 +3208,55 @@ class NeptunApiClient {
         )
         val candidateBaseUrls = listOf(baseUrl)
 
-        for (base in candidateBaseUrls) {
-            for (path in modernPaths) {
-                try {
-                    val reqBuilder = Request.Builder()
-                        .url("$base$path")
-                        .get()
-                        .addHeader("Authorization", "Bearer $token")
-                        .addHeader("Accept", "application/json, text/plain, */*")
-                        .addHeader("Content-Type", "application/json")
+        try {
+            for (base in candidateBaseUrls) {
+                for (path in modernPaths) {
+                    try {
+                        val reqBuilder = Request.Builder()
+                            .url("$base$path")
+                            .get()
+                            .addHeader("Authorization", "Bearer $token")
+                            .addHeader("Accept", "application/json, text/plain, */*")
+                            .addHeader("Content-Type", "application/json")
 
-                    if (deviceCookie.isNotBlank()) {
-                        reqBuilder.addHeader("Cookie", deviceCookie)
-                    }
+                        if (deviceCookie.isNotBlank()) {
+                            reqBuilder.addHeader("Cookie", deviceCookie)
+                        }
 
-                    val resp = okHttpClient.newCall(reqBuilder.build()).execute()
-                    if (resp.code == 401 || resp.code == 403 || !resp.isSuccessful) {
-                        continue
+                        val resp = okHttpClient.newCall(reqBuilder.build()).execute()
+                        if (resp.code == 401 || resp.code == 403) {
+                            throw NeptunUnauthorizedException("${resp.code} Exams")
+                        }
+                        if (!resp.isSuccessful) {
+                            continue
+                        }
+                        val body = resp.body?.string() ?: ""
+                        val isRedirect = resp.request.url.encodedPath.contains("Login", ignoreCase = true) ||
+                            (body.trim().startsWith("<") && (body.contains("Account/Login", ignoreCase = true) || body.contains("Login2FA", ignoreCase = true)))
+                        if (isRedirect) {
+                            throw NeptunUnauthorizedException("Redirected to Login for Exams request")
+                        }
+                        val parsed = safeParseJson(body) ?: continue
+                        val items = parseExamItems(parsed)
+                        if (items.isNotEmpty()) return@withContext items
+                    } catch (e: NeptunUnauthorizedException) {
+                        throw e
+                    } catch (e: Exception) {
+                        Log.e(tag, "Modern exams fetch error ($path): ${e.message}")
                     }
-                    val body = resp.body?.string() ?: ""
-                    val parsed = safeParseJson(body) ?: continue
-                    val items = parseExamItems(parsed)
-                    if (items.isNotEmpty()) return@withContext items
-                } catch (e: Exception) {
-                    Log.e(tag, "Modern exams fetch error ($path): ${e.message}")
                 }
             }
+        } catch (e: NeptunUnauthorizedException) {
+            Log.w(tag, "Modern exams unauthorized: ${e.message}")
+            if (username.isNotEmpty() && password.isNotEmpty() && !baseUrl.contains("elte.hu", ignoreCase = true)) {
+                try {
+                    val leg = getLegacyExams(baseUrl, username, password)
+                    if (leg.isNotEmpty()) return@withContext leg
+                } catch (legacyEx: Exception) {
+                    Log.w(tag, "Legacy exams fallback failed: ${legacyEx.message}")
+                }
+            }
+            throw e
         }
 
         if (username.isNotEmpty() && password.isNotEmpty()) {
@@ -3420,8 +3457,16 @@ class NeptunApiClient {
             }
 
             val toPayResp = okHttpClient.newCall(toPayReqBuilder.build()).execute()
+            if (toPayResp.code == 401 || toPayResp.code == 403) {
+                throw NeptunUnauthorizedException("${toPayResp.code} Finances (ItemsToBePayed)")
+            }
             if (toPayResp.isSuccessful) {
                 val toPayBody = toPayResp.body?.string() ?: ""
+                val isRedirect = toPayResp.request.url.encodedPath.contains("Login", ignoreCase = true) ||
+                    (toPayBody.trim().startsWith("<") && (toPayBody.contains("Account/Login", ignoreCase = true) || toPayBody.contains("Login2FA", ignoreCase = true)))
+                if (isRedirect) {
+                    throw NeptunUnauthorizedException("Redirected to Login for ItemsToBePayed")
+                }
                 val toPayData = safeParseJsonObject(toPayBody)?.get("data")?.jsonArray
                 if (toPayData != null) {
                     for (item in toPayData) {
@@ -3481,8 +3526,16 @@ class NeptunApiClient {
             }
 
             val impResp = okHttpClient.newCall(impReqBuilder.build()).execute()
+            if (impResp.code == 401 || impResp.code == 403) {
+                throw NeptunUnauthorizedException("${impResp.code} Finances (StudentImpositions)")
+            }
             if (impResp.isSuccessful) {
                 val impBody = impResp.body?.string() ?: ""
+                val isRedirect = impResp.request.url.encodedPath.contains("Login", ignoreCase = true) ||
+                    (impBody.trim().startsWith("<") && (impBody.contains("Account/Login", ignoreCase = true) || impBody.contains("Login2FA", ignoreCase = true)))
+                if (isRedirect) {
+                    throw NeptunUnauthorizedException("Redirected to Login for StudentImpositions")
+                }
                 val impData = safeParseJsonObject(impBody)?.get("data")?.jsonArray
                 if (impData != null) {
                     for (item in impData) {
@@ -3534,6 +3587,16 @@ class NeptunApiClient {
                     }
                 }
             }
+        } catch (e: NeptunUnauthorizedException) {
+            if (username.isNotEmpty() && password.isNotEmpty() && !baseUrl.contains("elte.hu", ignoreCase = true)) {
+                try {
+                    val leg = getLegacyFinances(baseUrl, username, password)
+                    if (leg.isNotEmpty()) return@withContext leg
+                } catch (legacyEx: Exception) {
+                    Log.w(tag, "Legacy finances fallback failed: ${legacyEx.message}")
+                }
+            }
+            throw e
         } catch (e: Exception) {
             Log.e(tag, "GetStudentImpositions error: ${e.message}")
         }
@@ -3553,8 +3616,16 @@ class NeptunApiClient {
             }
 
             val resp = okHttpClient.newCall(reqBuilder.build()).execute()
+            if (resp.code == 401 || resp.code == 403) {
+                throw NeptunUnauthorizedException("${resp.code} Finances (PreviousTransactions)")
+            }
             if (resp.isSuccessful) {
                 val respBody = resp.body?.string() ?: ""
+                val isRedirect = resp.request.url.encodedPath.contains("Login", ignoreCase = true) ||
+                    (respBody.trim().startsWith("<") && (respBody.contains("Account/Login", ignoreCase = true) || respBody.contains("Login2FA", ignoreCase = true)))
+                if (isRedirect) {
+                    throw NeptunUnauthorizedException("Redirected to Login for PreviousTransactions")
+                }
                 val parsed = safeParseJsonObject(respBody)
                 val dataPart = parsed?.get("data")?.jsonArray
                 if (dataPart != null) {
@@ -3601,6 +3672,16 @@ class NeptunApiClient {
                     }
                 }
             }
+        } catch (e: NeptunUnauthorizedException) {
+            if (username.isNotEmpty() && password.isNotEmpty() && !baseUrl.contains("elte.hu", ignoreCase = true)) {
+                try {
+                    val leg = getLegacyFinances(baseUrl, username, password)
+                    if (leg.isNotEmpty()) return@withContext leg
+                } catch (legacyEx: Exception) {
+                    Log.w(tag, "Legacy finances fallback failed: ${legacyEx.message}")
+                }
+            }
+            throw e
         } catch (e: Exception) {
             Log.e(tag, "Modern transactions error: ${e.message}")
         }

@@ -308,9 +308,10 @@ class NeptunRepositoryImpl(
                 }
             }
 
-            // 4. Jelszavas belépés (végső fallback kizárólag régebbi legacy WCF egyetemeknél)
+            // 4. Jelszavas belépés (ha a fiók nem igényel interaktív 2FA-t)
             val password = prefsManager.getPassword()
-            if (!freshModern && creds.neptunCode.isNotEmpty() && password.isNotEmpty() && password != "******") {
+            val requiresInteractive = creds.requiresInteractiveReauth || prefsManager.isInteractiveReauthRequired()
+            if (!requiresInteractive && creds.neptunCode.isNotEmpty() && password.isNotEmpty() && password != "******") {
                 try {
                     val authRes = neptunApiClient.authenticate(freshLoginUrl, creds.neptunCode, password, freshDeviceCookie)
                     when {
@@ -373,40 +374,34 @@ class NeptunRepositoryImpl(
             return@withContext false
         }
 
+        val requiresKeepAlive = prefsManager.isSessionKeepAliveEnabled() || creds.sessionKeepAlive
+        if (!requiresKeepAlive) {
+            Log.d("NeptunRepo", "Keep-alive kihagyva: a fiók intézménye (${creds.universityName}) nem igényli a heartbeat-et")
+            return@withContext true
+        }
+
         val baseUrl = prefsManager.getBaseUrl().ifEmpty { creds.neptunUrl }
         val loginUrl = prefsManager.getLoginUrl().ifEmpty { creds.neptunUrl }
-        val isElte = loginUrl.contains("neptun.elte.hu", ignoreCase = true) ||
-                     baseUrl.contains("neptun.elte.hu", ignoreCase = true) ||
-                     creds.neptunUrl.contains("neptun.elte.hu", ignoreCase = true)
-
         val sessionCookie = prefsManager.getSessionCookie()
         val deviceCookie = prefsManager.getDeviceCookie(creds.neptunCode)
 
-        if (isElte) {
-            val aspBaseUrl = normalizeAspBaseUrl(loginUrl.ifEmpty { creds.neptunUrl })
-            val pingRes = neptunApiClient.pingSession(aspBaseUrl, sessionCookie, deviceCookie)
-            if (pingRes.isAlive) {
-                Log.d("NeptunRepo", "Keep-alive ping sikeres ELTE szerver felé")
-                pingRes.freshCookies?.let { fresh ->
-                    prefsManager.setSessionCookie(fresh)
-                }
-                ensureValidToken(forceRefresh = false)
-                return@withContext true
-            } else if (pingRes.isRedirectToLogin) {
-                Log.w("NeptunRepo", "Keep-alive ping jelezte: ELTE session lejárt a szerveren")
-                prefsManager.markSessionExpired()
-                return@withContext false
-            } else {
-                Log.d("NeptunRepo", "Keep-alive ping átmeneti hiba, munkamenet nem lejártnak tekintett")
-                return@withContext false
+        val targetUrl = loginUrl.ifEmpty { baseUrl }
+        val aspBaseUrl = normalizeAspBaseUrl(targetUrl)
+        val pingRes = neptunApiClient.pingSession(aspBaseUrl, sessionCookie, deviceCookie)
+        if (pingRes.isAlive) {
+            Log.d("NeptunRepo", "Keep-alive ping sikeres szerver felé")
+            pingRes.freshCookies?.let { fresh ->
+                prefsManager.setSessionCookie(fresh)
             }
-        } else {
-            val token = ensureValidToken(forceRefresh = true)
-            if (token.isBlank()) {
-                prefsManager.markSessionExpired()
-                return@withContext false
-            }
+            ensureValidToken(forceRefresh = false)
             return@withContext true
+        } else if (pingRes.isRedirectToLogin) {
+            Log.w("NeptunRepo", "Keep-alive ping jelezte: session lejárt a szerveren")
+            prefsManager.markSessionExpired()
+            return@withContext false
+        } else {
+            Log.d("NeptunRepo", "Keep-alive ping átmeneti hiba, munkamenet nem lejártnak tekintett")
+            return@withContext false
         }
     }
 
@@ -469,6 +464,7 @@ class NeptunRepositoryImpl(
                         retryEx.printStackTrace()
                     }
                 } else {
+                    prefsManager.markSessionExpired()
                     fetchError = e
                 }
             } catch (e: Exception) {
@@ -479,18 +475,16 @@ class NeptunRepositoryImpl(
 
         if (fetchSucceeded) {
             prefsManager.setDataMode(DataMode.REAL)
-            if (eventsToInsert.isNotEmpty()) {
-                prefsManager.clearSessionExpired()
-                database.calendarDao().replaceEvents(eventsToInsert.map { CalendarEventEntity.fromDomain(it) })
-                _calendarEventsFlow.value = eventsToInsert
-                prefsManager.saveCalendarEvents(eventsToInsert)
-                return@withContext Result.success(Unit)
-            } else {
-                Log.w("NeptunRepo", "Üres órarend érkezett a szervertől, meglévő adatok megőrzése.")
-                return@withContext Result.failure(IllegalStateException("Üres órarend érkezett a szervertől"))
-            }
+            prefsManager.clearSessionExpired()
+            database.calendarDao().replaceEvents(eventsToInsert.map { CalendarEventEntity.fromDomain(it) })
+            _calendarEventsFlow.value = eventsToInsert
+            prefsManager.saveCalendarEvents(eventsToInsert)
+            return@withContext Result.success(Unit)
         }
 
+        if (fetchError is NeptunUnauthorizedException) {
+            prefsManager.markSessionExpired()
+        }
         Result.failure(fetchError ?: IllegalStateException("Failed to fetch calendar events from server"))
     }
 
@@ -548,6 +542,7 @@ class NeptunRepositoryImpl(
                         retryEx.printStackTrace()
                     }
                 } else {
+                    prefsManager.markSessionExpired()
                     fetchError = e
                 }
             } catch (e: Exception) {
@@ -558,22 +553,20 @@ class NeptunRepositoryImpl(
 
         if (fetchSucceeded) {
             prefsManager.setDataMode(DataMode.REAL)
-            if (gradesToInsert.isNotEmpty()) {
-                prefsManager.clearSessionExpired()
-                val existingGrades = database.gradesDao().getAllGrades().first()
-                val ghostMap = existingGrades.mapNotNull { if (it.ghostGrade != null) it.id to it.ghostGrade else null }.toMap()
-                val entitiesToSave = gradesToInsert.map { grade ->
-                    val ghost = ghostMap[grade.id]
-                    SubjectGradeEntity.fromDomain(if (ghost != null) grade.copy(ghostGrade = ghost) else grade)
-                }
-                database.gradesDao().replaceGrades(entitiesToSave)
-                return@withContext Result.success(Unit)
-            } else {
-                Log.w("NeptunRepo", "Üres jegylista érkezett a szervertől, meglévő adatok megőrzése.")
-                return@withContext Result.failure(IllegalStateException("Üres jegylista érkezett a szervertől"))
+            prefsManager.clearSessionExpired()
+            val existingGrades = database.gradesDao().getAllGrades().first()
+            val ghostMap = existingGrades.mapNotNull { if (it.ghostGrade != null) it.id to it.ghostGrade else null }.toMap()
+            val entitiesToSave = gradesToInsert.map { grade ->
+                val ghost = ghostMap[grade.id]
+                SubjectGradeEntity.fromDomain(if (ghost != null) grade.copy(ghostGrade = ghost) else grade)
             }
+            database.gradesDao().replaceGrades(entitiesToSave)
+            return@withContext Result.success(Unit)
         }
 
+        if (fetchError is NeptunUnauthorizedException) {
+            prefsManager.markSessionExpired()
+        }
         Result.failure(fetchError ?: IllegalStateException("Failed to fetch grades from server"))
     }
 
@@ -631,6 +624,7 @@ class NeptunRepositoryImpl(
                         retryEx.printStackTrace()
                     }
                 } else {
+                    prefsManager.markSessionExpired()
                     fetchError = e
                 }
             } catch (e: Exception) {
@@ -641,6 +635,7 @@ class NeptunRepositoryImpl(
 
         if (fetchSucceeded) {
             prefsManager.clearSessionExpired()
+            prefsManager.setDataMode(DataMode.REAL)
             val existingEntities = database.messagesDao().getAllMessages().first()
             val existingById = existingEntities.associateBy { it.id }
             val existingByKey = existingEntities.associateBy { "${it.sender}_${it.subject}_${it.sendDate}" }
@@ -665,26 +660,22 @@ class NeptunRepositoryImpl(
                     isOfficial = msg.isOfficial
                 )
             }
-            if (entitiesToSave.isNotEmpty()) {
-                prefsManager.clearSessionExpired()
-                prefsManager.setDataMode(DataMode.REAL)
-                database.messagesDao().replaceMessages(entitiesToSave)
-                if (existingEntities.isEmpty() || !prefsManager.isBaselineDone("messages")) {
-                    val tracker = com.example.core.notification.NotifiedItemsTracker(prefsManager)
-                    tracker.recordKnownItems(
-                        key = "messages",
-                        items = entitiesToSave,
-                        idOf = { it.id },
-                        altIdOf = { "${it.sender.trim()}_${it.subject.trim()}_${it.sendDate.trim()}" }
-                    )
-                }
-                return@withContext Result.success(Unit)
-            } else {
-                Log.w("NeptunRepo", "Üres üzenetlista érkezett a szervertől, meglévő adatok megőrzése.")
-                return@withContext Result.failure(IllegalStateException("Üres üzenetlista érkezett a szervertől"))
+            database.messagesDao().replaceMessages(entitiesToSave)
+            if (entitiesToSave.isNotEmpty() && (existingEntities.isEmpty() || !prefsManager.isBaselineDone("messages"))) {
+                val tracker = com.example.core.notification.NotifiedItemsTracker(prefsManager)
+                tracker.recordKnownItems(
+                    key = "messages",
+                    items = entitiesToSave,
+                    idOf = { it.id },
+                    altIdOf = { "${it.sender.trim()}_${it.subject.trim()}_${it.sendDate.trim()}" }
+                )
             }
+            return@withContext Result.success(Unit)
         }
 
+        if (fetchError is NeptunUnauthorizedException) {
+            prefsManager.markSessionExpired()
+        }
         Result.failure(fetchError ?: IllegalStateException("Failed to fetch messages from server"))
     }
 
@@ -743,6 +734,7 @@ class NeptunRepositoryImpl(
                         retryEx.printStackTrace()
                     }
                 } else {
+                    prefsManager.markSessionExpired()
                     fetchError = e
                 }
             } catch (e: Exception) {
@@ -752,17 +744,15 @@ class NeptunRepositoryImpl(
         }
 
         if (fetchSucceeded) {
+            prefsManager.clearSessionExpired()
             prefsManager.setDataMode(DataMode.REAL)
-            if (financesToInsert.isNotEmpty()) {
-                prefsManager.clearSessionExpired()
-                database.financesDao().replaceFinances(financesToInsert.map { FinanceItemEntity.fromDomain(it) })
-                return@withContext Result.success(Unit)
-            } else {
-                Log.w("NeptunRepo", "Üres pénzügyi lista érkezett a szervertől, meglévő adatok megőrzése.")
-                return@withContext Result.failure(IllegalStateException("Üres pénzügyi lista érkezett a szervertől"))
-            }
+            database.financesDao().replaceFinances(financesToInsert.map { FinanceItemEntity.fromDomain(it) })
+            return@withContext Result.success(Unit)
         }
 
+        if (fetchError is NeptunUnauthorizedException) {
+            prefsManager.markSessionExpired()
+        }
         Result.failure(fetchError ?: IllegalStateException("Failed to fetch finances from server"))
     }
 
@@ -820,6 +810,7 @@ class NeptunRepositoryImpl(
                         retryEx.printStackTrace()
                     }
                 } else {
+                    prefsManager.markSessionExpired()
                     fetchError = e
                 }
             } catch (e: Exception) {
@@ -829,17 +820,15 @@ class NeptunRepositoryImpl(
         }
 
         if (fetchSucceeded) {
+            prefsManager.clearSessionExpired()
             prefsManager.setDataMode(DataMode.REAL)
-            if (examsToInsert.isNotEmpty()) {
-                prefsManager.clearSessionExpired()
-                database.examsDao().replaceExams(examsToInsert.map { ExamItemEntity.fromDomain(it) })
-                return@withContext Result.success(Unit)
-            } else {
-                Log.w("NeptunRepo", "Üres vizsgalista érkezett a szervertől, meglévő adatok megőrzése.")
-                return@withContext Result.failure(IllegalStateException("Üres vizsgalista érkezett a szervertől"))
-            }
+            database.examsDao().replaceExams(examsToInsert.map { ExamItemEntity.fromDomain(it) })
+            return@withContext Result.success(Unit)
         }
 
+        if (fetchError is NeptunUnauthorizedException) {
+            prefsManager.markSessionExpired()
+        }
         Result.failure(fetchError ?: IllegalStateException("Failed to fetch exams from server"))
     }
 
@@ -1058,15 +1047,35 @@ class NeptunRepositoryImpl(
                 val password = prefsManager.getPassword()
                 val deviceCookie = prefsManager.getDeviceCookie(creds.neptunCode)
 
-                var content = neptunApiClient.getMessageContent(
-                    baseUrl = baseUrl,
-                    token = token,
-                    messageId = messageId,
-                    isModern = isModern,
-                    username = creds.neptunCode,
-                    password = password,
-                    deviceCookie = deviceCookie
-                )
+                var content = ""
+                try {
+                    content = neptunApiClient.getMessageContent(
+                        baseUrl = baseUrl,
+                        token = token,
+                        messageId = messageId,
+                        isModern = isModern,
+                        username = creds.neptunCode,
+                        password = password,
+                        deviceCookie = deviceCookie
+                    )
+                } catch (e: NeptunUnauthorizedException) {
+                    token = ensureValidToken(forceRefresh = true)
+                    if (token.isNotBlank()) {
+                        val updatedCookie = prefsManager.getDeviceCookie(creds.neptunCode)
+                        val updatedBaseUrl = prefsManager.getBaseUrl().ifEmpty { creds.neptunUrl }
+                        content = neptunApiClient.getMessageContent(
+                            baseUrl = updatedBaseUrl,
+                            token = token,
+                            messageId = messageId,
+                            isModern = isModern,
+                            username = creds.neptunCode,
+                            password = password,
+                            deviceCookie = updatedCookie
+                        )
+                    } else {
+                        prefsManager.markSessionExpired()
+                    }
+                }
 
                 // If content is empty and modern API, attempt token refresh and retry
                 if (content.isBlank() && isModern && creds.neptunCode.isNotEmpty()) {
@@ -1099,6 +1108,9 @@ class NeptunRepositoryImpl(
                     database.messagesDao().markAsRead(messageId)
                     return@withContext content
                 }
+            } catch (e: NeptunUnauthorizedException) {
+                prefsManager.markSessionExpired()
+                e.printStackTrace()
             } catch (e: Exception) {
                 e.printStackTrace()
             }

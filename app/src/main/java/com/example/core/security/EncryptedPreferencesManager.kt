@@ -80,12 +80,18 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
             // Csak és kizárólag Robolectric / JVM unit teszt környezetben engedélyezett, ahol nincs AndroidKeyStore daemon
             context.getSharedPreferences("neptun_secure_storage_test", Context.MODE_PRIVATE)
         } else {
-            // Éles Android eszközön soha nem engedünk titkosítatlan fallbacket: újrakíséreljük a tiszta inicializációt
+            android.util.Log.w("EncryptedPrefs", "Első inicializálás sikertelen: ${e.message}, újrapróbálás...")
             try {
-                context.deleteSharedPreferences("neptun_secure_storage")
+                // Újrapróbálkozás törlés nélkül (pl. átmeneti Keystore lock után app frissítéskor)
                 createEncryptedPrefs(context)
-            } catch (retryEx: Exception) {
-                throw SecurityException("A hardveres Keystore vagy titkosított tároló nem inicializálható: ${retryEx.message}", retryEx)
+            } catch (retryWithoutDeleteEx: Exception) {
+                android.util.Log.e("EncryptedPrefs", "Második kísérlet is sikertelen, tiszta inicializáció: ${retryWithoutDeleteEx.message}")
+                try {
+                    context.deleteSharedPreferences("neptun_secure_storage")
+                    createEncryptedPrefs(context)
+                } catch (retryEx: Exception) {
+                    throw SecurityException("A hardveres Keystore vagy titkosított tároló nem inicializálható: ${retryEx.message}", retryEx)
+                }
             }
         }
     }.also {
@@ -507,7 +513,9 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
         neptunUrl: String,
         studentName: String = "Teszt Hallgató",
         sessionToken: String = "",
-        trainingProgram: String = "Egyetemi Képzés"
+        trainingProgram: String = "Egyetemi Képzés",
+        sessionKeepAlive: Boolean = false,
+        requiresInteractiveReauth: Boolean = false
     ) {
         val editor = prefs.edit()
             .putString(KEY_NEPTUN_CODE, neptunCode)
@@ -523,18 +531,21 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
             .putString(KEY_SESSION_TOKEN, sessionToken)
             .putString(KEY_ACCESS_TOKEN, sessionToken)
             .putString(KEY_TRAINING_PROGRAM, trainingProgram)
+            .putBoolean(KEY_SESSION_KEEP_ALIVE, sessionKeepAlive)
+            .putBoolean(KEY_REQUIRES_INTERACTIVE_REAUTH, requiresInteractiveReauth)
             .putBoolean(KEY_IS_LOGGED_IN, true)
             .putLong(KEY_LAST_SYNC, System.currentTimeMillis())
 
         if (password.isNotBlank() && password != "******") {
             editor.putString(KEY_PASSWORD, password)
-        } else {
-            editor.remove(KEY_PASSWORD)
         }
         editor.apply()
 
         _credentialsFlow.value = loadCredentials()
     }
+
+    fun isSessionKeepAliveEnabled(): Boolean = prefs.getBoolean(KEY_SESSION_KEEP_ALIVE, false)
+    fun isInteractiveReauthRequired(): Boolean = prefs.getBoolean(KEY_REQUIRES_INTERACTIVE_REAUTH, false)
 
     fun updateStudentInfo(
         studentName: String? = null,
@@ -564,6 +575,8 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
         val studentName = prefs.getString(KEY_STUDENT_NAME, "Hallgató") ?: "Hallgató"
         val trainingProgram = prefs.getString(KEY_TRAINING_PROGRAM, "Mérnökinformatikus BSc") ?: "Mérnökinformatikus BSc"
         val lastSync = prefs.getLong(KEY_LAST_SYNC, 0L)
+        val sessionKeepAlive = prefs.getBoolean(KEY_SESSION_KEEP_ALIVE, false)
+        val requiresInteractiveReauth = prefs.getBoolean(KEY_REQUIRES_INTERACTIVE_REAUTH, false)
 
         return StudentCredentials(
             neptunCode = neptunCode,
@@ -573,7 +586,9 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
             studentName = studentName,
             trainingProgram = trainingProgram,
             isLoggedIn = isLoggedIn,
-            lastSyncTime = lastSync
+            lastSyncTime = lastSync,
+            sessionKeepAlive = sessionKeepAlive,
+            requiresInteractiveReauth = requiresInteractiveReauth
         )
     }
 
@@ -850,6 +865,8 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
         private const val KEY_HIDDEN_PAGES = "key_hidden_pages"
         private const val KEY_DATA_MODE = "key_data_mode"
         private const val KEY_SESSION_EXPIRED = "key_session_expired"
+        private const val KEY_SESSION_KEEP_ALIVE = "key_session_keep_alive"
+        private const val KEY_REQUIRES_INTERACTIVE_REAUTH = "key_requires_interactive_reauth"
         private const val KEY_APP_LANGUAGE_CODE = "key_app_language_code"
         private const val KEY_APP_LANGUAGE_NAME = "key_app_language_name"
         private const val KEY_APP_LANGUAGE_LCID = "key_app_language_lcid"

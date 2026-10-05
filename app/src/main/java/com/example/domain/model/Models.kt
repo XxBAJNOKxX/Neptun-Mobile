@@ -10,7 +10,9 @@ data class University(
     val name: String,
     val shortName: String,
     val city: String,
-    val neptunUrl: String
+    val neptunUrl: String,
+    val sessionKeepAlive: Boolean = false,
+    val requiresInteractiveReauth: Boolean = false
 )
 
 @Immutable
@@ -72,7 +74,9 @@ data class StudentCredentials(
     val studentName: String = "",
     val trainingProgram: String = "Mérnökinformatikus BSc",
     val isLoggedIn: Boolean = false,
-    val lastSyncTime: Long = 0L
+    val lastSyncTime: Long = 0L,
+    val sessionKeepAlive: Boolean = false,
+    val requiresInteractiveReauth: Boolean = false
 )
 
 @Serializable

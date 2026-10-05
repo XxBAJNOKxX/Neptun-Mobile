@@ -25,9 +25,16 @@ class SessionKeepAliveWorker(
             val creds = prefs.loadCredentials()
 
             if (creds != null && creds.isLoggedIn) {
-                Log.d(TAG, "Executing periodic keep-alive ping...")
+                if (!prefs.isSessionKeepAliveEnabled() && !creds.sessionKeepAlive) {
+                    Log.d(TAG, "Keep-alive nem szükséges ehhez az egyetemhez (${creds.universityName}), periodikus munka törlése.")
+                    cancelPeriodicKeepAlive(applicationContext)
+                    return Result.success()
+                }
+                Log.d(TAG, "Executing periodic keep-alive ping for ${creds.universityName}...")
                 val isAlive = repo.keepAliveSession()
                 Log.d(TAG, "Keep-alive ping result: isAlive=$isAlive")
+            } else {
+                cancelPeriodicKeepAlive(applicationContext)
             }
             Result.success()
         } catch (e: Exception) {
