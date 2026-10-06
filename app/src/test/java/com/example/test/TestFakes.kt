@@ -37,12 +37,31 @@ class FakeAuthRepository : AuthRepository {
     override fun getCredentials(): Flow<StudentCredentials?> = credentialsFlow.asStateFlow()
     override suspend fun loadUniversitiesFromAssets(): List<University> = universitiesList
 
+    var shouldRequire2FASession: Boolean = false
+    var twoFASessionToReturn: Neptun2FASession? = null
+    var verify2FACodeResult: Result<StudentCredentials>? = null
+
     override suspend fun login(
         university: University,
         neptunCode: String,
         password: String,
         twoFactorCode: String
     ): Result<StudentCredentials> {
+        if (shouldRequire2FASession) {
+            val session = twoFASessionToReturn ?: Neptun2FASession(
+                neptunCode = neptunCode,
+                key = "KEY_123",
+                phase = "RequestEmailCode",
+                rendered = "",
+                verificationToken = "token",
+                hasTotp = true,
+                hasEmail = true,
+                codePrefix = "",
+                cookies = emptyMap(),
+                baseUrl = university.neptunUrl
+            )
+            return Result.failure(com.example.domain.repository.TwoFactorSessionRequiredException(session))
+        }
         val creds = StudentCredentials(
             neptunCode = neptunCode,
             universityId = university.id,
@@ -57,13 +76,19 @@ class FakeAuthRepository : AuthRepository {
         return Result.success(creds)
     }
 
-    override suspend fun request2FAEmailCode(session: Neptun2FASession): Result<Neptun2FASession> = Result.success(session)
+    override suspend fun request2FAEmailCode(session: Neptun2FASession): Result<Neptun2FASession> =
+        Result.success(session.copy(codePrefix = "AZ", phase = "RequestEmailCode"))
+
     override suspend fun verify2FACode(session: Neptun2FASession, code: String, isTotp: Boolean): Result<StudentCredentials> {
+        verify2FACodeResult?.let { return it }
+        if (code != "123456") {
+            return Result.failure(Exception("A megadott biztonsági kód érvénytelen vagy lejárt!"))
+        }
         val creds = StudentCredentials(
-            neptunCode = "TEST01",
-            universityId = "bme",
-            universityName = "BME",
-            neptunUrl = "https://neptun.bme.hu",
+            neptunCode = session.neptunCode,
+            universityId = "elte",
+            universityName = "ELTE",
+            neptunUrl = session.baseUrl,
             studentName = "Teszt Hallgató",
             trainingProgram = "BSc",
             isLoggedIn = true,

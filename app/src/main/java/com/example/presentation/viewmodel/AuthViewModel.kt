@@ -335,7 +335,7 @@ class AuthViewModel(
                         is TwoFactorSessionRequiredException -> {
                             val session = error.session
                             val defaultMethod = if (!session.hasTotp || session.hasEmail) TwoFactorMethod.EMAIL else TwoFactorMethod.TOTP
-                            val isEmailReq = session.codePrefix.isNotEmpty() || session.phase.equals("RequestEmailCode", ignoreCase = true)
+                            val isEmailReq = session.codePrefix.isNotEmpty()
                             _uiState.update {
                                 it.copy(
                                     isLoading = false,
@@ -483,7 +483,7 @@ class AuthViewModel(
                             is TwoFactorSessionRequiredException -> {
                                 val session = error.session
                                 val defaultMethod = if (!session.hasTotp || session.hasEmail) TwoFactorMethod.EMAIL else TwoFactorMethod.TOTP
-                                val isEmailReq = session.codePrefix.isNotEmpty() || session.phase.equals("RequestEmailCode", ignoreCase = true)
+                                val isEmailReq = session.codePrefix.isNotEmpty()
                                 _uiState.update {
                                     it.copy(
                                         isLoading = false,
@@ -495,9 +495,6 @@ class AuthViewModel(
                                         twoFactorSuccessMessage = if (isEmailReq && session.codePrefix.isNotEmpty()) "Előtag: ${session.codePrefix}-" else null,
                                         twoFactorErrorMessage = null
                                     )
-                                }
-                                if (!isEmailReq) {
-                                    requestEmailCode()
                                 }
                             }
                             is TwoFactorRequiredException -> {
@@ -569,7 +566,7 @@ class AuthViewModel(
                             authRepository.savePassword(pwd)
                             val session = error.session
                             val defaultMethod = if (!session.hasTotp || session.hasEmail) TwoFactorMethod.EMAIL else TwoFactorMethod.TOTP
-                            val isEmailReq = session.codePrefix.isNotEmpty() || session.phase.equals("RequestEmailCode", ignoreCase = true)
+                            val isEmailReq = session.codePrefix.isNotEmpty()
                             _uiState.update {
                                 it.copy(
                                     isLoading = false,
@@ -580,9 +577,6 @@ class AuthViewModel(
                                     codePrefix = session.codePrefix,
                                     twoFactorSuccessMessage = if (isEmailReq && session.codePrefix.isNotEmpty()) "Előtag: ${session.codePrefix}-" else null
                                 )
-                            }
-                            if (!isEmailReq) {
-                                requestEmailCode()
                             }
                         }
                         is TwoFactorRequiredException -> {

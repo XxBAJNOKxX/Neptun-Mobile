@@ -217,4 +217,81 @@ class AuthViewModelTest {
         assertFalse(finalState.isQuickReAuthOpen)
         assertEquals("enteredPass123", authRepository.storedPassword)
     }
+
+    @Test
+    fun `initiateQuickReAuth with 2FA requires user to request email code and shows prefix`() = runTest {
+        mainDispatcherRule.testDispatcher.scheduler.advanceUntilIdle()
+
+        authRepository.storedPassword = "savedSecretPassword"
+        authRepository.shouldRequire2FASession = true
+        authRepository.credentialsFlow.value = StudentCredentials(
+            neptunCode = "TEST01",
+            universityId = "elte",
+            universityName = "ELTE",
+            neptunUrl = "https://neptun.elte.hu",
+            studentName = "Teszt Hallgató",
+            trainingProgram = "BSc",
+            isLoggedIn = true,
+            lastSyncTime = System.currentTimeMillis()
+        )
+
+        viewModel.initiateQuickReAuth()
+        mainDispatcherRule.testDispatcher.scheduler.advanceUntilIdle()
+
+        val stateAfterReauth = viewModel.uiState.value
+        assertTrue(stateAfterReauth.isTwoFactorRequired)
+        assertFalse(stateAfterReauth.isEmailCodeRequested)
+        assertEquals("", stateAfterReauth.codePrefix)
+
+        // User clicks "Kód kérése e-mailben"
+        viewModel.requestEmailCode()
+        mainDispatcherRule.testDispatcher.scheduler.advanceUntilIdle()
+
+        val stateAfterRequest = viewModel.uiState.value
+        assertTrue(stateAfterRequest.isEmailCodeRequested)
+        assertEquals("AZ", stateAfterRequest.codePrefix)
+        assertNotNull(stateAfterRequest.twoFactorSuccessMessage)
+
+        // Submitting invalid code fails and leaves dialog open
+        viewModel.onTwoFactorCodeChange("999999")
+        viewModel.submitTwoFactor()
+        mainDispatcherRule.testDispatcher.scheduler.advanceUntilIdle()
+
+        val stateAfterInvalid = viewModel.uiState.value
+        assertTrue(stateAfterInvalid.isTwoFactorRequired)
+        assertNotNull(stateAfterInvalid.twoFactorErrorMessage)
+
+        // Submitting valid code succeeds and dismisses 2FA
+        viewModel.onTwoFactorCodeChange("123456")
+        viewModel.submitTwoFactor()
+        mainDispatcherRule.testDispatcher.scheduler.advanceUntilIdle()
+
+        val stateAfterValid = viewModel.uiState.value
+        assertFalse(stateAfterValid.isTwoFactorRequired)
+        assertFalse(stateAfterValid.isQuickReAuthOpen)
+        assertNotNull(stateAfterValid.credentials)
+    }
+
+    @Test
+    fun `standard login with 2FA starts with unrequested email code and populates prefix on request`() = runTest {
+        mainDispatcherRule.testDispatcher.scheduler.advanceUntilIdle()
+
+        authRepository.shouldRequire2FASession = true
+        viewModel.onNeptunCodeChange("USER01")
+        viewModel.onPasswordChange("Pass123")
+        viewModel.login()
+        mainDispatcherRule.testDispatcher.scheduler.advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertTrue(state.isTwoFactorRequired)
+        assertFalse(state.isEmailCodeRequested)
+        assertEquals("", state.codePrefix)
+
+        viewModel.requestEmailCode()
+        mainDispatcherRule.testDispatcher.scheduler.advanceUntilIdle()
+
+        val updated = viewModel.uiState.value
+        assertTrue(updated.isEmailCodeRequested)
+        assertEquals("AZ", updated.codePrefix)
+    }
 }

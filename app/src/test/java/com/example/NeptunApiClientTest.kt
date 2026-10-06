@@ -518,5 +518,54 @@ class NeptunApiClientTest {
         assertTrue(com.example.core.util.SystemMessageHelper.isSystemSender("SYSTEM USER"))
         assertFalse(com.example.core.util.SystemMessageHelper.isSystemSender("Dr. Nagy Ádám"))
     }
+
+    @Test
+    fun testExtractValidationErrorsFrom2FAForm() {
+        val errorHtml = """
+            <div class="validation-summary-errors text-danger">
+                <ul>
+                    <li>A megadott biztonsági kód érvénytelen vagy lejárt!</li>
+                </ul>
+            </div>
+        """.trimIndent()
+        val errors = client.extractValidationErrors(errorHtml)
+        assertEquals(1, errors.size)
+        assertEquals("A megadott biztonsági kód érvénytelen vagy lejárt!", errors[0])
+    }
+
+    @Test
+    fun testExtractValidationErrorsFromFieldSpan() {
+        val errorHtml = """
+            <span class="field-validation-error text-danger" data-valmsg-for="EmailCode">
+                Nem megfelelő az ellenőrző kód.
+            </span>
+        """.trimIndent()
+        val errors = client.extractValidationErrors(errorHtml)
+        assertEquals(1, errors.size)
+        assertEquals("Nem megfelelő az ellenőrző kód.", errors[0])
+    }
+
+    @Test
+    fun testParseCodePrefixFromFormInputsAndText() {
+        val formHtmlWithInput = """
+            <form action="/Account/Login2FA" method="post">
+                <input type="hidden" name="CodePrefix" value="AZ" />
+                <input type="text" name="EmailCode" value="" />
+            </form>
+        """.trimIndent()
+        val inputs = client.parseFormInputs(formHtmlWithInput)
+        assertEquals("AZ", inputs["CodePrefix"])
+
+        val htmlWithTextPrefix = """
+            <div>
+                <span class="badge">Kód előtagja: 736-</span>
+                <input type="text" name="EmailCode" />
+            </div>
+        """.trimIndent()
+        val prefixRegex = Regex("""(?:kód\s*előtag(?:ja)?|előtag)\s*[:\-]?\s*([a-zA-Z0-9]{2,4})""", RegexOption.IGNORE_CASE)
+        val match = prefixRegex.find(htmlWithTextPrefix)
+        assertNotNull(match)
+        assertEquals("736", match?.groupValues?.get(1))
+    }
 }
 

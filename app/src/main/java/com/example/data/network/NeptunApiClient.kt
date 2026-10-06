@@ -814,15 +814,35 @@ class NeptunApiClient(
             cookieMap = mergeCookies(cookieMap, parseCookiesFromHeaders(newCookies)).toMutableMap()
 
             val errors = extractValidationErrors(html)
-            if (errors.isNotEmpty()) {
-                return@withContext Result.failure(Exception(errors.joinToString(" | ")))
+            val inputs = parseFormInputs(html, "Login2FA")
+
+            var parsedPrefix = inputs["CodePrefix"].orEmpty().trim()
+            if (parsedPrefix.isEmpty()) {
+                val prefixRegex = Regex("""(?:kód\s*előtag(?:ja)?|előtag)\s*[:\-]?\s*([a-zA-Z0-9]{2,4})""", RegexOption.IGNORE_CASE)
+                parsedPrefix = prefixRegex.find(html)?.groupValues?.getOrNull(1).orEmpty().trim()
             }
 
-            val inputs = parseFormInputs(html, "Login2FA")
+            if (errors.isNotEmpty()) {
+                val errMsg = errors.joinToString(" | ")
+                val isRecent = errMsg.contains("Nemrég küldtünk", ignoreCase = true) ||
+                        errMsg.contains("néhány perc múlva", ignoreCase = true)
+                if (isRecent && parsedPrefix.isNotEmpty()) {
+                    val updatedSession = session.copy(
+                        phase = inputs["Phase"] ?: "RequestEmailCode",
+                        codePrefix = parsedPrefix,
+                        rendered = inputs["Rendered"] ?: session.rendered,
+                        verificationToken = inputs["__RequestVerificationToken"] ?: session.verificationToken,
+                        key = inputs["Key"]?.ifEmpty { session.key } ?: session.key,
+                        cookies = cookieMap
+                    )
+                    return@withContext Result.success(updatedSession)
+                }
+                return@withContext Result.failure(Exception(errMsg))
+            }
 
             val updatedSession = session.copy(
                 phase = inputs["Phase"] ?: "RequestEmailCode",
-                codePrefix = inputs["CodePrefix"] ?: "",
+                codePrefix = parsedPrefix,
                 rendered = inputs["Rendered"] ?: session.rendered,
                 verificationToken = inputs["__RequestVerificationToken"] ?: session.verificationToken,
                 key = inputs["Key"]?.ifEmpty { session.key } ?: session.key,
@@ -883,25 +903,28 @@ class NeptunApiClient(
             var locationHeader = ""
             var newCookies: List<String> = emptyList()
             var html = ""
-            var isSuccessful = false
             okHttpClient.newBuilder().followRedirects(false).build().newCall(req).execute().use { resp ->
                 statusCode = resp.code
                 locationHeader = resp.header("Location").orEmpty()
                 newCookies = resp.headers("Set-Cookie")
                 html = resp.body?.string().orEmpty()
-                isSuccessful = resp.isSuccessful
             }
             cookieMap = mergeCookies(cookieMap, parseCookiesFromHeaders(newCookies)).toMutableMap()
 
-            if (statusCode in 300..399) {
+            if (statusCode in 300..399 && locationHeader.isNotEmpty() && !locationHeader.contains("Account/Login", ignoreCase = true)) {
+                return@withContext exchangeAspSessionToModernToken(session.baseUrl, cookieMap, session.neptunCode)
+            }
+
+            val isStillOn2FaPage = html.contains("Login2FA", ignoreCase = true) ||
+                    html.contains("EmailCode", ignoreCase = true) ||
+                    html.contains("TOTPCode", ignoreCase = true) ||
+                    locationHeader.contains("Account/Login", ignoreCase = true)
+
+            if (!isStillOn2FaPage && (html.contains("ToNeptunWeb", ignoreCase = true) || html.contains("Kijelentkezés", ignoreCase = true) || html.contains("outerlogin", ignoreCase = true))) {
                 return@withContext exchangeAspSessionToModernToken(session.baseUrl, cookieMap, session.neptunCode)
             }
 
             val errors = extractValidationErrors(html)
-            if (errors.isEmpty() && (html.contains("ToNeptunWeb", ignoreCase = true) || html.contains("Kijelentkezés", ignoreCase = true) || locationHeader.isNotEmpty() || isSuccessful)) {
-                return@withContext exchangeAspSessionToModernToken(session.baseUrl, cookieMap, session.neptunCode)
-            }
-
             val errorMsg = if (errors.isNotEmpty()) {
                 errors.joinToString(" | ")
             } else {
@@ -1068,10 +1091,8 @@ class NeptunApiClient(
                 }
             }
 
-            val effectiveBaseUrl = if (cleanBase.contains("elte.hu", ignoreCase = true) && !cleanBase.contains("hallgato", ignoreCase = true)) {
-                "https://hallgato1.neptun.elte.hu"
-            } else {
-                cleanBase
+            if (cleanBase.contains("elte.hu", ignoreCase = true)) {
+                return@withContext NeptunAuthResult.Failure("Nem sikerült érvényesíteni az ELTE munkamenetet!")
             }
 
             return@withContext NeptunAuthResult.Success(
@@ -1081,14 +1102,12 @@ class NeptunApiClient(
                 studentName = "Hallgató ($username)",
                 trainingProgram = "Egyetemi képzés",
                 isModernApi = false,
-                normalizedBaseUrl = effectiveBaseUrl
+                normalizedBaseUrl = cleanBase
             )
         } catch (e: Exception) {
             Log.e(tag, "exchangeAspSessionToModernToken error: ${e.message}")
-            val effectiveBaseUrl = if (aspBaseUrl.contains("elte.hu", ignoreCase = true) && !aspBaseUrl.contains("hallgato", ignoreCase = true)) {
-                "https://hallgato1.neptun.elte.hu"
-            } else {
-                aspBaseUrl
+            if (aspBaseUrl.contains("elte.hu", ignoreCase = true)) {
+                return@withContext NeptunAuthResult.Failure("Hiba az ELTE munkamenet érvényesítésekor: ${e.localizedMessage}")
             }
             return@withContext NeptunAuthResult.Success(
                 accessToken = "aspnet-session-$username",
@@ -1097,7 +1116,7 @@ class NeptunApiClient(
                 studentName = "Hallgató ($username)",
                 trainingProgram = "Egyetemi képzés",
                 isModernApi = false,
-                normalizedBaseUrl = effectiveBaseUrl
+                normalizedBaseUrl = aspBaseUrl
             )
         }
     }
