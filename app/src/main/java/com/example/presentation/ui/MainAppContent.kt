@@ -60,6 +60,7 @@ import com.example.core.crash.CrashReporter
 import com.example.core.di.AppContainer
 import com.example.core.export.IcsExporter
 import com.example.core.security.DataMode
+import com.example.core.util.BatteryOptimizationHelper
 import com.example.presentation.navigation.NavigationItem
 import com.example.presentation.ui.components.BiometricLockScreen
 import com.example.presentation.ui.components.InAppUpdateDialog
@@ -296,6 +297,58 @@ private fun MainDashboard(
     }
 
     val isInteractiveReauth = appContainer.prefsManager.isInteractiveReauthRequired()
+    val isElteOr2Fa = isInteractiveReauth ||
+            authState.credentials?.universityId == "elte" ||
+            authState.credentials?.neptunUrl?.contains("elte.hu") == true
+
+    var showBatteryOptDialog by rememberSaveable(authState.credentials?.neptunCode) {
+        mutableStateOf(
+            isElteOr2Fa &&
+            !BatteryOptimizationHelper.isIgnoringBatteryOptimizations(context) &&
+            !appContainer.prefsManager.isBatteryOptimizationPromptDismissed()
+        )
+    }
+
+    if (showBatteryOptDialog &&
+        isElteOr2Fa &&
+        !BatteryOptimizationHelper.isIgnoringBatteryOptimizations(context) &&
+        !appContainer.prefsManager.isBatteryOptimizationPromptDismissed()
+    ) {
+        AlertDialog(
+            onDismissRequest = { showBatteryOptDialog = false },
+            title = { Text(strings.batteryOptimizationDialogTitle) },
+            text = { Text(strings.batteryOptimizationDialogMessage) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        BatteryOptimizationHelper.openBatteryOptimizationSettings(context)
+                        showBatteryOptDialog = false
+                    }
+                ) {
+                    Text(strings.batteryOptimizationOpenSettings)
+                }
+            },
+            dismissButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(
+                        onClick = {
+                            appContainer.prefsManager.setBatteryOptimizationPromptDismissed(true)
+                            showBatteryOptDialog = false
+                        }
+                    ) {
+                        Text(strings.batteryOptimizationDoNotShowAgain)
+                    }
+                    TextButton(
+                        onClick = {
+                            showBatteryOptDialog = false
+                        }
+                    ) {
+                        Text(strings.later)
+                    }
+                }
+            }
+        )
+    }
 
     // 2FA nélküli fióknál csendes újra-hitelesítés, ha a munkamenet lejár
     LaunchedEffect(sessionExpired, isInteractiveReauth) {

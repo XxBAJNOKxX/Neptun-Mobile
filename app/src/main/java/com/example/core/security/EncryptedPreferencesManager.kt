@@ -578,6 +578,14 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
     fun isSessionKeepAliveEnabled(): Boolean = prefs.getBoolean(KEY_SESSION_KEEP_ALIVE, false)
     fun isInteractiveReauthRequired(): Boolean = prefs.getBoolean(KEY_REQUIRES_INTERACTIVE_REAUTH, false)
 
+    fun isBatteryOptimizationPromptDismissed(): Boolean {
+        return prefs.getBoolean(KEY_BATTERY_OPT_PROMPT_DISMISSED, false)
+    }
+
+    fun setBatteryOptimizationPromptDismissed(dismissed: Boolean) {
+        prefs.edit().putBoolean(KEY_BATTERY_OPT_PROMPT_DISMISSED, dismissed).apply()
+    }
+
     fun updateStudentInfo(
         studentName: String? = null,
         trainingProgram: String? = null,
@@ -789,6 +797,7 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
         val reminderMins = prefs.getInt(KEY_CLASS_REMINDER_MINUTES, 15)
         val savedPersonalization = loadPersonalization()
         val savedNotifQuiet = loadNotificationPreferences()
+        val savedBatteryOptDismissed = isBatteryOptimizationPromptDismissed()
 
         // Preserve already notified items, baselines and device cookies so re-login or sync doesn't re-trigger notifications or 2FA
         val savedNotifiedEntries = prefs.all.filter { (k, _) ->
@@ -819,6 +828,7 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
             .putBoolean(KEY_QUIET_HOURS_ENABLED, savedNotifQuiet.quietHoursEnabled)
             .putInt(KEY_QUIET_START_MINUTE, savedNotifQuiet.quietStartMinute)
             .putInt(KEY_QUIET_END_MINUTE, savedNotifQuiet.quietEndMinute)
+            .putBoolean(KEY_BATTERY_OPT_PROMPT_DISMISSED, savedBatteryOptDismissed)
             .putBoolean(KEY_IS_LOGGED_IN, false)
 
         for ((k, v) in savedNotifiedEntries) {
@@ -909,6 +919,7 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
         private const val KEY_DEGREE_PROGRESS = "key_degree_progress"
         private const val KEY_ACADEMIC_PERIODS = "key_academic_periods"
         private const val KEY_CALENDAR_EVENTS = "key_calendar_events"
+        const val KEY_BATTERY_OPT_PROMPT_DISMISSED = "battery_opt_prompt_dismissed"
     }
 }
 

@@ -58,6 +58,8 @@ import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.SystemUpdate
+import androidx.compose.material.icons.filled.Warning
+import com.example.core.util.BatteryOptimizationHelper
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -195,6 +197,7 @@ fun SettingsScreen(
     }
 
     var isNotificationPermissionGranted by remember { mutableStateOf(checkPermission()) }
+    var isBatteryOptIgnoring by remember { mutableStateOf(BatteryOptimizationHelper.isIgnoringBatteryOptimizations(context)) }
 
     // A Compose activity-result launcher a FragmentActivity 16 bites requestCode
     // korlátjával ütközve IllegalArgumentException-t dobott
@@ -206,6 +209,7 @@ fun SettingsScreen(
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 isNotificationPermissionGranted = checkPermission()
+                isBatteryOptIgnoring = BatteryOptimizationHelper.isIgnoringBatteryOptimizations(context)
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -1623,6 +1627,98 @@ fun SettingsScreen(
             }
 
             com.example.core.debug.DebugFeatures.DevMenuSection(modifier = Modifier.padding(top = 16.dp))
+
+            // Battery Optimization Status Card
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (isBatteryOptIgnoring) {
+                        NeptunGreen.copy(alpha = 0.08f)
+                    } else {
+                        NeptunGold.copy(alpha = 0.10f)
+                    }
+                ),
+                border = BorderStroke(
+                    1.dp,
+                    if (isBatteryOptIgnoring) NeptunGreen.copy(alpha = 0.3f) else NeptunGold.copy(alpha = 0.4f)
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("battery_optimization_card")
+            ) {
+                Column(
+                    modifier = Modifier.padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = if (isBatteryOptIgnoring) Icons.Default.CheckCircle else Icons.Default.Warning,
+                            contentDescription = null,
+                            tint = if (isBatteryOptIgnoring) NeptunGreen else NeptunGold,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = strings.batteryOptimizationTitle,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+
+                    Text(
+                        text = if (isBatteryOptIgnoring) {
+                            strings.batteryOptimizationDisabledSuccess
+                        } else {
+                            strings.batteryOptimizationActiveWarning
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    if (!isBatteryOptIgnoring) {
+                        val guidance = BatteryOptimizationHelper.getManufacturerGuidance()
+                        if (guidance.isNotBlank()) {
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.6f),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = guidance,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(10.dp)
+                                )
+                            }
+                        }
+
+                        Button(
+                            onClick = {
+                                BatteryOptimizationHelper.openBatteryOptimizationSettings(context)
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("battery_optimization_settings_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.OpenInBrowser,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = strings.batteryOptimizationOpenSettings,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+                }
+            }
 
             // Sync and Logout Actions Card
             Card(

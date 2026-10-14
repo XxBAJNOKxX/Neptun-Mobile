@@ -490,6 +490,15 @@ interface AppStrings {
     val notifMessagesSummaryTitle: (Int) -> String
     val notifGradesSummaryTitle: (Int) -> String
     val notifFinancesSummaryTitle: (Int) -> String
+
+    // Battery Optimization
+    val batteryOptimizationTitle: String
+    val batteryOptimizationActiveWarning: String
+    val batteryOptimizationDisabledSuccess: String
+    val batteryOptimizationOpenSettings: String
+    val batteryOptimizationDialogTitle: String
+    val batteryOptimizationDialogMessage: String
+    val batteryOptimizationDoNotShowAgain: String
 }
 
 class HungarianStrings : AppStrings {
@@ -987,6 +996,15 @@ class HungarianStrings : AppStrings {
     override val notifMessagesSummaryTitle: (Int) -> String = { "$it új üzenet" }
     override val notifGradesSummaryTitle: (Int) -> String = { "$it új érdemjegy" }
     override val notifFinancesSummaryTitle: (Int) -> String = { "$it befizetendő tétel" }
+
+    // Battery Optimization
+    override val batteryOptimizationTitle = "Akkumulátor-optimalizálás és háttérszinkron"
+    override val batteryOptimizationActiveWarning = "Az akkumulátor-optimalizálás be van kapcsolva. Ez késleltetheti a háttérszinkronizálást és az órakezdési értesítéseket."
+    override val batteryOptimizationDisabledSuccess = "Az akkumulátor-optimalizálás ki van kapcsolva. A háttérszinkron és az értesítések megbízhatóan működnek."
+    override val batteryOptimizationOpenSettings = "Beállítások megnyitása"
+    override val batteryOptimizationDialogTitle = "Akkumulátor-optimalizálás figyelmeztetés"
+    override val batteryOptimizationDialogMessage = "Az ELTE-s (2FA-s) fiókoknál a háttérszinkronizáció és az órakezdési értesítések megbízható működéséhez javasolt az akkumulátor-optimalizálás kikapcsolása az alkalmazás számára, különben a rendszer felfüggesztheti a folyamatokat."
+    override val batteryOptimizationDoNotShowAgain = "Ne mutasd többet"
 }
 
 class EnglishStrings : AppStrings {
@@ -1481,6 +1499,15 @@ class EnglishStrings : AppStrings {
     override val notifMessagesSummaryTitle: (Int) -> String = { "$it new messages" }
     override val notifGradesSummaryTitle: (Int) -> String = { "$it new grades" }
     override val notifFinancesSummaryTitle: (Int) -> String = { "$it pending payment items" }
+
+    // Battery Optimization
+    override val batteryOptimizationTitle = "Battery Optimization & Background Sync"
+    override val batteryOptimizationActiveWarning = "Battery optimization is active. This may delay background sync and class reminders."
+    override val batteryOptimizationDisabledSuccess = "Battery optimization is disabled. Background sync and notifications work reliably."
+    override val batteryOptimizationOpenSettings = "Open Settings"
+    override val batteryOptimizationDialogTitle = "Battery Optimization Notice"
+    override val batteryOptimizationDialogMessage = "For ELTE (2FA) accounts, disabling battery optimization for this app is recommended so background sync and class reminders can operate reliably without being halted by the system."
+    override val batteryOptimizationDoNotShowAgain = "Don't show again"
 }
 
 class GermanStrings : AppStrings {
@@ -1973,6 +2000,15 @@ class GermanStrings : AppStrings {
     override val notifMessagesSummaryTitle: (Int) -> String = { "$it neue Nachrichten" }
     override val notifGradesSummaryTitle: (Int) -> String = { "$it neue Noten" }
     override val notifFinancesSummaryTitle: (Int) -> String = { "$it ausstehende Zahlungen" }
+
+    // Battery Optimization
+    override val batteryOptimizationTitle = "Akku-Optimierung & Hintergrund-Synchronisierung"
+    override val batteryOptimizationActiveWarning = "Die Akku-Optimierung ist aktiv. Dies kann die Hintergrund-Synchronisierung und Benachrichtigungen verzögern."
+    override val batteryOptimizationDisabledSuccess = "Akku-Optimierung ist deaktiviert. Hintergrund-Synchronisierung und Benachrichtigungen funktionieren zuverlässig."
+    override val batteryOptimizationOpenSettings = "Einstellungen öffnen"
+    override val batteryOptimizationDialogTitle = "Hinweis zur Akku-Optimierung"
+    override val batteryOptimizationDialogMessage = "Für ELTE-Konten (2FA) wird empfohlen, die Akku-Optimierung für diese App zu deaktivieren, damit die Hintergrund-Synchronisierung und Benachrichtigungen zuverlässig funktionieren."
+    override val batteryOptimizationDoNotShowAgain = "Nicht mehr anzeigen"
 }
 
 object AppStringsProvider {
