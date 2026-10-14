@@ -161,14 +161,23 @@ class FakeNeptunRepository : NeptunRepository {
     override fun getDegreeProgress(): Flow<DegreeProgress?> = degreeProgressFlow.asStateFlow()
     override fun getAcademicPeriods(): Flow<List<AcademicPeriod>> = academicPeriodsFlow.asStateFlow()
 
-    override suspend fun syncAllData(neptunCode: String, sessionToken: String): Result<Unit> = Result.success(Unit)
-    override suspend fun refreshCalendar(): Result<Unit> = Result.success(Unit)
-    override suspend fun refreshGrades(): Result<Unit> = Result.success(Unit)
-    override suspend fun refreshMessages(): Result<Unit> = Result.success(Unit)
-    override suspend fun refreshFinances(): Result<Unit> = Result.success(Unit)
-    override suspend fun refreshExams(): Result<Unit> = Result.success(Unit)
-    override suspend fun refreshDegreeProgress(): Result<Unit> = Result.success(Unit)
-    override suspend fun refreshAcademicPeriods(): Result<Unit> = Result.success(Unit)
+    var syncAllDataResult: Result<Unit> = Result.success(Unit)
+    var refreshCalendarResult: Result<Unit> = Result.success(Unit)
+    var refreshGradesResult: Result<Unit> = Result.success(Unit)
+    var refreshMessagesResult: Result<Unit> = Result.success(Unit)
+    var refreshFinancesResult: Result<Unit> = Result.success(Unit)
+    var refreshExamsResult: Result<Unit> = Result.success(Unit)
+    var refreshDegreeProgressResult: Result<Unit> = Result.success(Unit)
+    var refreshAcademicPeriodsResult: Result<Unit> = Result.success(Unit)
+
+    override suspend fun syncAllData(neptunCode: String, sessionToken: String): Result<Unit> = syncAllDataResult
+    override suspend fun refreshCalendar(): Result<Unit> = refreshCalendarResult
+    override suspend fun refreshGrades(): Result<Unit> = refreshGradesResult
+    override suspend fun refreshMessages(): Result<Unit> = refreshMessagesResult
+    override suspend fun refreshFinances(): Result<Unit> = refreshFinancesResult
+    override suspend fun refreshExams(): Result<Unit> = refreshExamsResult
+    override suspend fun refreshDegreeProgress(): Result<Unit> = refreshDegreeProgressResult
+    override suspend fun refreshAcademicPeriods(): Result<Unit> = refreshAcademicPeriodsResult
 
     override suspend fun setGhostGrade(subjectId: String, ghostGrade: Int?) {
         subjectGradesFlow.value = subjectGradesFlow.value.map {

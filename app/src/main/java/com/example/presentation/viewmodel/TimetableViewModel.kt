@@ -45,7 +45,9 @@ data class TimetableUiState(
     val academicPeriods: List<AcademicPeriod> = emptyList(),
     val periodFilter: Int = 0, // 0 = Mind, 1 = Aktív, 2 = Közelgő, 3 = Lezárult
     val isRefreshingPeriods: Boolean = false,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val lastSyncTime: Long = 0L,
+    val hasSyncedSuccessfully: Boolean = false
 )
 
 private fun currentOrNextSchoolDay(): Int {
@@ -299,12 +301,19 @@ class TimetableViewModel(
 
     fun refreshCalendar(isManual: Boolean = true) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isRefreshing = true, errorMessage = null) }
+            _uiState.update {
+                it.copy(
+                    isRefreshing = true,
+                    errorMessage = if (it.errorMessage == "TIMETABLE_LOAD_FAILED") null else it.errorMessage
+                )
+            }
             val res = neptunRepository.refreshCalendar()
             _uiState.update {
                 it.copy(
                     isRefreshing = false,
-                    errorMessage = if (res.isFailure && (isManual || it.events.isEmpty())) "TIMETABLE_LOAD_FAILED" else null
+                    errorMessage = if (res.isFailure) "TIMETABLE_LOAD_FAILED" else if (it.errorMessage == "TIMETABLE_LOAD_FAILED") null else it.errorMessage,
+                    hasSyncedSuccessfully = if (res.isSuccess) true else it.hasSyncedSuccessfully,
+                    lastSyncTime = if (res.isSuccess) System.currentTimeMillis() else it.lastSyncTime
                 )
             }
         }
@@ -334,12 +343,17 @@ class TimetableViewModel(
 
     fun refreshAcademicPeriods(isManual: Boolean = true) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isRefreshingPeriods = true, errorMessage = null) }
+            _uiState.update {
+                it.copy(
+                    isRefreshingPeriods = true,
+                    errorMessage = if (it.errorMessage == "PERIODS_LOAD_FAILED") null else it.errorMessage
+                )
+            }
             val res = neptunRepository.refreshAcademicPeriods()
             _uiState.update {
                 it.copy(
                     isRefreshingPeriods = false,
-                    errorMessage = if (res.isFailure && (isManual || it.academicPeriods.isEmpty())) "PERIODS_LOAD_FAILED" else null
+                    errorMessage = if (res.isFailure && (isManual || it.academicPeriods.isEmpty())) "PERIODS_LOAD_FAILED" else if (it.errorMessage == "PERIODS_LOAD_FAILED") null else it.errorMessage
                 )
             }
         }

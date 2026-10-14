@@ -38,6 +38,8 @@ import androidx.compose.material.icons.filled.Today
 import androidx.compose.material.icons.filled.Upcoming
 import androidx.compose.material.icons.filled.ViewAgenda
 import androidx.compose.material.icons.filled.ViewWeek
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -70,6 +72,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.core.i18n.currentStrings
@@ -176,14 +179,20 @@ fun TimetableScreen(
             }
         }
 
-        if (uiState.errorMessage != null) {
+        if (uiState.errorMessage != null && (uiState.events.isNotEmpty() || uiState.selectedTab == 1)) {
             val errorText = when (uiState.errorMessage) {
                 "TIMETABLE_LOAD_FAILED" -> strings.timetableLoadFailed
                 "PERIODS_LOAD_FAILED" -> strings.periodsLoadFailed
                 else -> uiState.errorMessage
             }
+            val formattedError = if (uiState.selectedTab == 0 && uiState.lastSyncTime > 0) {
+                val sdf = java.text.SimpleDateFormat("yyyy. MM. dd. HH:mm", java.util.Locale.getDefault())
+                "$errorText\n${strings.lastSyncLabel} ${sdf.format(java.util.Date(uiState.lastSyncTime))}"
+            } else {
+                errorText
+            }
             com.example.presentation.ui.components.SyncErrorBanner(
-                errorMessage = errorText,
+                errorMessage = formattedError,
                 onRetry = if (uiState.selectedTab == 1) onRefreshPeriods else onRefresh
             )
         }
@@ -397,49 +406,79 @@ fun TimetableScreen(
         }
 
         if (uiState.isWeekView) {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                item { Spacer(modifier = Modifier.height(4.dp)) }
-
-                dayList.forEachIndexed { idx, (dayNum, dayName) ->
-                    val weekDay = uiState.weekDays.getOrNull(idx)
-                    val dayEvents = if (hasDatedEvents && weekDay != null) {
-                        uiState.events.filter { it.dateString.startsWith(weekDay.isoDate) }
-                    } else {
-                        if (uiState.selectedWeekOffset == 0) uiState.events.filter { it.dayOfWeek == dayNum }
-                        else emptyList()
-                    }.sortedBy { it.startHour * 60 + it.startMinute }
-
-                    item {
-                        Text(
-                            text = if (weekDay != null) "$dayName (${weekDay.dateFormatted})" else dayName,
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(vertical = 6.dp)
-                        )
-                    }
-
-                    if (dayEvents.isEmpty()) {
-                        item {
-                            EmptyDayNotice(message = strings.noClassesThisDay)
-                        }
-                    } else {
-                        items(dayEvents, key = { it.id }) { event ->
-                            TimetableEventCard(
-                                event = event,
-                                isOngoing = event.id == uiState.ongoingEvent?.id,
-                                isNextUpcoming = event.id == uiState.nextUpcomingEvent?.id,
-                                onScheduleReminder = { onScheduleReminder(event) }
-                            )
-                        }
+            if (uiState.errorMessage != null && uiState.events.isEmpty()) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(24.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Warning,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(48.dp)
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = strings.timetableLoadFailed,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.error,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Button(onClick = onRefresh) {
+                        Text(strings.retry)
                     }
                 }
-                item { Spacer(modifier = Modifier.height(20.dp)) }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    item { Spacer(modifier = Modifier.height(4.dp)) }
+
+                    dayList.forEachIndexed { idx, (dayNum, dayName) ->
+                        val weekDay = uiState.weekDays.getOrNull(idx)
+                        val dayEvents = if (hasDatedEvents && weekDay != null) {
+                            uiState.events.filter { it.dateString.startsWith(weekDay.isoDate) }
+                        } else {
+                            if (uiState.selectedWeekOffset == 0) uiState.events.filter { it.dayOfWeek == dayNum }
+                            else emptyList()
+                        }.sortedBy { it.startHour * 60 + it.startMinute }
+
+                        item {
+                            Text(
+                                text = if (weekDay != null) "$dayName (${weekDay.dateFormatted})" else dayName,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(vertical = 6.dp)
+                            )
+                        }
+
+                        if (dayEvents.isEmpty()) {
+                            if (!uiState.isRefreshing) {
+                                item {
+                                    EmptyDayNotice(message = strings.noClassesThisDay)
+                                }
+                            }
+                        } else {
+                            items(dayEvents, key = { it.id }) { event ->
+                                TimetableEventCard(
+                                    event = event,
+                                    isOngoing = event.id == uiState.ongoingEvent?.id,
+                                    isNextUpcoming = event.id == uiState.nextUpcomingEvent?.id,
+                                    onScheduleReminder = { onScheduleReminder(event) }
+                                )
+                            }
+                        }
+                    }
+                    item { Spacer(modifier = Modifier.height(20.dp)) }
+                }
             }
         } else {
             HorizontalPager(
@@ -456,13 +495,41 @@ fun TimetableScreen(
                 }.sortedBy { it.startHour * 60 + it.startMinute }
 
                 if (eventsForDay.isEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(24.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        EmptyDayNotice(message = strings.noClassesScheduledForDay)
+                    if (uiState.errorMessage != null && uiState.events.isEmpty()) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(24.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Warning,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(48.dp)
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                text = strings.timetableLoadFailed,
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.error,
+                                textAlign = TextAlign.Center
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Button(onClick = onRefresh) {
+                                Text(strings.retry)
+                            }
+                        }
+                    } else if (!uiState.isRefreshing) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(24.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            EmptyDayNotice(message = strings.noClassesScheduledForDay)
+                        }
                     }
                 } else {
                     LazyColumn(

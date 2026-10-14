@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Upcoming
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -166,7 +167,9 @@ fun DashboardScreen(
                     next = uiState.nextEvent,
                     hasClassesToday = uiState.todayClasses.isNotEmpty(),
                     isLoaded = uiState.isCalendarLoaded,
-                    onOpenTimetable = { onNavigate(NavigationItem.TIMETABLE) }
+                    isCalendarSyncFailed = uiState.isCalendarSyncFailed,
+                    onOpenTimetable = { onNavigate(NavigationItem.TIMETABLE) },
+                    onRetry = onRefresh
                 )
             }
 
@@ -352,7 +355,9 @@ private fun NextClassCard(
     next: CalendarEvent?,
     hasClassesToday: Boolean,
     isLoaded: Boolean = true,
-    onOpenTimetable: () -> Unit
+    isCalendarSyncFailed: Boolean = false,
+    onOpenTimetable: () -> Unit,
+    onRetry: () -> Unit = onOpenTimetable
 ) {
     val strings = currentStrings()
     val event = ongoing ?: next
@@ -375,10 +380,14 @@ private fun NextClassCard(
         }
     }
 
+    val isFailedOrNotLoaded = event == null && !hasClassesToday && (!isLoaded || isCalendarSyncFailed)
+
     Card(
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (ongoing != null) {
+            containerColor = if (isFailedOrNotLoaded && isCalendarSyncFailed) {
+                MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f)
+            } else if (ongoing != null) {
                 MaterialTheme.colorScheme.primaryContainer
             } else {
                 MaterialTheme.colorScheme.surface
@@ -390,17 +399,89 @@ private fun NextClassCard(
             .defaultMinSize(minHeight = 48.dp)
             .clickable(
                 role = Role.Button,
-                onClickLabel = strings.navTimetable,
-                onClick = onOpenTimetable
+                onClickLabel = if (isFailedOrNotLoaded) strings.retry else strings.navTimetable,
+                onClick = if (isFailedOrNotLoaded) onRetry else onOpenTimetable
             )
     ) {
-        if (!isLoaded) {
+        if (event == null && !hasClassesToday) {
+            if (!isLoaded && !isCalendarSyncFailed) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Schedule,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = strings.todayClasses,
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(0.55f)
+                            .height(20.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+                    )
+                }
+            } else if (!isLoaded || isCalendarSyncFailed) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Warning,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = strings.timetableLoadFailedRetry,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    }
+                }
+            } else {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.DateRange,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (isWeekend) (when (strings.languageCode) { "de" -> "Wochenende"; "en" -> "Weekend"; else -> "Hétvége" })
+                                   else strings.todayClasses,
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = randomMessage,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+        } else if (event == null) {
             Column(modifier = Modifier.padding(18.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
-                        imageVector = Icons.Default.Schedule,
+                        imageVector = Icons.Default.CheckCircle,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                        tint = NeptunGreen,
                         modifier = Modifier.size(20.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
@@ -408,35 +489,7 @@ private fun NextClassCard(
                         text = strings.todayClasses,
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
-                    )
-                }
-                Spacer(modifier = Modifier.height(10.dp))
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(0.55f)
-                        .height(20.dp)
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
-                )
-            }
-        } else if (event == null) {
-            Column(modifier = Modifier.padding(18.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = if (hasClassesToday) Icons.Default.CheckCircle else Icons.Default.DateRange,
-                        contentDescription = null,
-                        tint = if (hasClassesToday) NeptunGreen else MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = if (hasClassesToday) strings.todayClasses
-                               else if (isWeekend) (when (strings.languageCode) { "de" -> "Wochenende"; "en" -> "Weekend"; else -> "Hétvége" })
-                               else strings.todayClasses,
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = if (hasClassesToday) NeptunGreen else MaterialTheme.colorScheme.primary
+                        color = NeptunGreen
                     )
                 }
                 Spacer(modifier = Modifier.height(8.dp))

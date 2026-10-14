@@ -23,6 +23,8 @@ import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.ReceiptLong
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
@@ -42,6 +44,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.core.i18n.currentStrings
@@ -93,7 +96,7 @@ fun FinancesScreen(
         ) {
             item { Spacer(modifier = Modifier.height(4.dp)) }
 
-            if (uiState.errorMessage != null) {
+            if (uiState.errorMessage != null && uiState.allFinances.isNotEmpty()) {
                 item {
                     val errorText = when (uiState.errorMessage) {
                         "FINANCES_LOAD_FAILED" -> strings.financesLoadFailed
@@ -165,29 +168,57 @@ fun FinancesScreen(
 
             if (uiState.filteredFinances.isEmpty()) {
                 item {
-                    Surface(
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
+                    if (uiState.errorMessage != null && uiState.allFinances.isEmpty()) {
                         Column(
-                            modifier = Modifier.padding(24.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(32.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.CheckCircle,
+                                imageVector = Icons.Default.Warning,
                                 contentDescription = null,
-                                tint = NeptunGreen,
-                                modifier = Modifier.size(36.dp)
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(48.dp)
                             )
-                            Spacer(modifier = Modifier.height(8.dp))
+                            Spacer(modifier = Modifier.height(12.dp))
                             Text(
-                                text = if (strings.languageCode == "hu") "Nincs ilyen státuszú pénzügyi tétel!"
-                                       else if (strings.languageCode == "de") "Keine Finanzposten mit diesem Status gefunden!"
-                                       else "No financial items with this status found!",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                text = strings.financesLoadFailed,
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.error,
+                                textAlign = TextAlign.Center
                             )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Button(onClick = onRefresh) {
+                                Text(strings.retry)
+                            }
+                        }
+                    } else {
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(24.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CheckCircle,
+                                    contentDescription = null,
+                                    tint = NeptunGreen,
+                                    modifier = Modifier.size(36.dp)
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = if (strings.languageCode == "hu") "Nincs ilyen státuszú pénzügyi tétel!"
+                                           else if (strings.languageCode == "de") "Keine Finanzposten mit diesem Status gefunden!"
+                                           else "No financial items with this status found!",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                     }
                 }

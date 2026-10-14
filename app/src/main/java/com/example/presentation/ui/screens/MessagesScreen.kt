@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.Mail
 import androidx.compose.material.icons.filled.MarkEmailRead
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.foundation.text.selection.SelectionContainer
 import com.example.presentation.ui.util.HtmlBlock
 import com.example.presentation.ui.util.HtmlTableView
@@ -68,6 +69,7 @@ import androidx.compose.ui.semantics.semantics
 import com.example.core.i18n.AppStrings
 import com.example.core.i18n.currentStrings
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -161,7 +163,7 @@ fun MessagesScreen(
             modifier = Modifier.fillMaxSize()
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
-                if (uiState.errorMessage != null) {
+                if (uiState.errorMessage != null && uiState.messages.isNotEmpty()) {
                     val errorText = when (uiState.errorMessage) {
                         "MESSAGES_LOAD_FAILED" -> strings.messagesLoadFailed
                         else -> uiState.errorMessage
@@ -179,19 +181,47 @@ fun MessagesScreen(
                             .padding(32.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(
-                                imageVector = Icons.Default.DoneAll,
-                                contentDescription = strings.noMessages,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(48.dp)
-                            )
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Text(
-                                text = if (uiState.showUnreadOnly) strings.noUnreadMessages else strings.noMessagesInInbox,
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                        if (uiState.errorMessage != null && uiState.messages.isEmpty()) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(24.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Warning,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(48.dp)
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Text(
+                                    text = strings.messagesLoadFailed,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.error,
+                                    textAlign = TextAlign.Center
+                                )
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Button(onClick = onRefresh) {
+                                    Text(strings.retry)
+                                }
+                            }
+                        } else {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(
+                                    imageVector = Icons.Default.DoneAll,
+                                    contentDescription = strings.noMessages,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(48.dp)
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Text(
+                                    text = if (uiState.showUnreadOnly) strings.noUnreadMessages else strings.noMessagesInInbox,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                     }
                 } else {

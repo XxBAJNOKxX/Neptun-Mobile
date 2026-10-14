@@ -143,6 +143,7 @@ interface AppStrings {
     val messagesLoadFailed: String
     val messageDetailLoadFailed: String
     val timetableLoadFailed: String
+    val timetableLoadFailedRetry: String
     val gradesLoadFailed: String
     val financesLoadFailed: String
     val periodsLoadFailed: String
@@ -641,6 +642,7 @@ class HungarianStrings : AppStrings {
     override val messagesLoadFailed = "Az üzenetek betöltése nem sikerült."
     override val messageDetailLoadFailed = "Az üzenet betöltése nem sikerült."
     override val timetableLoadFailed = "Az órarend betöltése nem sikerült."
+    override val timetableLoadFailedRetry = "Az órarend betöltése nem sikerült. Koppints az újratöltéshez."
     override val gradesLoadFailed = "A jegyek betöltése nem sikerült."
     override val financesLoadFailed = "A pénzügyi tételek betöltése nem sikerült."
     override val periodsLoadFailed = "Az időszakok betöltése nem sikerült."
@@ -1134,6 +1136,7 @@ class EnglishStrings : AppStrings {
     override val messagesLoadFailed = "Failed to load messages."
     override val messageDetailLoadFailed = "Failed to load message."
     override val timetableLoadFailed = "Failed to load timetable."
+    override val timetableLoadFailedRetry = "Failed to load timetable. Tap to reload."
     override val gradesLoadFailed = "Failed to load grades."
     override val financesLoadFailed = "Failed to load finances."
     override val periodsLoadFailed = "Failed to load academic periods."
@@ -1625,6 +1628,7 @@ class GermanStrings : AppStrings {
     override val messagesLoadFailed = "Nachrichten konnten nicht geladen werden."
     override val messageDetailLoadFailed = "Nachricht konnte nicht geladen werden."
     override val timetableLoadFailed = "Stundenplan konnte nicht geladen werden."
+    override val timetableLoadFailedRetry = "Stundenplan konnte nicht geladen werden. Zum Neuladen tippen."
     override val gradesLoadFailed = "Noten konnten nicht geladen werden."
     override val financesLoadFailed = "Finanzposten konnten nicht geladen werden."
     override val periodsLoadFailed = "Semestertermine konnten nicht geladen werden."

@@ -39,7 +39,9 @@ data class DashboardUiState(
     val nextUpcomingExam: ExamItem? = null,
     val activePeriods: List<AcademicPeriod> = emptyList(),
     val degreeProgress: DegreeProgress? = null,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val isCalendarSyncFailed: Boolean = false,
+    val hasSyncedSuccessfully: Boolean = false
 )
 
 class DashboardViewModel(
@@ -53,6 +55,8 @@ class DashboardViewModel(
     private val initialToday = if (initialEvents.isNotEmpty()) {
         getTodayClasses(initialEvents, LocalDate.now(), LocalTime.now())
     } else emptyList()
+
+    private var currentEvents: List<CalendarEvent> = initialEvents
 
     private val _uiState = MutableStateFlow(
         DashboardUiState(
@@ -68,13 +72,14 @@ class DashboardViewModel(
     init {
         viewModelScope.launch {
             neptunRepository.getCalendarEvents().collect { events ->
+                currentEvents = events
                 val today = getTodayClasses(events, LocalDate.now(), LocalTime.now())
                 _uiState.update {
                     it.copy(
                         todayClasses = today,
                         ongoingEvent = getTodayClasses.ongoingClass(today),
                         nextEvent = getTodayClasses.nextClass(today),
-                        isCalendarLoaded = true
+                        isCalendarLoaded = events.isNotEmpty() || it.hasSyncedSuccessfully
                     )
                 }
             }
@@ -150,9 +155,14 @@ class DashboardViewModel(
                 Result.failure(e)
             }
             _uiState.update {
+                val syncSuccess = res.isSuccess
+                val syncFailed = res.isFailure
                 it.copy(
                     isRefreshing = false,
-                    errorMessage = if (res.isFailure) "SYNC_FAILED" else null
+                    errorMessage = if (syncFailed) "SYNC_FAILED" else null,
+                    hasSyncedSuccessfully = if (syncSuccess) true else it.hasSyncedSuccessfully,
+                    isCalendarSyncFailed = if (syncFailed && currentEvents.isEmpty()) true else (if (syncSuccess) false else it.isCalendarSyncFailed),
+                    isCalendarLoaded = currentEvents.isNotEmpty() || syncSuccess || it.hasSyncedSuccessfully
                 )
             }
         }
