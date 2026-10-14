@@ -606,7 +606,7 @@ class AuthViewModel(
 
     fun logout(clearLocalData: Boolean = false) {
         viewModelScope.launch {
-            authRepository.logout()
+            authRepository.logout(clearLocalData)
             if (clearLocalData) {
                 neptunRepository.clearLocalData()
             }

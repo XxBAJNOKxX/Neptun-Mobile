@@ -1,7 +1,10 @@
 package com.example.data.repository
 
+import android.content.Context
 import android.util.Log
 import com.example.BuildConfig
+import com.example.core.notification.AlarmScheduler
+import com.example.core.notification.NotificationHelper
 import com.example.core.security.DataMode
 import com.example.core.security.EncryptedPreferencesManager
 import com.example.data.local.NeptunDatabase
@@ -40,7 +43,8 @@ import kotlinx.coroutines.withContext
 class NeptunRepositoryImpl(
     private val database: NeptunDatabase,
     private val prefsManager: EncryptedPreferencesManager,
-    private val neptunApiClient: NeptunApiClient = NeptunApiClient()
+    private val neptunApiClient: NeptunApiClient = NeptunApiClient(),
+    private val context: Context? = null
 ) : NeptunRepository {
 
     private val tokenMutex = Mutex()
@@ -1166,6 +1170,18 @@ class NeptunRepositoryImpl(
     }
 
     override suspend fun clearLocalData() = withContext(Dispatchers.IO) {
+        context?.let { ctx ->
+            try {
+                AlarmScheduler(ctx).cancelAllClassAlarms()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+            try {
+                NotificationHelper.cancelAll(ctx)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
         database.calendarDao().clearAll()
         database.gradesDao().clearAll()
         database.messagesDao().clearAll()

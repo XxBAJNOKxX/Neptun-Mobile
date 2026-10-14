@@ -505,6 +505,19 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
         return prefs.getString(KEY_NEPTUN_CODE, "") ?: ""
     }
 
+    fun getNeptunCode(): String {
+        return getLastNeptunCode()
+    }
+
+    fun isLoggedIn(): Boolean {
+        return prefs.getBoolean(KEY_IS_LOGGED_IN, false)
+    }
+
+    fun setLoggedIn(loggedIn: Boolean) {
+        prefs.edit().putBoolean(KEY_IS_LOGGED_IN, loggedIn).apply()
+        _credentialsFlow.value = loadCredentials()
+    }
+
     fun saveCredentials(
         neptunCode: String,
         password: String = "",

@@ -101,5 +101,9 @@ abstract class NeptunDatabase : RoomDatabase() {
                 instance
             }
         }
+
+        fun setInstance(instance: NeptunDatabase?) {
+            INSTANCE = instance
+        }
     }
 }

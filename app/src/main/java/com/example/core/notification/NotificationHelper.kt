@@ -26,6 +26,11 @@ object NotificationHelper {
     const val CHANNEL_ID_FINANCES = "neptun_finances_channel"
     const val CHANNEL_NAME_FINANCES = "Pénzügyi Értesítések"
 
+    const val EXTRA_NAVIGATE_TO = "navigate_to"
+    const val NAVIGATE_TIMETABLE = "timetable"
+    const val EXTRA_TARGET_DATE = "target_date"
+    const val EXTRA_TARGET_DAY = "target_day"
+
     fun createNotificationChannels(context: Context) {
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val strings = AppStringsProvider.getForContext(context)
@@ -86,7 +91,9 @@ object NotificationHelper {
         room: String,
         startTime: String,
         courseType: String,
-        minutesBefore: Int = 15
+        minutesBefore: Int = 15,
+        dateString: String = "",
+        dayOfWeek: Int = 0
     ) {
         val lower = subjectName.lowercase()
         if (lower.contains("szünnap") || lower.contains("szünet") || lower.contains("munkaszünet") ||
@@ -99,6 +106,9 @@ object NotificationHelper {
         val strings = AppStringsProvider.getForContext(context)
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            putExtra(EXTRA_NAVIGATE_TO, NAVIGATE_TIMETABLE)
+            putExtra(EXTRA_TARGET_DATE, dateString)
+            putExtra(EXTRA_TARGET_DAY, dayOfWeek)
         }
         val pendingIntent = PendingIntent.getActivity(
             context,
@@ -292,6 +302,14 @@ object NotificationHelper {
             android.util.Log.e("NotificationHelper", "Értesítés küldése jogosultság hiányában sikertelen: ${e.message}")
         } catch (e: Exception) {
             android.util.Log.e("NotificationHelper", "Értesítés küldése sikertelen: ${e.message}")
+        }
+    }
+
+    fun cancelAll(context: Context) {
+        try {
+            NotificationManagerCompat.from(context).cancelAll()
+        } catch (e: Exception) {
+            android.util.Log.e("NotificationHelper", "Értesítések törlése sikertelen: ${e.message}")
         }
     }
 }

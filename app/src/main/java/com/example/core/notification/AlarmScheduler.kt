@@ -12,6 +12,35 @@ import java.util.Calendar
 class AlarmScheduler(private val context: Context) {
 
     private val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+    private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+    companion object {
+        const val PREFS_NAME = "alarm_scheduler_prefs"
+        const val KEY_SCHEDULED_ALARM_IDS = "scheduled_alarm_ids"
+    }
+
+    private fun getStoredAlarmIds(): Set<Int> {
+        val raw = prefs.getStringSet(KEY_SCHEDULED_ALARM_IDS, emptySet()) ?: emptySet()
+        return raw.mapNotNull { it.toIntOrNull() }.toSet()
+    }
+
+    internal fun getScheduledAlarmIds(): Set<Int> = getStoredAlarmIds()
+
+    private fun addStoredAlarmId(id: Int) {
+        val current = prefs.getStringSet(KEY_SCHEDULED_ALARM_IDS, emptySet())?.toMutableSet() ?: mutableSetOf()
+        current.add(id.toString())
+        prefs.edit().putStringSet(KEY_SCHEDULED_ALARM_IDS, current).apply()
+    }
+
+    private fun removeStoredAlarmId(id: Int) {
+        val current = prefs.getStringSet(KEY_SCHEDULED_ALARM_IDS, emptySet())?.toMutableSet() ?: mutableSetOf()
+        current.remove(id.toString())
+        prefs.edit().putStringSet(KEY_SCHEDULED_ALARM_IDS, current).apply()
+    }
+
+    private fun clearStoredAlarmIds() {
+        prefs.edit().remove(KEY_SCHEDULED_ALARM_IDS).apply()
+    }
 
     fun scheduleClassAlarm(event: CalendarEvent, reminderMinutesBefore: Int = 15) {
         if (!event.isActualAttendedClass) return
@@ -57,6 +86,8 @@ class AlarmScheduler(private val context: Context) {
             putExtra(ClassAlarmReceiver.EXTRA_COURSE_TYPE, event.courseType.displayName)
             putExtra(ClassAlarmReceiver.EXTRA_NOTIFICATION_ID, alarmId)
             putExtra(ClassAlarmReceiver.EXTRA_MINUTES_BEFORE, reminderMinutesBefore)
+            putExtra(ClassAlarmReceiver.EXTRA_DATE_STRING, event.dateString)
+            putExtra(ClassAlarmReceiver.EXTRA_DAY_OF_WEEK, event.dayOfWeek)
         }
 
         val pendingIntent = PendingIntent.getBroadcast(
@@ -80,12 +111,14 @@ class AlarmScheduler(private val context: Context) {
                     pendingIntent
                 )
             }
+            addStoredAlarmId(alarmId)
         } catch (e: SecurityException) {
             alarmManager.set(
                 AlarmManager.RTC_WAKEUP,
                 triggerTime,
                 pendingIntent
             )
+            addStoredAlarmId(alarmId)
         }
     }
 
@@ -100,6 +133,24 @@ class AlarmScheduler(private val context: Context) {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         alarmManager.cancel(pendingIntent)
+        pendingIntent.cancel()
+        removeStoredAlarmId(alarmId)
+    }
+
+    fun cancelAllClassAlarms() {
+        val ids = getStoredAlarmIds()
+        for (alarmId in ids) {
+            val intent = Intent(context, ClassAlarmReceiver::class.java)
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                alarmId,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            alarmManager.cancel(pendingIntent)
+            pendingIntent.cancel()
+        }
+        clearStoredAlarmIds()
     }
 
     private fun generateClassKey(event: CalendarEvent): String {

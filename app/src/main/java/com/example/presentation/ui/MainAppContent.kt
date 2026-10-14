@@ -87,7 +87,10 @@ import kotlinx.coroutines.launch
 import java.io.File
 
 @Composable
-fun MainAppContent() {
+fun MainAppContent(
+    navIntentData: com.example.MainActivity.NavigationIntentData? = null,
+    onNavIntentHandled: () -> Unit = {}
+) {
     val context = LocalContext.current
     val strings = com.example.core.i18n.currentStrings()
     val app = context.applicationContext as NeptunApp
@@ -205,7 +208,9 @@ fun MainAppContent() {
             MainDashboard(
                 app = app,
                 authViewModel = authViewModel,
-                appUpdateViewModel = appUpdateViewModel
+                appUpdateViewModel = appUpdateViewModel,
+                navIntentData = navIntentData,
+                onNavIntentHandled = onNavIntentHandled
             )
         }
     }
@@ -215,7 +220,9 @@ fun MainAppContent() {
 private fun MainDashboard(
     app: NeptunApp,
     authViewModel: AuthViewModel,
-    appUpdateViewModel: AppUpdateViewModel
+    appUpdateViewModel: AppUpdateViewModel,
+    navIntentData: com.example.MainActivity.NavigationIntentData? = null,
+    onNavIntentHandled: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val strings = com.example.core.i18n.currentStrings()
@@ -246,10 +253,37 @@ private fun MainDashboard(
 
     var gradesInitialTab by rememberSaveable { mutableIntStateOf(0) }
     var timetableInitialTab by rememberSaveable { mutableIntStateOf(0) }
+    var timetableSelectedDay by rememberSaveable { mutableIntStateOf(0) }
+
+    LaunchedEffect(navIntentData) {
+        navIntentData?.let { data ->
+            if (data.navigateTo == com.example.core.notification.NotificationHelper.NAVIGATE_TIMETABLE) {
+                currentDestination = NavigationItem.TIMETABLE
+                if (data.targetDay > 0) {
+                    timetableSelectedDay = data.targetDay
+                }
+                onNavIntentHandled()
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        val activity = context as? android.app.Activity
+        val itn = activity?.intent
+        val navTo = itn?.getStringExtra(com.example.core.notification.NotificationHelper.EXTRA_NAVIGATE_TO)
+        if (navTo == com.example.core.notification.NotificationHelper.NAVIGATE_TIMETABLE) {
+            val targetDay = itn.getIntExtra(com.example.core.notification.NotificationHelper.EXTRA_TARGET_DAY, 0)
+            currentDestination = NavigationItem.TIMETABLE
+            if (targetDay > 0) {
+                timetableSelectedDay = targetDay
+            }
+            itn.removeExtra(com.example.core.notification.NotificationHelper.EXTRA_NAVIGATE_TO)
+        }
+    }
 
     // Ha a jelenlegi oldalt épp elrejtették, váltsunk a kezdőképernyőre
     LaunchedEffect(visibleItems) {
-        if (currentDestination !in visibleItems) {
+        if (currentDestination !in visibleItems && currentDestination != NavigationItem.TIMETABLE) {
             currentDestination = startDestination
         }
     }
@@ -462,6 +496,8 @@ private fun MainDashboard(
                                 currentDestination = NavigationItem.TIMETABLE
                             }
                         },
+                        timetableSelectedDay = timetableSelectedDay,
+                        onResetTimetableSelectedDay = { timetableSelectedDay = 0 },
                         onResetTimetableInitialTab = { timetableInitialTab = 0 },
                         onResetGradesInitialTab = { gradesInitialTab = 0 }
                     )
@@ -504,6 +540,8 @@ private fun MainDashboard(
                     appUpdateViewModel = appUpdateViewModel,
                     gradesInitialTab = gradesInitialTab,
                     timetableInitialTab = timetableInitialTab,
+                    timetableSelectedDay = timetableSelectedDay,
+                    onResetTimetableSelectedDay = { timetableSelectedDay = 0 },
                     onNavigate = { item ->
                         if (item in visibleItems) {
                             currentDestination = item
@@ -590,12 +628,14 @@ private fun DashboardNavContent(
     appUpdateViewModel: AppUpdateViewModel,
     gradesInitialTab: Int,
     timetableInitialTab: Int,
+    timetableSelectedDay: Int = 0,
     onNavigate: (NavigationItem) -> Unit,
     onOpenExams: () -> Unit,
     onOpenProgress: () -> Unit,
     onOpenPeriods: () -> Unit,
     onResetTimetableInitialTab: () -> Unit,
-    onResetGradesInitialTab: () -> Unit
+    onResetGradesInitialTab: () -> Unit,
+    onResetTimetableSelectedDay: () -> Unit = {}
 ) {
     Crossfade(
         targetState = currentDestination,
@@ -616,7 +656,9 @@ private fun DashboardNavContent(
             NavigationItem.TIMETABLE -> TimetableTabRoute(
                 appContainer = appContainer,
                 initialTab = timetableInitialTab,
-                onResetInitialTab = onResetTimetableInitialTab
+                initialDay = timetableSelectedDay,
+                onResetInitialTab = onResetTimetableInitialTab,
+                onResetInitialDay = onResetTimetableSelectedDay
             )
 
             NavigationItem.GRADES -> GradesTabRoute(
@@ -680,7 +722,9 @@ private fun HomeTabRoute(
 private fun TimetableTabRoute(
     appContainer: AppContainer,
     initialTab: Int,
-    onResetInitialTab: () -> Unit
+    initialDay: Int = 0,
+    onResetInitialTab: () -> Unit,
+    onResetInitialDay: () -> Unit = {}
 ) {
     val timetableViewModel: TimetableViewModel = viewModel(
         factory = TimetableViewModel.provideFactory(
@@ -693,6 +737,12 @@ private fun TimetableTabRoute(
         if (initialTab != 0) {
             timetableViewModel.selectTab(initialTab)
             onResetInitialTab()
+        }
+    }
+    LaunchedEffect(initialDay) {
+        if (initialDay > 0) {
+            timetableViewModel.selectDay(initialDay)
+            onResetInitialDay()
         }
     }
     val timetableState by timetableViewModel.uiState.collectAsStateWithLifecycle()

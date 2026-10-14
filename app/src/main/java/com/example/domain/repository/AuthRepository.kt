@@ -23,7 +23,7 @@ interface AuthRepository {
     ): Result<StudentCredentials>
     suspend fun request2FAEmailCode(session: Neptun2FASession): Result<Neptun2FASession>
     suspend fun verify2FACode(session: Neptun2FASession, code: String, isTotp: Boolean): Result<StudentCredentials>
-    suspend fun logout()
+    suspend fun logout(clearLocalData: Boolean = true)
     suspend fun isOfflineModeAvailable(): Boolean
     suspend fun continueOffline(): Result<StudentCredentials>
     fun getSavedUniversityId(): String

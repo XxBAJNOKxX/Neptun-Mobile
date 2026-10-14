@@ -34,7 +34,7 @@ class DefaultAppContainer(private val context: Context) : AppContainer {
     }
 
     override val neptunRepository: NeptunRepository by lazy {
-        NeptunRepositoryImpl(database, prefsManager)
+        NeptunRepositoryImpl(database, prefsManager, context = context)
     }
 
     override val calculateAveragesUseCase: CalculateAveragesUseCase by lazy {

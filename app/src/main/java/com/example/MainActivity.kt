@@ -1,5 +1,6 @@
 package com.example
 
+import android.content.Intent
 import android.content.res.Configuration
 import android.os.Bundle
 import androidx.activity.compose.setContent
@@ -7,18 +8,32 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.core.i18n.AppStringsProvider
 import com.example.core.i18n.LocalAppStrings
+import com.example.core.notification.NotificationHelper
 import com.example.presentation.ui.MainAppContent
 import com.example.ui.theme.MyApplicationTheme
 import java.util.Locale
 
 // FragmentActivity, mert a biometrikus zár (BiometricPrompt) igényli.
 class MainActivity : FragmentActivity() {
+
+    data class NavigationIntentData(
+        val navigateTo: String?,
+        val targetDate: String? = null,
+        val targetDay: Int = 0
+    )
+
+    var navIntentData by mutableStateOf<NavigationIntentData?>(null)
+        private set
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        handleIntent(intent)
         enableEdgeToEdge()
         val app = application as NeptunApp
         val prefsManager = app.appContainer.prefsManager
@@ -54,9 +69,28 @@ class MainActivity : FragmentActivity() {
                     dynamicColor = themeSettings.useDynamicColor,
                     accentColor = themeSettings.accentColor
                 ) {
-                    MainAppContent()
+                    MainAppContent(
+                        navIntentData = navIntentData,
+                        onNavIntentHandled = { navIntentData = null }
+                    )
                 }
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIntent(intent)
+    }
+
+    private fun handleIntent(intent: Intent?) {
+        if (intent == null) return
+        val navigateTo = intent.getStringExtra(NotificationHelper.EXTRA_NAVIGATE_TO)
+        val targetDate = intent.getStringExtra(NotificationHelper.EXTRA_TARGET_DATE)
+        val targetDay = intent.getIntExtra(NotificationHelper.EXTRA_TARGET_DAY, 0)
+        if (navigateTo != null) {
+            navIntentData = NavigationIntentData(navigateTo, targetDate, targetDay)
         }
     }
 

@@ -1,6 +1,8 @@
 package com.example.data.repository
 
 import android.content.Context
+import com.example.core.notification.AlarmScheduler
+import com.example.core.notification.NotificationHelper
 import com.example.core.security.DataMode
 import com.example.core.security.EncryptedPreferencesManager
 import com.example.data.network.NeptunApiClient
@@ -245,9 +247,24 @@ class AuthRepositoryImpl(
         }
     }
 
-    override suspend fun logout() = withContext(Dispatchers.IO) {
+    override suspend fun logout(clearLocalData: Boolean) = withContext(Dispatchers.IO) {
         com.example.core.work.SessionKeepAliveWorker.cancelPeriodicKeepAlive(context)
-        prefsManager.clear()
+        try {
+            AlarmScheduler(context).cancelAllClassAlarms()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        try {
+            NotificationHelper.cancelAll(context)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
+        if (clearLocalData) {
+            prefsManager.clear()
+        } else {
+            prefsManager.setLoggedIn(false)
+        }
     }
 
     override suspend fun isOfflineModeAvailable(): Boolean = withContext(Dispatchers.IO) {

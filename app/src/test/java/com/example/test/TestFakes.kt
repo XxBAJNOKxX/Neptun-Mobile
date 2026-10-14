@@ -98,7 +98,7 @@ class FakeAuthRepository : AuthRepository {
         return Result.success(creds)
     }
 
-    override suspend fun logout() {
+    override suspend fun logout(clearLocalData: Boolean) {
         credentialsFlow.value = null
     }
 
