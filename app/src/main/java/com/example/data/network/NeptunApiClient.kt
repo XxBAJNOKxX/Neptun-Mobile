@@ -3,6 +3,7 @@ package com.example.data.network
 import android.util.Base64
 import android.util.Log
 import com.example.domain.model.CalendarEvent
+import com.example.core.export.IcsParser
 import com.example.domain.model.CourseType
 import com.example.domain.model.ExamItem
 import com.example.domain.model.FinanceItem
@@ -1993,7 +1994,14 @@ class NeptunApiClient(
                 events = fetchModernCalendarEvents(baseUrl, token, "", startIso, endIso, deviceCookie)
             }
 
-            if (events.isEmpty() && username.isNotEmpty() && password.isNotEmpty()) {
+            if (events.isEmpty()) {
+                events = fetchModernCalendarEventsIcsFallback(baseUrl, token, trainId, startIso, endIso, deviceCookie)
+                if (events.isEmpty() && trainId.isNotEmpty()) {
+                    events = fetchModernCalendarEventsIcsFallback(baseUrl, token, "", startIso, endIso, deviceCookie)
+                }
+            }
+
+            if (events.isEmpty() && username.isNotEmpty() && password.isNotEmpty() && !baseUrl.contains("elte.hu", ignoreCase = true)) {
                 events = getLegacyCalendarEvents(baseUrl, username, password)
             }
 
@@ -2011,10 +2019,15 @@ class NeptunApiClient(
             throw e
         } catch (e: Exception) {
             Log.e(tag, "Failed to get modern calendar events: ${e.message}")
-            if (username.isNotEmpty() && password.isNotEmpty()) {
-                return@withContext getLegacyCalendarEvents(baseUrl, username, password)
+            if (username.isNotEmpty() && password.isNotEmpty() && !baseUrl.contains("elte.hu", ignoreCase = true)) {
+                try {
+                    val leg = getLegacyCalendarEvents(baseUrl, username, password)
+                    if (leg.isNotEmpty()) return@withContext leg
+                } catch (legacyEx: Exception) {
+                    Log.w(tag, "Legacy calendar fallback failed: ${legacyEx.message}")
+                }
             }
-            return@withContext emptyList()
+            throw e
         }
     }
 
@@ -2105,8 +2118,8 @@ class NeptunApiClient(
             }
 
             val resp = okHttpClient.newCall(reqBuilder.build()).execute()
-            if (resp.code == 401) {
-                throw NeptunUnauthorizedException("401 Calendar")
+            if (resp.code == 401 || resp.code == 403) {
+                throw NeptunUnauthorizedException("${resp.code} Calendar")
             }
             if (!resp.isSuccessful) return@withContext emptyList()
             val respBody = resp.body?.string() ?: ""
@@ -2188,6 +2201,60 @@ class NeptunApiClient(
             throw e
         } catch (e: Exception) {
             Log.e(tag, "fetchModernCalendarEvents error: ${e.message}")
+            return@withContext emptyList()
+        }
+    }
+
+    private suspend fun fetchModernCalendarEventsIcsFallback(
+        baseUrl: String,
+        token: String,
+        trainId: String,
+        startIso: String,
+        endIso: String,
+        deviceCookie: String = ""
+    ): List<CalendarEvent> = withContext(Dispatchers.IO) {
+        try {
+            val urlBuilder = StringBuilder(
+                "$baseUrl/api/Calendar/CalendarExportFileToDownloadFilteredCalendar" +
+                "?startDate=$startIso&endDate=$endIso" +
+                "&isClassesVisible=true&isExamsVisible=true&isFinalExamsVisible=true" +
+                "&isOtherEventsVisible=true&isTasksVisible=true&isOnlineMeetingsVisible=true" +
+                "&isPeriodsVisible=false"
+            )
+            if (trainId.isNotEmpty()) {
+                urlBuilder.append("&studentTrainingId=").append(trainId)
+            }
+
+            val reqBuilder = Request.Builder()
+                .url(urlBuilder.toString())
+                .get()
+                .addHeader("Authorization", "Bearer $token")
+                .addHeader("Accept", "text/calendar, text/plain, */*")
+
+            if (deviceCookie.isNotBlank()) {
+                reqBuilder.addHeader("Cookie", deviceCookie)
+            }
+
+            val resp = okHttpClient.newCall(reqBuilder.build()).execute()
+            if (resp.code == 401 || resp.code == 403) {
+                throw NeptunUnauthorizedException("${resp.code} Calendar ICS")
+            }
+            if (!resp.isSuccessful) return@withContext emptyList()
+            val respBody = resp.body?.string() ?: ""
+            val isRedirect = resp.request.url.encodedPath.contains("Login", ignoreCase = true) ||
+                (respBody.trim().startsWith("<") && (respBody.contains("Account/Login", ignoreCase = true) || respBody.contains("Login2FA", ignoreCase = true)))
+            if (isRedirect) {
+                throw NeptunUnauthorizedException("Redirected to Login for Calendar ICS request")
+            }
+
+            if (respBody.contains("BEGIN:VCALENDAR")) {
+                return@withContext IcsParser.parse(respBody)
+            }
+            return@withContext emptyList()
+        } catch (e: NeptunUnauthorizedException) {
+            throw e
+        } catch (e: Exception) {
+            Log.e(tag, "fetchModernCalendarEventsIcsFallback error: ${e.message}")
             return@withContext emptyList()
         }
     }

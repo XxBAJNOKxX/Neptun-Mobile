@@ -476,9 +476,13 @@ class NeptunRepositoryImpl(
         if (fetchSucceeded) {
             prefsManager.setDataMode(DataMode.REAL)
             prefsManager.clearSessionExpired()
-            database.calendarDao().replaceEvents(eventsToInsert.map { CalendarEventEntity.fromDomain(it) })
-            _calendarEventsFlow.value = eventsToInsert
-            prefsManager.saveCalendarEvents(eventsToInsert)
+            if (eventsToInsert.isNotEmpty()) {
+                database.calendarDao().replaceEvents(eventsToInsert.map { CalendarEventEntity.fromDomain(it) })
+                _calendarEventsFlow.value = eventsToInsert
+                prefsManager.saveCalendarEvents(eventsToInsert)
+            } else {
+                Log.w("NeptunRepo", "Calendar events fetch returned empty list; preserving cached local events")
+            }
             return@withContext Result.success(Unit)
         }
 
@@ -554,13 +558,17 @@ class NeptunRepositoryImpl(
         if (fetchSucceeded) {
             prefsManager.setDataMode(DataMode.REAL)
             prefsManager.clearSessionExpired()
-            val existingGrades = database.gradesDao().getAllGrades().first()
-            val ghostMap = existingGrades.mapNotNull { if (it.ghostGrade != null) it.id to it.ghostGrade else null }.toMap()
-            val entitiesToSave = gradesToInsert.map { grade ->
-                val ghost = ghostMap[grade.id]
-                SubjectGradeEntity.fromDomain(if (ghost != null) grade.copy(ghostGrade = ghost) else grade)
+            if (gradesToInsert.isNotEmpty()) {
+                val existingGrades = database.gradesDao().getAllGrades().first()
+                val ghostMap = existingGrades.mapNotNull { if (it.ghostGrade != null) it.id to it.ghostGrade else null }.toMap()
+                val entitiesToSave = gradesToInsert.map { grade ->
+                    val ghost = ghostMap[grade.id]
+                    SubjectGradeEntity.fromDomain(if (ghost != null) grade.copy(ghostGrade = ghost) else grade)
+                }
+                database.gradesDao().replaceGrades(entitiesToSave)
+            } else {
+                Log.w("NeptunRepo", "Grades fetch returned empty list; preserving cached local grades")
             }
-            database.gradesDao().replaceGrades(entitiesToSave)
             return@withContext Result.success(Unit)
         }
 
@@ -636,39 +644,43 @@ class NeptunRepositoryImpl(
         if (fetchSucceeded) {
             prefsManager.clearSessionExpired()
             prefsManager.setDataMode(DataMode.REAL)
-            val existingEntities = database.messagesDao().getAllMessages().first()
-            val existingById = existingEntities.associateBy { it.id }
-            val existingByKey = existingEntities.associateBy { "${it.sender}_${it.subject}_${it.sendDate}" }
+            if (messagesToInsert.isNotEmpty()) {
+                val existingEntities = database.messagesDao().getAllMessages().first()
+                val existingById = existingEntities.associateBy { it.id }
+                val existingByKey = existingEntities.associateBy { "${it.sender}_${it.subject}_${it.sendDate}" }
 
-            val entitiesToSave = messagesToInsert.map { msg ->
-                val key = "${msg.sender}_${msg.subject}_${msg.sendDate}"
-                val existing = existingById[msg.id] ?: existingByKey[key]
-                val wasReadLocally = existing?.isRead == true
+                val entitiesToSave = messagesToInsert.map { msg ->
+                    val key = "${msg.sender}_${msg.subject}_${msg.sendDate}"
+                    val existing = existingById[msg.id] ?: existingByKey[key]
+                    val wasReadLocally = existing?.isRead == true
 
-                NeptunMessageEntity(
-                    id = msg.id,
-                    subject = msg.subject,
-                    sender = msg.sender,
-                    sendDate = msg.sendDate,
-                    previewText = if (existing != null && existing.previewText.isNotBlank() && existing.previewText != "Koppints a teljes üzenet megtekintéséhez...") {
-                        existing.previewText
-                    } else {
-                        msg.previewText
-                    },
-                    bodyHtml = if (existing != null && existing.bodyHtml.isNotBlank()) existing.bodyHtml else msg.bodyHtml,
-                    isRead = wasReadLocally || msg.isRead,
-                    isOfficial = msg.isOfficial
-                )
-            }
-            database.messagesDao().replaceMessages(entitiesToSave)
-            if (entitiesToSave.isNotEmpty() && (existingEntities.isEmpty() || !prefsManager.isBaselineDone("messages"))) {
-                val tracker = com.example.core.notification.NotifiedItemsTracker(prefsManager)
-                tracker.recordKnownItems(
-                    key = "messages",
-                    items = entitiesToSave,
-                    idOf = { it.id },
-                    altIdOf = { "${it.sender.trim()}_${it.subject.trim()}_${it.sendDate.trim()}" }
-                )
+                    NeptunMessageEntity(
+                        id = msg.id,
+                        subject = msg.subject,
+                        sender = msg.sender,
+                        sendDate = msg.sendDate,
+                        previewText = if (existing != null && existing.previewText.isNotBlank() && existing.previewText != "Koppints a teljes üzenet megtekintéséhez...") {
+                            existing.previewText
+                        } else {
+                            msg.previewText
+                        },
+                        bodyHtml = if (existing != null && existing.bodyHtml.isNotBlank()) existing.bodyHtml else msg.bodyHtml,
+                        isRead = wasReadLocally || msg.isRead,
+                        isOfficial = msg.isOfficial
+                    )
+                }
+                database.messagesDao().replaceMessages(entitiesToSave)
+                if (existingEntities.isEmpty() || !prefsManager.isBaselineDone("messages")) {
+                    val tracker = com.example.core.notification.NotifiedItemsTracker(prefsManager)
+                    tracker.recordKnownItems(
+                        key = "messages",
+                        items = entitiesToSave,
+                        idOf = { it.id },
+                        altIdOf = { "${it.sender.trim()}_${it.subject.trim()}_${it.sendDate.trim()}" }
+                    )
+                }
+            } else {
+                Log.w("NeptunRepo", "Messages fetch returned empty list; preserving cached local messages")
             }
             return@withContext Result.success(Unit)
         }
@@ -746,7 +758,11 @@ class NeptunRepositoryImpl(
         if (fetchSucceeded) {
             prefsManager.clearSessionExpired()
             prefsManager.setDataMode(DataMode.REAL)
-            database.financesDao().replaceFinances(financesToInsert.map { FinanceItemEntity.fromDomain(it) })
+            if (financesToInsert.isNotEmpty()) {
+                database.financesDao().replaceFinances(financesToInsert.map { FinanceItemEntity.fromDomain(it) })
+            } else {
+                Log.w("NeptunRepo", "Finances fetch returned empty list; preserving cached local finances")
+            }
             return@withContext Result.success(Unit)
         }
 
@@ -822,7 +838,11 @@ class NeptunRepositoryImpl(
         if (fetchSucceeded) {
             prefsManager.clearSessionExpired()
             prefsManager.setDataMode(DataMode.REAL)
-            database.examsDao().replaceExams(examsToInsert.map { ExamItemEntity.fromDomain(it) })
+            if (examsToInsert.isNotEmpty()) {
+                database.examsDao().replaceExams(examsToInsert.map { ExamItemEntity.fromDomain(it) })
+            } else {
+                Log.w("NeptunRepo", "Exams fetch returned empty list; preserving cached local exams")
+            }
             return@withContext Result.success(Unit)
         }
 
@@ -850,14 +870,20 @@ class NeptunRepositoryImpl(
             val deviceCookie = prefsManager.getDeviceCookie(creds.neptunCode)
 
             if (token.isNotBlank()) {
-                progress = neptunApiClient.getDegreeProgress(
-                    baseUrl = baseUrl,
-                    token = token,
-                    trainingId = trainingId,
-                    deviceCookie = deviceCookie
-                )
+                try {
+                    progress = neptunApiClient.getDegreeProgress(
+                        baseUrl = baseUrl,
+                        token = token,
+                        trainingId = trainingId,
+                        deviceCookie = deviceCookie
+                    )
+                } catch (e: Exception) {
+                    Log.w("NeptunRepo", "Failed to fetch degree progress: ${e.message}")
+                }
             }
         }
+
+        val previousSaved = prefsManager.getDegreeProgress()
 
         if (progress != null) {
             val allGrades = try { database.gradesDao().getAllGrades().first() } catch (_: Exception) { emptyList() }
@@ -866,9 +892,15 @@ class NeptunRepositoryImpl(
             val sumGradeTimesCredits = completedGrades.sumOf { (it.grade ?: 0) * it.credit }
             val dbAvg = if (dbCompletedCredits > 0) sumGradeTimesCredits.toDouble() / dbCompletedCredits else 0.0
 
-            val effectiveCompleted = if (progress.completedCredits > 0) progress.completedCredits else dbCompletedCredits
-            val effectiveAvg = if (progress.cumulativeWeightedAverage > 0.0) progress.cumulativeWeightedAverage else ((dbAvg * 100).toInt() / 100.0)
-            val effectiveIndex = if (progress.cumulativeCreditIndex > 0.0) progress.cumulativeCreditIndex else (if (dbCompletedCredits > 0) ((dbAvg * 0.95) * 100).toInt() / 100.0 else 0.0)
+            val effectiveCompleted = if (progress.completedCredits > 0) progress.completedCredits
+                else if (dbCompletedCredits > 0) dbCompletedCredits
+                else previousSaved?.completedCredits ?: 0
+            val effectiveAvg = if (progress.cumulativeWeightedAverage > 0.0) progress.cumulativeWeightedAverage
+                else if (dbAvg > 0.0) ((dbAvg * 100).toInt() / 100.0)
+                else previousSaved?.cumulativeWeightedAverage ?: 0.0
+            val effectiveIndex = if (progress.cumulativeCreditIndex > 0.0) progress.cumulativeCreditIndex
+                else if (dbCompletedCredits > 0) ((dbAvg * 0.95) * 100).toInt() / 100.0
+                else previousSaved?.cumulativeCreditIndex ?: 0.0
 
             val userTarget = prefsManager.loadPersonalization().targetCredits.coerceIn(30, 400)
             val effectiveTarget = if (!prefsManager.getShouldAutoSetTargetCredits()) {
@@ -886,13 +918,18 @@ class NeptunRepositoryImpl(
                 cumulativeCreditIndex = effectiveIndex
             )
 
-            _degreeProgressFlow.value = progress
-            prefsManager.saveDegreeProgress(progress)
+            if (effectiveCompleted > 0 || previousSaved == null) {
+                _degreeProgressFlow.value = progress
+                prefsManager.saveDegreeProgress(progress)
+            } else {
+                Log.w("NeptunRepo", "Server degree progress has 0 credits and previous progress exists; preserving previous progress")
+            }
+
             if (prefsManager.getShouldAutoSetTargetCredits() && progress.totalRequiredCredits in 30..400) {
                 prefsManager.setTargetCredits(progress.totalRequiredCredits)
             }
         } else {
-            val existingProgress = _degreeProgressFlow.value ?: prefsManager.getDegreeProgress()
+            val existingProgress = _degreeProgressFlow.value ?: previousSaved
             if (existingProgress != null && (existingProgress.templates.isNotEmpty() || existingProgress.totalCurriculums > 0)) {
                 val allGrades = try { database.gradesDao().getAllGrades().first() } catch (_: Exception) { emptyList() }
                 val completedGrades = allGrades.filter { (it.grade ?: 0) >= 2 }
@@ -901,43 +938,52 @@ class NeptunRepositoryImpl(
                 val avg = if (completedCredits > 0) sumGradeTimesCredits.toDouble() / completedCredits else 0.0
                 val userTarget = prefsManager.loadPersonalization().targetCredits.coerceIn(30, 400)
                 val effectiveTarget = if (!prefsManager.getShouldAutoSetTargetCredits()) userTarget else existingProgress.totalRequiredCredits
+                val finalCredits = if (completedCredits > 0) completedCredits else existingProgress.completedCredits
                 val updated = existingProgress.copy(
-                    completedCredits = if (completedCredits > 0) completedCredits else existingProgress.completedCredits,
+                    completedCredits = finalCredits,
                     totalRequiredCredits = effectiveTarget,
                     cumulativeWeightedAverage = if (avg > 0.0) ((avg * 100).toInt() / 100.0) else existingProgress.cumulativeWeightedAverage,
                     cumulativeCreditIndex = if (completedCredits > 0) ((avg * 0.95) * 100).toInt() / 100.0 else existingProgress.cumulativeCreditIndex
                 )
-                _degreeProgressFlow.value = updated
-                prefsManager.saveDegreeProgress(updated)
+                if (finalCredits > 0 || previousSaved == null) {
+                    _degreeProgressFlow.value = updated
+                    prefsManager.saveDegreeProgress(updated)
+                } else {
+                    Log.w("NeptunRepo", "Degree progress update has 0 credits and previous progress exists; preserving previous progress")
+                }
             } else {
                 // Fallback calculation from local grades if server didn't provide structured advancement
                 try {
-                    val allGrades = database.gradesDao().getAllGrades().first()
+                    val allGrades = try { database.gradesDao().getAllGrades().first() } catch (_: Exception) { emptyList() }
                     val completedGrades = allGrades.filter { (it.grade ?: 0) >= 2 }
                     val completedCredits = completedGrades.sumOf { it.credit }
                     val totalTarget = prefsManager.loadPersonalization().targetCredits.coerceIn(30, 400)
                     val sumGradeTimesCredits = completedGrades.sumOf { (it.grade ?: 0) * it.credit }
                     val avg = if (completedCredits > 0) sumGradeTimesCredits.toDouble() / completedCredits else 0.0
 
-                    progress = DegreeProgress(
-                        completedCredits = completedCredits,
-                        totalRequiredCredits = totalTarget,
-                        compulsoryCompleted = 0,
-                        compulsoryTotal = 0,
-                        compulsoryElectiveCompleted = 0,
-                        compulsoryElectiveTotal = 0,
-                        freeElectiveCompleted = 0,
-                        freeElectiveTotal = 0,
-                        thesisCompleted = 0,
-                        thesisTotal = 0,
-                        criteriaPassedCount = 0,
-                        criteriaTotalCount = 0,
-                        cumulativeWeightedAverage = (avg * 100).toInt() / 100.0,
-                        cumulativeCreditIndex = if (completedCredits > 0) ((avg * 0.95) * 100).toInt() / 100.0 else 0.0,
-                        templates = emptyList()
-                    )
-                    _degreeProgressFlow.value = progress
-                    prefsManager.saveDegreeProgress(progress)
+                    if (completedCredits > 0 || previousSaved == null) {
+                        progress = DegreeProgress(
+                            completedCredits = completedCredits,
+                            totalRequiredCredits = totalTarget,
+                            compulsoryCompleted = 0,
+                            compulsoryTotal = 0,
+                            compulsoryElectiveCompleted = 0,
+                            compulsoryElectiveTotal = 0,
+                            freeElectiveCompleted = 0,
+                            freeElectiveTotal = 0,
+                            thesisCompleted = 0,
+                            thesisTotal = 0,
+                            criteriaPassedCount = 0,
+                            criteriaTotalCount = 0,
+                            cumulativeWeightedAverage = (avg * 100).toInt() / 100.0,
+                            cumulativeCreditIndex = if (completedCredits > 0) ((avg * 0.95) * 100).toInt() / 100.0 else 0.0,
+                            templates = emptyList()
+                        )
+                        _degreeProgressFlow.value = progress
+                        prefsManager.saveDegreeProgress(progress)
+                    } else {
+                        Log.w("NeptunRepo", "Local grades are empty and previous non-zero progress exists; preserving degree progress")
+                    }
                 } catch (e: Exception) {
                     e.printStackTrace()
                 }

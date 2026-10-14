@@ -25,10 +25,9 @@ interface CalendarDao {
 
     @Transaction
     suspend fun replaceEvents(events: List<CalendarEventEntity>) {
+        if (events.isEmpty()) return
         clearAll()
-        if (events.isNotEmpty()) {
-            insertEvents(events)
-        }
+        insertEvents(events)
     }
 }
 
@@ -51,10 +50,9 @@ interface GradesDao {
 
     @Transaction
     suspend fun replaceGrades(grades: List<SubjectGradeEntity>) {
+        if (grades.isEmpty()) return
         clearAll()
-        if (grades.isNotEmpty()) {
-            insertGrades(grades)
-        }
+        insertGrades(grades)
     }
 }
 
@@ -77,10 +75,9 @@ interface MessagesDao {
 
     @Transaction
     suspend fun replaceMessages(messages: List<NeptunMessageEntity>) {
+        if (messages.isEmpty()) return
         clearAll()
-        if (messages.isNotEmpty()) {
-            insertMessages(messages)
-        }
+        insertMessages(messages)
     }
 }
 
@@ -97,10 +94,9 @@ interface FinancesDao {
 
     @Transaction
     suspend fun replaceFinances(items: List<FinanceItemEntity>) {
+        if (items.isEmpty()) return
         clearAll()
-        if (items.isNotEmpty()) {
-            insertFinances(items)
-        }
+        insertFinances(items)
     }
 }
 
@@ -117,9 +113,8 @@ interface ExamsDao {
 
     @Transaction
     suspend fun replaceExams(items: List<ExamItemEntity>) {
+        if (items.isEmpty()) return
         clearAll()
-        if (items.isNotEmpty()) {
-            insertExams(items)
-        }
+        insertExams(items)
     }
 }
