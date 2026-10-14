@@ -319,6 +319,8 @@ class AuthViewModel(
 
             result.fold(
                 onSuccess = { creds ->
+                    authRepository.clearSessionExpired()
+                    authRepository.clearSessionExpiredSnooze()
                     _uiState.update {
                         it.copy(
                             isLoading = false,
@@ -328,7 +330,9 @@ class AuthViewModel(
                             errorMessage = null
                         )
                     }
-                    neptunRepository.syncAllData(creds.neptunCode, "")
+                    viewModelScope.launch {
+                        neptunRepository.syncAllData(creds.neptunCode, "")
+                    }
                 },
                 onFailure = { error ->
                     when (error) {
@@ -405,6 +409,7 @@ class AuthViewModel(
                 result.fold(
                     onSuccess = { creds ->
                         authRepository.clearSessionExpired()
+                        authRepository.clearSessionExpiredSnooze()
                         _uiState.update {
                             it.copy(
                                 isTwoFactorLoading = false,
@@ -417,7 +422,9 @@ class AuthViewModel(
                                 errorMessage = null
                             )
                         }
-                        neptunRepository.syncAllData(creds.neptunCode, "")
+                        viewModelScope.launch {
+                            neptunRepository.syncAllData(creds.neptunCode, "")
+                        }
                     },
                     onFailure = { error ->
                         _uiState.update {
@@ -432,6 +439,11 @@ class AuthViewModel(
         } else {
             login()
         }
+    }
+
+    fun snoozeSessionExpired(minutes: Long = 15L) {
+        authRepository.setSessionExpiredSnooze(minutes * 60 * 1000L)
+        authRepository.clearSessionExpired()
     }
 
     fun initiateQuickReAuth() {
@@ -466,6 +478,7 @@ class AuthViewModel(
                 result.fold(
                     onSuccess = { updatedCreds ->
                         authRepository.clearSessionExpired()
+                        authRepository.clearSessionExpiredSnooze()
                         _uiState.update {
                             it.copy(
                                 isLoading = false,
@@ -476,7 +489,9 @@ class AuthViewModel(
                                 isPasswordPromptRequired = false
                             )
                         }
-                        neptunRepository.syncAllData(updatedCreds.neptunCode, "")
+                        viewModelScope.launch {
+                            neptunRepository.syncAllData(updatedCreds.neptunCode, "")
+                        }
                     },
                     onFailure = { error ->
                         when (error) {
@@ -549,6 +564,7 @@ class AuthViewModel(
                 onSuccess = { updatedCreds ->
                     authRepository.savePassword(pwd)
                     authRepository.clearSessionExpired()
+                    authRepository.clearSessionExpiredSnooze()
                     _uiState.update {
                         it.copy(
                             isLoading = false,
@@ -558,7 +574,9 @@ class AuthViewModel(
                             isPasswordPromptRequired = false
                         )
                     }
-                    neptunRepository.syncAllData(updatedCreds.neptunCode, "")
+                    viewModelScope.launch {
+                        neptunRepository.syncAllData(updatedCreds.neptunCode, "")
+                    }
                 },
                 onFailure = { error ->
                     when (error) {

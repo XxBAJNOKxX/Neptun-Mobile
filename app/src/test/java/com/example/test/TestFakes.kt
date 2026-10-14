@@ -141,7 +141,18 @@ class FakeAuthRepository : AuthRepository {
     override fun getSavedPassword(): String = storedPassword
     override fun savePassword(password: String) { storedPassword = password }
     override fun getSavedCredentials(): StudentCredentials? = credentialsFlow.value
-    override fun clearSessionExpired() {}
+    var sessionExpiredCleared = false
+    override fun clearSessionExpired() {
+        sessionExpiredCleared = true
+    }
+    var sessionExpiredSnoozeUntil: Long = 0L
+    override fun setSessionExpiredSnooze(durationMillis: Long) {
+        sessionExpiredSnoozeUntil = System.currentTimeMillis() + durationMillis
+    }
+    override fun isSessionExpiredSnoozed(): Boolean = System.currentTimeMillis() < sessionExpiredSnoozeUntil
+    override fun clearSessionExpiredSnooze() {
+        sessionExpiredSnoozeUntil = 0L
+    }
 }
 
 class FakeNeptunRepository : NeptunRepository {
@@ -162,6 +173,8 @@ class FakeNeptunRepository : NeptunRepository {
     override fun getAcademicPeriods(): Flow<List<AcademicPeriod>> = academicPeriodsFlow.asStateFlow()
 
     var syncAllDataResult: Result<Unit> = Result.success(Unit)
+    var syncAllDataCallCount: Int = 0
+    var lastSyncAllDataNeptunCode: String? = null
     var refreshCalendarResult: Result<Unit> = Result.success(Unit)
     var refreshGradesResult: Result<Unit> = Result.success(Unit)
     var refreshMessagesResult: Result<Unit> = Result.success(Unit)
@@ -170,7 +183,11 @@ class FakeNeptunRepository : NeptunRepository {
     var refreshDegreeProgressResult: Result<Unit> = Result.success(Unit)
     var refreshAcademicPeriodsResult: Result<Unit> = Result.success(Unit)
 
-    override suspend fun syncAllData(neptunCode: String, sessionToken: String): Result<Unit> = syncAllDataResult
+    override suspend fun syncAllData(neptunCode: String, sessionToken: String): Result<Unit> {
+        syncAllDataCallCount++
+        lastSyncAllDataNeptunCode = neptunCode
+        return syncAllDataResult
+    }
     override suspend fun refreshCalendar(): Result<Unit> = refreshCalendarResult
     override suspend fun refreshGrades(): Result<Unit> = refreshGradesResult
     override suspend fun refreshMessages(): Result<Unit> = refreshMessagesResult

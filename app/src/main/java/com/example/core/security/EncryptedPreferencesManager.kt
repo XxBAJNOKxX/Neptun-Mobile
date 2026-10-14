@@ -432,13 +432,30 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
     fun isSessionExpired(): Boolean = prefs.getBoolean(KEY_SESSION_EXPIRED, false)
 
     fun markSessionExpired() {
+        if (isSessionExpiredSnoozed()) return
         prefs.edit().putBoolean(KEY_SESSION_EXPIRED, true).apply()
         _sessionExpiredFlow.value = true
     }
 
-    fun clearSessionExpired() {
+    fun clearSessionExpired(clearSnooze: Boolean = false) {
+        if (clearSnooze) {
+            clearSessionExpiredSnooze()
+        }
         prefs.edit().putBoolean(KEY_SESSION_EXPIRED, false).apply()
         _sessionExpiredFlow.value = false
+    }
+
+    fun setSessionExpiredSnooze(durationMillis: Long) {
+        prefs.edit().putLong(KEY_SESSION_EXPIRED_SNOOZE_UNTIL, System.currentTimeMillis() + durationMillis).apply()
+    }
+
+    fun isSessionExpiredSnoozed(): Boolean {
+        val until = prefs.getLong(KEY_SESSION_EXPIRED_SNOOZE_UNTIL, 0L)
+        return System.currentTimeMillis() < until
+    }
+
+    fun clearSessionExpiredSnooze() {
+        prefs.edit().remove(KEY_SESSION_EXPIRED_SNOOZE_UNTIL).apply()
     }
 
     // ------------------------------------------------------------------ //
@@ -553,6 +570,7 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
             editor.putString(KEY_PASSWORD, password)
         }
         editor.apply()
+        clearSessionExpiredSnooze()
 
         _credentialsFlow.value = loadCredentials()
     }
@@ -811,6 +829,7 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
             }
         }
         editor.apply()
+        clearSessionExpiredSnooze()
 
         _credentialsFlow.value = null
         _sessionExpiredFlow.value = false
@@ -878,6 +897,7 @@ class EncryptedPreferencesManager(context: Context) : NotifiedStore {
         private const val KEY_HIDDEN_PAGES = "key_hidden_pages"
         private const val KEY_DATA_MODE = "key_data_mode"
         private const val KEY_SESSION_EXPIRED = "key_session_expired"
+        private const val KEY_SESSION_EXPIRED_SNOOZE_UNTIL = "session_expired_snooze_until"
         private const val KEY_SESSION_KEEP_ALIVE = "key_session_keep_alive"
         private const val KEY_REQUIRES_INTERACTIVE_REAUTH = "key_requires_interactive_reauth"
         private const val KEY_APP_LANGUAGE_CODE = "key_app_language_code"

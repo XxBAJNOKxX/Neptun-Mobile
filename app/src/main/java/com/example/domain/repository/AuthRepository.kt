@@ -40,5 +40,8 @@ interface AuthRepository {
     fun savePassword(password: String)
     fun getSavedCredentials(): StudentCredentials?
     fun clearSessionExpired()
+    fun setSessionExpiredSnooze(durationMillis: Long)
+    fun isSessionExpiredSnoozed(): Boolean
+    fun clearSessionExpiredSnooze()
 }
 

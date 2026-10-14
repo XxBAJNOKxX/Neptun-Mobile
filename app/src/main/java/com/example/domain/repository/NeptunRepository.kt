@@ -16,7 +16,7 @@ interface NeptunRepository {
     fun getDegreeProgress(): Flow<com.example.domain.model.DegreeProgress?>
     fun getAcademicPeriods(): Flow<List<com.example.domain.model.AcademicPeriod>>
 
-    suspend fun syncAllData(neptunCode: String, sessionToken: String): Result<Unit>
+    suspend fun syncAllData(neptunCode: String = "", sessionToken: String = ""): Result<Unit>
     suspend fun refreshCalendar(): Result<Unit>
     suspend fun refreshGrades(): Result<Unit>
     suspend fun refreshMessages(): Result<Unit>

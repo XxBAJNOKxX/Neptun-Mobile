@@ -357,4 +357,10 @@ class AuthRepositoryImpl(
     override fun getSavedCredentials(): StudentCredentials? = prefsManager.loadCredentials()
 
     override fun clearSessionExpired() = prefsManager.clearSessionExpired()
+
+    override fun setSessionExpiredSnooze(durationMillis: Long) = prefsManager.setSessionExpiredSnooze(durationMillis)
+
+    override fun isSessionExpiredSnoozed(): Boolean = prefsManager.isSessionExpiredSnoozed()
+
+    override fun clearSessionExpiredSnooze() = prefsManager.clearSessionExpiredSnooze()
 }

@@ -251,6 +251,8 @@ private fun MainDashboard(
         mutableStateOf(startDestination)
     }
 
+    var showLogoutConfirm by rememberSaveable { mutableStateOf(false) }
+
     var gradesInitialTab by rememberSaveable { mutableIntStateOf(0) }
     var timetableInitialTab by rememberSaveable { mutableIntStateOf(0) }
     var timetableSelectedDay by rememberSaveable { mutableIntStateOf(0) }
@@ -305,7 +307,7 @@ private fun MainDashboard(
     // Lejárt munkamenet jelzése és gyors megújítás (kizárólag 2FA-s fióknál)
     if (sessionExpired && isInteractiveReauth && !authState.isQuickReAuthOpen && !authState.isTwoFactorRequired && !authState.isPasswordPromptRequired) {
         AlertDialog(
-            onDismissRequest = { appContainer.prefsManager.clearSessionExpired() },
+            onDismissRequest = { authViewModel.snoozeSessionExpired(minutes = 15) },
             title = { Text(strings.sessionExpiredTitle) },
             text = {
                 Text(strings.sessionExpiredDesc)
@@ -323,18 +325,42 @@ private fun MainDashboard(
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     TextButton(
                         onClick = {
-                            appContainer.prefsManager.clearSessionExpired()
-                            // Nem töröljük a helyi adatokat szerveroldali munkamenet-lejáratkor!
-                            authViewModel.logout(clearLocalData = false)
+                            showLogoutConfirm = true
                         }
                     ) {
                         Text(strings.logout)
                     }
                     TextButton(
-                        onClick = { appContainer.prefsManager.clearSessionExpired() }
+                        onClick = { authViewModel.snoozeSessionExpired(minutes = 15) }
                     ) {
                         Text(strings.later)
                     }
+                }
+            }
+        )
+    }
+
+    if (showLogoutConfirm) {
+        AlertDialog(
+            onDismissRequest = { showLogoutConfirm = false },
+            title = { Text(strings.logoutDialogTitle) },
+            text = { Text(strings.logoutDialogMessage) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        appContainer.prefsManager.clearSessionExpired()
+                        authViewModel.logout(clearLocalData = true)
+                        showLogoutConfirm = false
+                    }
+                ) {
+                    Text(strings.logoutBtn)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showLogoutConfirm = false }
+                ) {
+                    Text(strings.cancel)
                 }
             }
         )
