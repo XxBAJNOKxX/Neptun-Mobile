@@ -22,9 +22,17 @@ val githubRepo = (project.findProperty("githubRepository") as? String)
     ?: System.getenv("GITHUB_REPOSITORY")
     ?: "XxBAJNOKxX/Neptun-Mobile"
 
+ksp {
+  arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 android {
   namespace = "com.example"
   compileSdk { version = release(36) { minorApiLevel = 1 } }
+
+  sourceSets {
+    getByName("test").assets.srcDir("$projectDir/schemas")
+  }
 
   defaultConfig {
     applicationId = "app.neptun.yrklqi"

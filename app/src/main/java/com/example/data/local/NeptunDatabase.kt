@@ -6,6 +6,7 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.example.BuildConfig
 import com.example.data.local.dao.CalendarDao
 import com.example.data.local.dao.ExamsDao
 import com.example.data.local.dao.FinancesDao
@@ -26,7 +27,7 @@ import com.example.data.local.entity.SubjectGradeEntity
         ExamItemEntity::class
     ],
     version = 4,
-    exportSchema = false
+    exportSchema = true
 )
 abstract class NeptunDatabase : RoomDatabase() {
 
@@ -39,6 +40,28 @@ abstract class NeptunDatabase : RoomDatabase() {
     companion object {
         @Volatile
         private var INSTANCE: NeptunDatabase? = null
+
+        val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `exam_items` (
+                        `id` TEXT NOT NULL,
+                        `subjectName` TEXT NOT NULL,
+                        `subjectCode` TEXT NOT NULL,
+                        `courseCode` TEXT NOT NULL,
+                        `examDate` TEXT NOT NULL,
+                        `startTime` TEXT NOT NULL,
+                        `room` TEXT NOT NULL,
+                        `location` TEXT NOT NULL,
+                        `examType` TEXT NOT NULL,
+                        `isSignedUp` INTEGER NOT NULL,
+                        PRIMARY KEY(`id`)
+                    )
+                    """.trimIndent()
+                )
+            }
+        }
 
         val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {
@@ -62,14 +85,18 @@ abstract class NeptunDatabase : RoomDatabase() {
 
         fun getInstance(context: Context): NeptunDatabase {
             return INSTANCE ?: synchronized(this) {
-                val instance = Room.databaseBuilder(
+                val builder = Room.databaseBuilder(
                     context.applicationContext,
                     NeptunDatabase::class.java,
                     "neptun_mobile.db"
                 )
-                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4)
-                    .fallbackToDestructiveMigrationOnDowngrade(true)
-                    .build()
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+
+                if (BuildConfig.DEBUG) {
+                    builder.fallbackToDestructiveMigrationOnDowngrade(true)
+                }
+
+                val instance = builder.build()
                 INSTANCE = instance
                 instance
             }
