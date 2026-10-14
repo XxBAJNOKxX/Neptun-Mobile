@@ -12,17 +12,23 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.BuildConfig
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -99,8 +105,38 @@ object DebugFeatures {
     fun DevMenuSection(
         modifier: Modifier = Modifier
     ) {
+        val context = LocalContext.current
         var showLogDialog by remember { mutableStateOf(false) }
         var logs by remember { mutableStateOf(getLogs()) }
+
+        var refreshDbCountsKey by remember { mutableIntStateOf(0) }
+        var dbEventsCount by remember { mutableStateOf<Int?>(null) }
+        var dbGradesCount by remember { mutableStateOf<Int?>(null) }
+        var dbMessagesCount by remember { mutableStateOf<Int?>(null) }
+        var dbFinancesCount by remember { mutableStateOf<Int?>(null) }
+        var dbExamsCount by remember { mutableStateOf<Int?>(null) }
+        var isLoadingCounts by remember { mutableStateOf(false) }
+
+        LaunchedEffect(refreshDbCountsKey) {
+            isLoadingCounts = true
+            try {
+                withContext(Dispatchers.IO) {
+                    val app = context.applicationContext as? com.example.NeptunApp
+                    val db = app?.appContainer?.database
+                    if (db != null) {
+                        dbEventsCount = db.calendarDao().getAllEvents().first().size
+                        dbGradesCount = db.gradesDao().getAllGrades().first().size
+                        dbMessagesCount = db.messagesDao().getAllMessages().first().size
+                        dbFinancesCount = db.financesDao().getAllFinances().first().size
+                        dbExamsCount = db.examsDao().getAllExams().first().size
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                isLoadingCounts = false
+            }
+        }
 
         Card(
             modifier = modifier
@@ -177,6 +213,82 @@ object DebugFeatures {
                         Icon(Icons.Default.Delete, contentDescription = "Napló törlése")
                     }
                 }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.error.copy(alpha = 0.2f))
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Text(
+                    text = "Szimulációs Eszközök",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.error
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = {
+                        val app = context.applicationContext as? com.example.NeptunApp
+                        val prefs = app?.appContainer?.prefsManager
+                        prefs?.clearSessionExpiredSnooze()
+                        prefs?.markSessionExpired()
+                        logNetworkSession("DebugFeatures", "Munkamenet lejárata szimulálva.")
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.Timer, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Munkamenet lejáratának szimulálása")
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "Adatbázis állapot / darabszámok",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    IconButton(
+                        onClick = { refreshDbCountsKey++ },
+                        enabled = !isLoadingCounts
+                    ) {
+                        if (isLoadingCounts) {
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = "Darabszámok frissítése"
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        DbCountRow(label = "Órarend elemek", count = dbEventsCount)
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                        DbCountRow(label = "Érdemjegyek", count = dbGradesCount)
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                        DbCountRow(label = "Üzenetek", count = dbMessagesCount)
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                        DbCountRow(label = "Pénzügyek", count = dbFinancesCount)
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                        DbCountRow(label = "Vizsgák", count = dbExamsCount)
+                    }
+                }
             }
         }
 
@@ -235,3 +347,25 @@ object DebugFeatures {
         }
     }
 }
+
+@Composable
+private fun DbCountRow(label: String, count: Int?) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "$label:",
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = FontWeight.Medium
+        )
+        Text(
+            text = if (count != null) "$count db" else "...",
+            style = MaterialTheme.typography.bodySmall,
+            fontFamily = FontFamily.Monospace,
+            fontWeight = FontWeight.Bold
+        )
+    }
+}
+

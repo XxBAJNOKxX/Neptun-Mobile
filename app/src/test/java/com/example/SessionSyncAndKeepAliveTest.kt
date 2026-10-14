@@ -1,8 +1,16 @@
 package com.example
 
+import android.content.Context
+import androidx.room.Room
+import androidx.test.core.app.ApplicationProvider
+import com.example.core.security.EncryptedPreferencesManager
+import com.example.data.local.NeptunDatabase
+import com.example.data.local.entity.CalendarEventEntity
 import com.example.data.network.NeptunApiClient
 import com.example.data.network.NeptunUnauthorizedException
+import com.example.data.repository.NeptunRepositoryImpl
 import com.example.domain.model.University
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -15,7 +23,12 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34])
 class SessionSyncAndKeepAliveTest {
 
     private fun createMockClient(
@@ -272,5 +285,124 @@ class SessionSyncAndKeepAliveTest {
         val ping = client.pingSession("https://neptun.elte.hu", "cookie=123", "ELTE01")
         assertFalse(ping.isAlive)
         assertTrue(ping.isRedirectToLogin)
+    }
+
+    @Test
+    fun `session expiry simulation verifies 401, redirect and HTML responses without data loss`() = runTest {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val database = Room.inMemoryDatabaseBuilder(context, NeptunDatabase::class.java)
+            .allowMainThreadQueries()
+            .build()
+        val prefsManager = EncryptedPreferencesManager(context)
+
+        try {
+            // Pre-populate Room database with a calendar event
+            val initialEvent = CalendarEventEntity(
+                id = "evt_cached_01",
+                subjectName = "Szoftverarchitektúrák",
+                subjectCode = "BMEVIAU01",
+                courseCode = "01",
+                location = "I épület",
+                room = "IB028",
+                teacherName = "Dr. Oktató",
+                startHour = 10,
+                startMinute = 15,
+                endHour = 12,
+                endMinute = 0,
+                dayOfWeek = 2,
+                courseType = "LECTURE",
+                dateString = "2026-10-15"
+            )
+            database.calendarDao().replaceEvents(listOf(initialEvent))
+            assertEquals(1, database.calendarDao().getAllEvents().first().size)
+
+            // Setup credentials and valid non-expired JWT so ensureValidToken won't attempt background renewal
+            val payload = """{"exp":${(System.currentTimeMillis() / 1000) + 3600}}"""
+            val dummyJwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9." +
+                java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(payload.toByteArray()) +
+                ".dummySignature"
+
+            prefsManager.saveCredentials(
+                neptunCode = "TEST01",
+                password = "",
+                universityId = "elte",
+                universityName = "ELTE",
+                neptunUrl = "https://neptun.elte.hu",
+                requiresInteractiveReauth = true
+            )
+            prefsManager.setIsModernApi(true)
+            prefsManager.setAccessToken(dummyJwt)
+            prefsManager.clearSessionExpired()
+
+            // 1. Verify developer simulation of session expiry (clearing snooze + markSessionExpired)
+            prefsManager.setSessionExpiredSnooze(60_000L)
+            assertTrue("Snooze should be active initially", prefsManager.isSessionExpiredSnoozed())
+            // Simulate DevMenuSection button click:
+            prefsManager.clearSessionExpiredSnooze()
+            prefsManager.markSessionExpired()
+            assertTrue("Session should be marked expired after simulation", prefsManager.isSessionExpired())
+            // Cached events in Room must be preserved (not wiped)
+            var cached = database.calendarDao().getAllEvents().first()
+            assertEquals(1, cached.size)
+            assertEquals("Szoftverarchitektúrák", cached[0].subjectName)
+
+            // Reset expired state for network tests
+            prefsManager.clearSessionExpired()
+            assertFalse(prefsManager.isSessionExpired())
+
+            // 2. HTTP 401 response triggers markSessionExpired without data loss
+            val client401 = NeptunApiClient(createMockClient(statusCode = 401, responseBody = "Unauthorized"))
+            val repo401 = NeptunRepositoryImpl(database, prefsManager, client401, context)
+            val result401 = repo401.refreshCalendar()
+            assertTrue(result401.isFailure)
+            assertTrue("HTTP 401 must trigger markSessionExpired()", prefsManager.isSessionExpired())
+            cached = database.calendarDao().getAllEvents().first()
+            assertEquals("Cached events must be preserved after HTTP 401", 1, cached.size)
+            assertEquals("Szoftverarchitektúrák", cached[0].subjectName)
+
+            // Reset expired state
+            prefsManager.clearSessionExpired()
+            assertFalse(prefsManager.isSessionExpired())
+
+            // 3. Login redirect response triggers markSessionExpired without data loss
+            val clientRedirect = NeptunApiClient(
+                createMockClient(
+                    statusCode = 200,
+                    responseBody = "",
+                    redirectUrl = "https://neptun.elte.hu/Account/Login"
+                )
+            )
+            val repoRedirect = NeptunRepositoryImpl(database, prefsManager, clientRedirect, context)
+            val resultRedirect = repoRedirect.refreshCalendar()
+            assertTrue(resultRedirect.isFailure)
+            assertTrue("Login redirect must trigger markSessionExpired()", prefsManager.isSessionExpired())
+            cached = database.calendarDao().getAllEvents().first()
+            assertEquals("Cached events must be preserved after login redirect", 1, cached.size)
+            assertEquals("Szoftverarchitektúrák", cached[0].subjectName)
+
+            // Reset expired state
+            prefsManager.clearSessionExpired()
+            assertFalse(prefsManager.isSessionExpired())
+
+            // 4. HTML login page response triggers markSessionExpired without data loss
+            val loginHtml = "<html><head><title>Neptun Login</title></head><body><form action=\"/Account/Login\">Login</form></body></html>"
+            val clientHtml = NeptunApiClient(
+                createMockClient(
+                    statusCode = 200,
+                    responseBody = loginHtml,
+                    contentType = "text/html"
+                )
+            )
+            val repoHtml = NeptunRepositoryImpl(database, prefsManager, clientHtml, context)
+            val resultHtml = repoHtml.refreshCalendar()
+            assertTrue(resultHtml.isFailure)
+            assertTrue("HTML login response must trigger markSessionExpired()", prefsManager.isSessionExpired())
+            cached = database.calendarDao().getAllEvents().first()
+            assertEquals("Cached events must be preserved after HTML login response", 1, cached.size)
+            assertEquals("Szoftverarchitektúrák", cached[0].subjectName)
+
+        } finally {
+            database.close()
+        }
     }
 }
