@@ -35,6 +35,8 @@
 # --- EncryptedSharedPreferences (reflection alapú prefs) ---
 -keep class androidx.security.crypto.** { *; }
 -dontwarn androidx.security.crypto.**
+-dontwarn com.google.crypto.tink.**
+-dontwarn com.google.errorprone.annotations.**
 
 # --- WorkManager ---
 -keep class * extends androidx.work.CoroutineWorker { *; }
