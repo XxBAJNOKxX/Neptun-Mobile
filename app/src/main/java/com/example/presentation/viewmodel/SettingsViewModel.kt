@@ -34,7 +34,8 @@ data class UpdateCheckState(
     val updateAvailable: Boolean = false,
     val latestVersionName: String? = null,
     val downloadUrl: String? = null,
-    val message: String? = null
+    val message: String? = null,
+    val updateInfo: com.example.core.update.UpdateInfo? = null
 )
 
 data class SettingsUiState(
@@ -388,7 +389,8 @@ class SettingsViewModel(
                                     updateAvailable = true,
                                     latestVersionName = info.latestVersion,
                                     downloadUrl = info.downloadUrl,
-                                    message = "UPDATE_AVAILABLE:${info.tagName}:${currentChannel.displayName}"
+                                    message = "UPDATE_AVAILABLE:${info.tagName}:${currentChannel.displayName}",
+                                    updateInfo = info
                                 )
                             )
                         }
@@ -400,7 +402,8 @@ class SettingsViewModel(
                                     updateAvailable = false,
                                     latestVersionName = info.latestVersion,
                                     downloadUrl = info.downloadUrl,
-                                    message = "UP_TO_DATE:v${BuildConfig.VERSION_NAME}"
+                                    message = "UP_TO_DATE:v${BuildConfig.VERSION_NAME}",
+                                    updateInfo = info
                                 )
                             )
                         }

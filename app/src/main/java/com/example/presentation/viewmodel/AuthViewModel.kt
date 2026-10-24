@@ -325,6 +325,7 @@ class AuthViewModel(
                         it.copy(
                             isLoading = false,
                             credentials = creds,
+                            password = "",
                             isTwoFactorRequired = false,
                             twoFactorSession = null,
                             errorMessage = null
@@ -418,6 +419,7 @@ class AuthViewModel(
                                 isPasswordPromptRequired = false,
                                 twoFactorSession = null,
                                 credentials = creds,
+                                password = "",
                                 twoFactorCode = "",
                                 errorMessage = null
                             )

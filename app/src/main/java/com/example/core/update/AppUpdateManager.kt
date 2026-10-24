@@ -28,7 +28,8 @@ data class UpdateInfo(
     val releaseNotes: String,
     val tagName: String,
     val assetName: String = "",
-    val expectedSizeBytes: Long = 0L
+    val expectedSizeBytes: Long = 0L,
+    val expectedSha256: String = ""
 )
 
 data class ReleaseAsset(
@@ -157,18 +158,25 @@ class AppUpdateManager(
             }
 
             val tagName = releaseObj.optString("tag_name", "").trim()
-            val htmlUrl = releaseObj.optString("html_url", "https://github.com/$repo/releases")
             val releaseNotes = releaseObj.optString("body", "").trim()
 
             val assets = releaseObj.optJSONArray("assets")
             val chosenAsset = selectBestApkAsset(assets, isCurrentAppDebug = isDebugApp)
                 ?: return@withContext null
 
-            val apkDownloadUrl = chosenAsset.optString("browser_download_url")
+            val apkDownloadUrl = chosenAsset.optString("browser_download_url").trim()
+            if (apkDownloadUrl.isBlank() || !isTrustedDownloadUrl(apkDownloadUrl)) {
+                return@withContext null
+            }
             val assetName = chosenAsset.optString("name", "")
             val expectedSizeBytes = chosenAsset.optLong("size", 0L)
+            val rawDigest = chosenAsset.optString("digest", "").trim()
+            val expectedSha256 = if (rawDigest.startsWith("sha256:", ignoreCase = true)) {
+                rawDigest.substringAfter(":").trim().lowercase()
+            } else {
+                ""
+            }
 
-            val targetDownloadUrl = if (apkDownloadUrl.isNotBlank()) apkDownloadUrl else htmlUrl
             val currentVersion = BuildConfig.VERSION_NAME
             val isNewer = isNewerVersion(tagName, currentVersion)
 
@@ -176,11 +184,12 @@ class AppUpdateManager(
                 isUpdateAvailable = isNewer,
                 currentVersion = currentVersion,
                 latestVersion = tagName.removePrefix("v"),
-                downloadUrl = targetDownloadUrl,
+                downloadUrl = apkDownloadUrl,
                 releaseNotes = releaseNotes,
                 tagName = tagName,
                 assetName = assetName,
-                expectedSizeBytes = expectedSizeBytes
+                expectedSizeBytes = expectedSizeBytes,
+                expectedSha256 = expectedSha256
             )
         } catch (e: Exception) {
             null
@@ -192,14 +201,20 @@ class AppUpdateManager(
         info: UpdateInfo,
         onProgress: (Float, Long, Long) -> Unit
     ): File = withContext(Dispatchers.IO) {
+        if (!isTrustedDownloadUrl(info.downloadUrl)) {
+            throw SecurityException("Nem megbízható vagy nem HTTPS letöltési URL!")
+        }
+
         val updatesDir = File(context.cacheDir, "updates").apply { mkdirs() }
         val baseName = getSafeUpdateFileName(info.tagName, info.assetName, info.downloadUrl)
         val finalFile = File(updatesDir, "$baseName.apk")
         val partFile = File(updatesDir, "$baseName.apk.part")
 
-        // 1. Ha a végleges fájl már létezik és mérete egyezik (vagy nem ismert a méret)
+        // 1. Ha a végleges fájl már létezik és mérete/hash-e egyezik
         if (finalFile.exists() && finalFile.length() > 0) {
-            if (info.expectedSizeBytes <= 0 || finalFile.length() == info.expectedSizeBytes) {
+            val sizeMatches = info.expectedSizeBytes <= 0 || finalFile.length() == info.expectedSizeBytes
+            val hashMatches = info.expectedSha256.isBlank() || calculateSha256(finalFile).equals(info.expectedSha256, ignoreCase = true)
+            if (sizeMatches && hashMatches) {
                 onProgress(1f, finalFile.length(), finalFile.length())
                 return@withContext finalFile
             } else {
@@ -223,66 +238,75 @@ class AppUpdateManager(
             requestBuilder.header("Range", "bytes=$existingBytes-")
         }
 
-        val response = client.newCall(requestBuilder.build()).execute()
-        val responseCode = response.code
+        val retryFromZero = client.newCall(requestBuilder.build()).execute().use { response ->
+            val responseCode = response.code
 
-        if (responseCode == 416) {
-            // Range Not Satisfiable: sérült vagy nem érvényes offset, újrakezdjük 0-ról
-            response.close()
-            partFile.delete()
-            return@withContext downloadApk(context, info.copy(expectedSizeBytes = 0), onProgress)
-        }
+            if (responseCode == 416) {
+                // Range Not Satisfiable: sérült vagy nem érvényes offset, újrakezdjük 0-ról
+                partFile.delete()
+                return@use true
+            }
 
-        val isPartial = responseCode == 206
-        val isOk = responseCode == 200
+            val isPartial = responseCode == 206
+            val isOk = responseCode == 200
 
-        if (!isPartial && !isOk) {
-            response.close()
-            throw IllegalStateException("A letöltés meghiúsult: HTTP $responseCode")
-        }
+            if (!isPartial && !isOk) {
+                throw IllegalStateException("A letöltés meghiúsult: HTTP $responseCode")
+            }
 
-        val body = response.body ?: throw IllegalStateException("Üres letöltési válasz érkezett")
-        val bodyLength = body.contentLength()
+            val finalRequestHost = response.request.url.host.lowercase()
+            if (!response.request.isHttps || !isTrustedHost(finalRequestHost)) {
+                throw SecurityException("Nem megbízható átirányítási célállomás: $finalRequestHost")
+            }
 
-        val totalBytes = if (isPartial) {
-            val contentRange = response.header("Content-Range")
-            val totalFromHeader = contentRange?.substringAfterLast('/')?.toLongOrNull()
-            totalFromHeader ?: if (bodyLength > 0) existingBytes + bodyLength else info.expectedSizeBytes
-        } else {
-            existingBytes = 0L
-            if (bodyLength > 0) bodyLength else info.expectedSizeBytes
-        }
+            val body = response.body ?: throw IllegalStateException("Üres letöltési válasz érkezett")
+            val bodyLength = body.contentLength()
 
-        val append = isPartial && existingBytes > 0
-        body.byteStream().use { input ->
-            FileOutputStream(partFile, append).use { output ->
-                val buffer = ByteArray(32 * 1024)
-                var bytesRead: Int
-                var totalBytesRead = existingBytes
+            val totalBytes = if (isPartial) {
+                val contentRange = response.header("Content-Range")
+                val totalFromHeader = contentRange?.substringAfterLast('/')?.toLongOrNull()
+                totalFromHeader ?: if (bodyLength > 0) existingBytes + bodyLength else info.expectedSizeBytes
+            } else {
+                existingBytes = 0L
+                if (bodyLength > 0) bodyLength else info.expectedSizeBytes
+            }
 
-                val initialProgress = if (totalBytes > 0) {
-                    (totalBytesRead.toFloat() / totalBytes.toFloat()).coerceIn(0f, 1f)
-                } else {
-                    0f
-                }
-                onProgress(initialProgress, totalBytesRead, totalBytes)
+            val append = isPartial && existingBytes > 0
+            body.byteStream().use { input ->
+                FileOutputStream(partFile, append).use { output ->
+                    val buffer = ByteArray(32 * 1024)
+                    var bytesRead: Int
+                    var totalBytesRead = existingBytes
 
-                while (input.read(buffer).also { bytesRead = it } != -1) {
-                    output.write(buffer, 0, bytesRead)
-                    totalBytesRead += bytesRead
-                    val progress = if (totalBytes > 0) {
+                    val initialProgress = if (totalBytes > 0) {
                         (totalBytesRead.toFloat() / totalBytes.toFloat()).coerceIn(0f, 1f)
                     } else {
-                        0.5f
+                        0f
                     }
-                    onProgress(progress, totalBytesRead, totalBytes)
+                    onProgress(initialProgress, totalBytesRead, totalBytes)
+
+                    while (input.read(buffer).also { bytesRead = it } != -1) {
+                        output.write(buffer, 0, bytesRead)
+                        totalBytesRead += bytesRead
+                        val progress = if (totalBytes > 0) {
+                            (totalBytesRead.toFloat() / totalBytes.toFloat()).coerceIn(0f, 1f)
+                        } else {
+                            0.5f
+                        }
+                        onProgress(progress, totalBytesRead, totalBytes)
+                    }
+                    output.flush()
                 }
-                output.flush()
             }
+
+            if (totalBytes > 0 && partFile.length() < totalBytes) {
+                throw IllegalStateException("A letöltés megszakadt (${partFile.length()}/$totalBytes bájt)")
+            }
+            false
         }
 
-        if (totalBytes > 0 && partFile.length() < totalBytes) {
-            throw IllegalStateException("A letöltés megszakadt (${partFile.length()}/$totalBytes bájt)")
+        if (retryFromZero) {
+            return@withContext downloadApk(context, info.copy(expectedSizeBytes = 0), onProgress)
         }
 
         if (finalFile.exists()) {
@@ -296,6 +320,14 @@ class AppUpdateManager(
         if (info.expectedSizeBytes > 0 && finalFile.length() != info.expectedSizeBytes) {
             finalFile.delete()
             throw IllegalStateException("A letöltött fájl mérete (${finalFile.length()} B) eltér a várt mérettől (${info.expectedSizeBytes} B)!")
+        }
+
+        if (info.expectedSha256.isNotBlank()) {
+            val actualSha256 = calculateSha256(finalFile)
+            if (!actualSha256.equals(info.expectedSha256, ignoreCase = true)) {
+                finalFile.delete()
+                throw SecurityException("A letöltött APK SHA-256 ellenőrzőösszege nem egyezik a várt értékkel!")
+            }
         }
 
         finalFile
@@ -356,8 +388,9 @@ class AppUpdateManager(
     }
 
     /**
-     * Ellenőrzi, hogy a letöltött APK csomagneve és aláíró tanúsítványa
-     * megegyezik-e a jelenleg futó alkalmazáséval.
+     * Ellenőrzi, hogy a letöltött APK csomagneve, verziószáma (downgrade-védelem)
+     * és aláíró tanúsítványának kriptográfiai SHA-256 ujjlenyomata megegyezik-e
+     * a jelenleg futó alkalmazáséval.
      */
     fun verifyApkSignature(context: Context, apkFile: File): Boolean {
         return try {
@@ -383,44 +416,67 @@ class AppUpdateManager(
                 pm.getPackageInfo(context.packageName, PackageManager.GET_SIGNATURES)
             }
 
+            // Downgrade-védelem: az új APK versionCode-ja nem lehet kisebb a jelenleg telepítettnél
+            val currentVersionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                currentInfo.longVersionCode
+            } else {
+                @Suppress("DEPRECATION")
+                currentInfo.versionCode.toLong()
+            }
+            val archiveVersionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                archiveInfo.longVersionCode
+            } else {
+                @Suppress("DEPRECATION")
+                archiveInfo.versionCode.toLong()
+            }
+            if (archiveVersionCode < currentVersionCode) {
+                android.util.Log.e("AppUpdateManager", "APK downgrade elutasítva: $archiveVersionCode < $currentVersionCode")
+                return false
+            }
+
+            val currentSignatures: Array<android.content.pm.Signature>?
+            val archiveSignatures: Array<android.content.pm.Signature>?
+
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 val currentSigningInfo = currentInfo.signingInfo ?: return false
                 val archiveSigningInfo = archiveInfo.signingInfo ?: return false
 
-                val currentSignatures = if (currentSigningInfo.hasMultipleSigners()) {
+                currentSignatures = if (currentSigningInfo.hasMultipleSigners()) {
                     currentSigningInfo.apkContentsSigners
                 } else {
                     currentSigningInfo.signingCertificateHistory
                 }
 
-                val archiveSignatures = if (archiveSigningInfo.hasMultipleSigners()) {
+                archiveSignatures = if (archiveSigningInfo.hasMultipleSigners()) {
                     archiveSigningInfo.apkContentsSigners
                 } else {
                     archiveSigningInfo.signingCertificateHistory
                 }
-
-                if (currentSignatures.isNullOrEmpty() || archiveSignatures.isNullOrEmpty()) return false
-                val currentHashes = currentSignatures.map { it.toByteArray().contentHashCode() }.toSet()
-                val archiveHashes = archiveSignatures.map { it.toByteArray().contentHashCode() }.toSet()
-                val matches = currentHashes.intersect(archiveHashes).isNotEmpty()
-                if (!matches) {
-                    android.util.Log.e("AppUpdateManager", "APK aláíró tanúsítvány nem egyezik a futó appéval!")
-                }
-                matches
             } else {
                 @Suppress("DEPRECATION")
-                val currentSignatures = currentInfo.signatures
+                currentSignatures = currentInfo.signatures
                 @Suppress("DEPRECATION")
-                val archiveSignatures = archiveInfo.signatures
-                if (currentSignatures.isNullOrEmpty() || archiveSignatures.isNullOrEmpty()) return false
-                val currentHashes = currentSignatures.map { it.toByteArray().contentHashCode() }.toSet()
-                val archiveHashes = archiveSignatures.map { it.toByteArray().contentHashCode() }.toSet()
-                val matches = currentHashes.intersect(archiveHashes).isNotEmpty()
-                if (!matches) {
-                    android.util.Log.e("AppUpdateManager", "APK aláíró tanúsítvány nem egyezik a futó appéval!")
-                }
-                matches
+                archiveSignatures = archiveInfo.signatures
             }
+
+            if (currentSignatures.isNullOrEmpty() || archiveSignatures.isNullOrEmpty()) return false
+
+            val currentDigests = currentSignatures.map { sig ->
+                java.security.MessageDigest.getInstance("SHA-256").digest(sig.toByteArray())
+            }
+            val archiveDigests = archiveSignatures.map { sig ->
+                java.security.MessageDigest.getInstance("SHA-256").digest(sig.toByteArray())
+            }
+
+            val matches = currentDigests.any { curDigest ->
+                archiveDigests.any { archDigest ->
+                    java.security.MessageDigest.isEqual(curDigest, archDigest)
+                }
+            }
+            if (!matches) {
+                android.util.Log.e("AppUpdateManager", "APK aláíró tanúsítvány nem egyezik a futó appéval!")
+            }
+            matches
         } catch (e: Exception) {
             android.util.Log.e("AppUpdateManager", "Hiba az APK ellenőrzésekor: ${e.message}")
             false
@@ -482,21 +538,25 @@ class AppUpdateManager(
         }
 
         companion object {
+            private val PLUS_BUILD_REGEX = Regex("""\+(\d+)""")
+            private val DEV_BUILD_REGEX = Regex("""(?:debug|dev)[.-]?(\d+)""", RegexOption.IGNORE_CASE)
+            private val NUMBERS_REGEX = Regex("""\d+""")
+
             fun parse(raw: String): ParsedVersion {
                 val clean = raw.removePrefix("v").trim()
                 val isDebugOrDev = clean.contains("debug", ignoreCase = true) || clean.contains("dev", ignoreCase = true)
 
                 // Build szám keresése: pl. +105 vagy .105 vagy -105 a debug/dev után
                 val buildNumber = if (clean.contains("+")) {
-                    Regex("""\+(\d+)""").find(clean)?.groupValues?.get(1)?.toLongOrNull() ?: 0L
+                    PLUS_BUILD_REGEX.find(clean)?.groupValues?.get(1)?.toLongOrNull() ?: 0L
                 } else if (isDebugOrDev) {
-                    Regex("""(?:debug|dev)[.-]?(\d+)""", RegexOption.IGNORE_CASE).find(clean)?.groupValues?.get(1)?.toLongOrNull() ?: 0L
+                    DEV_BUILD_REGEX.find(clean)?.groupValues?.get(1)?.toLongOrNull() ?: 0L
                 } else {
                     0L
                 }
 
                 val versionPart = clean.substringBefore("-").substringBefore("+")
-                val numbers = Regex("""\d+""").findAll(versionPart).map { it.value.toInt() }.toList()
+                val numbers = NUMBERS_REGEX.findAll(versionPart).map { it.value.toInt() }.toList()
                 val major = numbers.getOrElse(0) { 0 }
                 val minor = numbers.getOrElse(1) { 0 }
                 val patch = numbers.getOrElse(2) { 0 }
@@ -507,6 +567,8 @@ class AppUpdateManager(
     }
 
     companion object {
+        private val SAFE_FILENAME_REGEX = Regex("[^a-zA-Z0-9._-]")
+
         data class CachedApiResponse(
             val body: String,
             val etag: String?,
@@ -524,13 +586,34 @@ class AppUpdateManager(
             return BuildConfig.DEBUG || BuildConfig.APPLICATION_ID.endsWith(".debug")
         }
 
+        fun isTrustedHost(host: String): Boolean {
+            val clean = host.lowercase().trim()
+            return clean == "github.com" ||
+                clean == "api.github.com" ||
+                clean == "objects.githubusercontent.com" ||
+                clean.endsWith(".github.com") ||
+                clean.endsWith(".githubusercontent.com")
+        }
+
+        fun isTrustedDownloadUrl(url: String): Boolean {
+            val trimmed = url.trim()
+            if (!trimmed.startsWith("https://", ignoreCase = true)) return false
+            return try {
+                val parsed = java.net.URI(trimmed)
+                val host = parsed.host ?: return false
+                parsed.scheme.equals("https", ignoreCase = true) && isTrustedHost(host)
+            } catch (_: Exception) {
+                false
+            }
+        }
+
         fun getSafeUpdateFileName(tagName: String, assetName: String, downloadUrl: String): String {
             val rawName = when {
                 assetName.isNotBlank() -> "${tagName.removePrefix("v")}_$assetName"
                 tagName.isNotBlank() -> "update_${tagName.removePrefix("v")}"
                 else -> "update_${downloadUrl.hashCode()}"
             }
-            return rawName.replace(Regex("[^a-zA-Z0-9._-]"), "_")
+            return rawName.replace(SAFE_FILENAME_REGEX, "_")
                 .removeSuffix(".apk")
         }
 

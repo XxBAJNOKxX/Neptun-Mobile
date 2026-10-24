@@ -37,9 +37,11 @@ class NeptunApp : Application() {
         }
         startForegroundKeepAlive()
         setupLifecycleAndNetworkKeepAliveTriggers()
-        try {
-            com.example.core.update.AppUpdateManager.checkAndCleanUpdateCacheOnNewVersion(this)
-        } catch (_: Exception) {
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            try {
+                com.example.core.update.AppUpdateManager.checkAndCleanUpdateCacheOnNewVersion(this@NeptunApp)
+            } catch (_: Exception) {
+            }
         }
     }
 

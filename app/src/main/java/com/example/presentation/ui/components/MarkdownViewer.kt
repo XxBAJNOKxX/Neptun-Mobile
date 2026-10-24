@@ -248,6 +248,9 @@ private sealed class MarkdownBlock {
     object Divider : MarkdownBlock()
 }
 
+private val MARKDOWN_TASK_REGEX = Regex("""^[-*+]\s+\[([ xX])\]\s+(.*)$""")
+private val MARKDOWN_NUMBERED_REGEX = Regex("""^(\d+)\.\s+(.*)$""")
+
 private fun parseMarkdownBlocks(markdown: String): List<MarkdownBlock> {
     val lines = markdown.lines()
     val blocks = mutableListOf<MarkdownBlock>()
@@ -318,8 +321,7 @@ private fun parseMarkdownBlocks(markdown: String): List<MarkdownBlock> {
         val indentLevel = (leadingSpaces / 2).coerceAtMost(3)
 
         // Task items (- [ ] / - [x])
-        val taskRegex = Regex("""^[-*+]\s+\[([ xX])\]\s+(.*)$""")
-        val taskMatch = taskRegex.find(trimmed)
+        val taskMatch = MARKDOWN_TASK_REGEX.find(trimmed)
         if (taskMatch != null) {
             val isChecked = taskMatch.groupValues[1].equals("x", ignoreCase = true)
             val content = taskMatch.groupValues[2]
@@ -337,8 +339,7 @@ private fun parseMarkdownBlocks(markdown: String): List<MarkdownBlock> {
         }
 
         // Numbered lists (1. , 2. )
-        val numberedRegex = Regex("""^(\d+)\.\s+(.*)$""")
-        val numMatch = numberedRegex.find(trimmed)
+        val numMatch = MARKDOWN_NUMBERED_REGEX.find(trimmed)
         if (numMatch != null) {
             val number = numMatch.groupValues[1]
             val content = numMatch.groupValues[2]
@@ -380,29 +381,35 @@ private fun rememberInlineMarkdown(
                     val closeParen = text.indexOf(')', closeBracket + 1)
                     if (closeParen != -1) {
                         val linkTitle = text.substring(index + 1, closeBracket)
-                        val url = text.substring(closeBracket + 2, closeParen)
+                        val url = text.substring(closeBracket + 2, closeParen).trim()
                         val startPos = builder.length
                         builder.append(linkTitle)
-                        try {
-                            builder.addLink(LinkAnnotation.Url(url), startPos, builder.length)
-                            builder.addStyle(
-                                SpanStyle(
-                                    color = linkColor,
-                                    textDecoration = TextDecoration.Underline,
-                                    fontWeight = FontWeight.SemiBold
-                                ),
-                                startPos,
-                                builder.length
-                            )
-                        } catch (_: Exception) {
-                            builder.addStyle(
-                                SpanStyle(
-                                    color = linkColor,
-                                    textDecoration = TextDecoration.Underline
-                                ),
-                                startPos,
-                                builder.length
-                            )
+                        val lowerUrl = url.lowercase()
+                        val isSafeScheme = lowerUrl.startsWith("https://") ||
+                            lowerUrl.startsWith("http://") ||
+                            lowerUrl.startsWith("mailto:")
+                        if (isSafeScheme) {
+                            try {
+                                builder.addLink(LinkAnnotation.Url(url), startPos, builder.length)
+                                builder.addStyle(
+                                    SpanStyle(
+                                        color = linkColor,
+                                        textDecoration = TextDecoration.Underline,
+                                        fontWeight = FontWeight.SemiBold
+                                    ),
+                                    startPos,
+                                    builder.length
+                                )
+                            } catch (_: Exception) {
+                                builder.addStyle(
+                                    SpanStyle(
+                                        color = linkColor,
+                                        textDecoration = TextDecoration.Underline
+                                    ),
+                                    startPos,
+                                    builder.length
+                                )
+                            }
                         }
                         index = closeParen + 1
                         continue

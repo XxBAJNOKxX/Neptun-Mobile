@@ -39,4 +39,16 @@ class CrashReporterTest {
         assertFalse(output.contains("654321"))
         assertTrue(output.contains("[REDACTED]"))
     }
+
+    @Test
+    fun `maskSensitiveData replaces Cookie headers, UserLogin and devicecookie`() {
+        val input = "Set-Cookie: .AspNetCore.Cookies=secretCookieVal123; Path=/\n" +
+            "Body: {\"UserLogin\":\"ABC123\",\"Password\":\"MyPass99\",\"devicecookie\":\"dev98765\"}"
+        val output = CrashReporter.maskSensitiveData(input)
+        assertFalse(output.contains("secretCookieVal123"))
+        assertFalse(output.contains("ABC123"))
+        assertFalse(output.contains("MyPass99"))
+        assertFalse(output.contains("dev98765"))
+        assertTrue(output.contains("[REDACTED]"))
+    }
 }

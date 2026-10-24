@@ -21,6 +21,14 @@ object IcsParser {
         "SU" to 7
     )
 
+    private val UNFOLD_REGEX = Regex("""\n[ \t]""")
+    private val BYDAY_REGEX = Regex("""BYDAY=([A-Z,]+)""", RegexOption.IGNORE_CASE)
+    private val TITLE_PREFIX_REGEX = Regex("""^(?:Előadás|Eloadas|Gyakorlat|Labor|Szeminárium|Szeminarium|Vizsga|Lecture|Practice|Lab|Seminar|Exam)\s*[:\-]\s*""", RegexOption.IGNORE_CASE)
+    private val TITLE_SUFFIX_REGEX = Regex("""\s*[\(\[]?(?:Előadás|Eloadas|Gyakorlat|Labor|Szeminárium|Szeminarium|Vizsga|Lecture|Practice|Lab|Seminar|Exam)[\)\]]?\s*$""", RegexOption.IGNORE_CASE)
+    private val CODE_SUFFIX_REGEX = Regex("""\s*\[[A-Za-z0-9_\-]+\]\s*$""")
+    private val TEACHER_REGEX = Regex("""(?:Oktató|Teacher|Lecturer|Instructor)\s*:\s*([^\n;]+)""", RegexOption.IGNORE_CASE)
+    private val SUBJECT_CODE_REGEX = Regex("""\[([A-Z0-9_\-]+)\]|\(([A-Z0-9_\-]+)\)""")
+
     fun parse(icsContent: String): List<CalendarEvent> {
         if (icsContent.isBlank()) return emptyList()
 
@@ -28,7 +36,7 @@ object IcsParser {
         val unfolded = icsContent
             .replace("\r\n", "\n")
             .replace("\r", "\n")
-            .replace(Regex("""\n[ \t]"""), "")
+            .replace(UNFOLD_REGEX, "")
 
         val lines = unfolded.lines()
         val events = mutableListOf<CalendarEvent>()
@@ -93,7 +101,7 @@ object IcsParser {
         var dayOfWeek = startDate.dayOfWeek.value
 
         if (rrule.isNotBlank()) {
-            val byDayMatch = Regex("""BYDAY=([A-Z,]+)""", RegexOption.IGNORE_CASE).find(rrule)
+            val byDayMatch = BYDAY_REGEX.find(rrule)
             if (byDayMatch != null) {
                 val firstDay = byDayMatch.groupValues[1].split(",").firstOrNull()?.trim()?.uppercase()
                 val mapped = dayOfWeekMap[firstDay]
@@ -143,18 +151,15 @@ object IcsParser {
 
     private fun extractSubjectTitle(summary: String): String {
         var title = summary.trim()
-        val prefixRegex = Regex("""^(?:Előadás|Eloadas|Gyakorlat|Labor|Szeminárium|Szeminarium|Vizsga|Lecture|Practice|Lab|Seminar|Exam)\s*[:\-]\s*""", RegexOption.IGNORE_CASE)
-        title = prefixRegex.replace(title, "")
-        val suffixRegex = Regex("""\s*[\(\[]?(?:Előadás|Eloadas|Gyakorlat|Labor|Szeminárium|Szeminarium|Vizsga|Lecture|Practice|Lab|Seminar|Exam)[\)\]]?\s*$""", RegexOption.IGNORE_CASE)
-        title = suffixRegex.replace(title, "").trim()
-        val codeSuffixRegex = Regex("""\s*\[[A-Za-z0-9_\-]+\]\s*$""")
-        title = codeSuffixRegex.replace(title, "").trim()
+        title = TITLE_PREFIX_REGEX.replace(title, "")
+        title = TITLE_SUFFIX_REGEX.replace(title, "").trim()
+        title = CODE_SUFFIX_REGEX.replace(title, "").trim()
         return if (title.isNotBlank()) title else summary.trim()
     }
 
     private fun extractTeacherName(description: String): String {
         if (description.isBlank()) return ""
-        val oktatoMatch = Regex("""(?:Oktató|Teacher|Lecturer|Instructor)\s*:\s*([^\n;]+)""", RegexOption.IGNORE_CASE).find(description)
+        val oktatoMatch = TEACHER_REGEX.find(description)
         if (oktatoMatch != null) {
             return oktatoMatch.groupValues[1].trim()
         }
@@ -162,7 +167,7 @@ object IcsParser {
     }
 
     private fun extractSubjectCode(summary: String): String {
-        val codeMatch = Regex("""\[([A-Z0-9_\-]+)\]|\(([A-Z0-9_\-]+)\)""").find(summary)
+        val codeMatch = SUBJECT_CODE_REGEX.find(summary)
         return codeMatch?.groupValues?.getOrNull(1)?.takeIf { it.isNotBlank() }
             ?: codeMatch?.groupValues?.getOrNull(2)?.takeIf { it.isNotBlank() }
             ?: "-"

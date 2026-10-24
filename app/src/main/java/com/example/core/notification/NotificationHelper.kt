@@ -161,6 +161,7 @@ object NotificationHelper {
                     .bigText("$subject\n\n$preview")
             )
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
             .build()
@@ -205,6 +206,7 @@ object NotificationHelper {
                     .bigText(strings.notifNewGradeBigText(subjectName, gradeDisplay, credit))
             )
             .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
             .build()
@@ -239,6 +241,7 @@ object NotificationHelper {
             .setPriority(
                 if (priorityHigh) NotificationCompat.PRIORITY_HIGH else NotificationCompat.PRIORITY_DEFAULT
             )
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
             .build()
@@ -273,6 +276,7 @@ object NotificationHelper {
                     .bigText(strings.notifFinanceBigText(title, amount, dueDate))
             )
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
             .build()

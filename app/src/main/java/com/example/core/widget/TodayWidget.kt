@@ -58,7 +58,9 @@ class TodayWidget : GlanceAppWidget() {
         val openAppIntent = Intent(context, MainActivity::class.java)
         val strings = com.example.core.i18n.AppStringsProvider.getForContext(context)
         val themeSettings = try {
-            EncryptedPreferencesManager(context).loadThemeSettings()
+            val prefs = (context.applicationContext as? com.example.NeptunApp)?.appContainer?.prefsManager
+                ?: EncryptedPreferencesManager(context)
+            prefs.loadThemeSettings()
         } catch (e: Exception) {
             ThemeSettings()
         }
@@ -71,6 +73,11 @@ class TodayWidget : GlanceAppWidget() {
     companion object {
         suspend fun loadTodayClasses(context: Context): List<CalendarEvent> {
             return try {
+                val prefs = (context.applicationContext as? com.example.NeptunApp)?.appContainer?.prefsManager
+                    ?: EncryptedPreferencesManager(context)
+                if (!prefs.isLoggedIn()) {
+                    return emptyList()
+                }
                 val db = NeptunDatabase.getInstance(context)
                 val events = db.calendarDao().getAllEvents().first().map { it.toDomain() }
                 GetTodayClassesUseCase()(events)

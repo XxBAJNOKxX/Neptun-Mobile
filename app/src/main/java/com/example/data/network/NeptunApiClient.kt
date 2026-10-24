@@ -135,6 +135,13 @@ class NeptunApiClient(
             }
     ).build()
 
+    private val noRedirectClient: OkHttpClient by lazy {
+        okHttpClient.newBuilder()
+            .followRedirects(false)
+            .followSslRedirects(false)
+            .build()
+    }
+
     fun normalizeBaseUrl(rawUrl: String): String {
         var url = rawUrl.trim()
         if (!url.startsWith("http://") && !url.startsWith("https://")) {
@@ -406,8 +413,11 @@ class NeptunApiClient(
 
     fun resolveUrl(url: String, baseUrl: String): String {
         val trimmed = url.trim()
-        if (trimmed.startsWith("http://", ignoreCase = true) || trimmed.startsWith("https://", ignoreCase = true)) {
+        if (trimmed.startsWith("https://", ignoreCase = true)) {
             return trimmed
+        }
+        if (trimmed.startsWith("http://", ignoreCase = true)) {
+            return "https://" + trimmed.substring(7)
         }
         val cleanBase = normalizeBaseUrl(baseUrl)
         val path = if (trimmed.startsWith("/")) trimmed else "/$trimmed"
@@ -627,9 +637,9 @@ class NeptunApiClient(
         var getHtml = ""
         var getCookies: List<String> = emptyList()
         try {
-            Log.i(tag, "authenticateAspDotNet: Starting GET $loginPageUrl with UA=$DEFAULT_USER_AGENT")
-            okHttpClient.newBuilder().followRedirects(false).build().newCall(getReq).execute().use { resp ->
-                Log.i(tag, "authenticateAspDotNet: GET $loginPageUrl returned code=${resp.code}, protocol=${resp.protocol}")
+            Log.d(tag, "authenticateAspDotNet: Starting GET $loginPageUrl")
+            noRedirectClient.newCall(getReq).execute().use { resp ->
+                Log.d(tag, "authenticateAspDotNet: GET returned code=${resp.code}, protocol=${resp.protocol}")
                 getCookies = resp.headers("Set-Cookie")
                 getHtml = resp.body?.string().orEmpty()
             }
@@ -680,17 +690,18 @@ class NeptunApiClient(
         var postCookies: List<String> = emptyList()
         var postBody = ""
         try {
-            Log.i(tag, "authenticateAspDotNet: Executing POST $loginPageUrl")
-            okHttpClient.newBuilder().followRedirects(false).build().newCall(postReq).execute().use { resp ->
+            Log.d(tag, "authenticateAspDotNet: Executing POST $loginPageUrl")
+            noRedirectClient.newCall(postReq).execute().use { resp ->
                 statusCode = resp.code
                 locationHeader = resp.header("Location").orEmpty()
                 postCookies = resp.headers("Set-Cookie")
+                postBody = resp.body?.string().orEmpty()
                 val sanitizedLocation = if (locationHeader.contains("?")) {
                     locationHeader.substringBefore("?") + "?[REDACTED]"
                 } else {
                     locationHeader
                 }
-                Log.i(tag, "authenticateAspDotNet: POST returned code=$statusCode, location=$sanitizedLocation")
+                Log.d(tag, "authenticateAspDotNet: POST returned code=$statusCode, location=$sanitizedLocation")
             }
         } catch (e: Exception) {
             Log.e(tag, "authenticateAspDotNet: POST $loginPageUrl FAILED with exception: ${e.javaClass.name}: ${e.message}", e)
@@ -722,7 +733,7 @@ class NeptunApiClient(
                 var res2FaCookies: List<String> = emptyList()
                 var html2Fa = ""
                 try {
-                    okHttpClient.newBuilder().followRedirects(false).build().newCall(get2FaReq).execute().use { resp ->
+                    noRedirectClient.newCall(get2FaReq).execute().use { resp ->
                         res2FaCookies = resp.headers("Set-Cookie")
                         html2Fa = resp.body?.string().orEmpty()
                     }
@@ -808,7 +819,7 @@ class NeptunApiClient(
 
             var newCookies: List<String> = emptyList()
             var html = ""
-            okHttpClient.newBuilder().followRedirects(false).build().newCall(req).execute().use { resp ->
+            noRedirectClient.newCall(req).execute().use { resp ->
                 newCookies = resp.headers("Set-Cookie")
                 html = resp.body?.string().orEmpty()
             }
@@ -904,7 +915,7 @@ class NeptunApiClient(
             var locationHeader = ""
             var newCookies: List<String> = emptyList()
             var html = ""
-            okHttpClient.newBuilder().followRedirects(false).build().newCall(req).execute().use { resp ->
+            noRedirectClient.newCall(req).execute().use { resp ->
                 statusCode = resp.code
                 locationHeader = resp.header("Location").orEmpty()
                 newCookies = resp.headers("Set-Cookie")
@@ -959,7 +970,6 @@ class NeptunApiClient(
                 .addHeader("Cookie", cookieHeader)
                 .build()
 
-            val noRedirectClient = okHttpClient.newBuilder().followRedirects(false).followSslRedirects(false).build()
             var locationHeader = ""
             var bridgeHtml = ""
             var modernCookieMap = cookies.toMutableMap()
@@ -1167,7 +1177,11 @@ class NeptunApiClient(
         }
 
         val outerLoginEndpoint = "$modernBaseUrl/api/Account/OuterLogin"
-        val outerPayload = """{"guid":"$guid","lcid":$languageId,"languageId":$languageId}"""
+        val outerPayload = buildJsonObject {
+            put("guid", guid)
+            put("lcid", languageId)
+            put("languageId", languageId)
+        }.toString()
 
         val outerReq = Request.Builder()
             .url(outerLoginEndpoint)
@@ -1179,13 +1193,15 @@ class NeptunApiClient(
             .addHeader("User-Agent", DEFAULT_USER_AGENT)
             .build()
 
-        val outerResp = okHttpClient.newCall(outerReq).execute()
-        if (!outerResp.isSuccessful) {
-            return@withContext NeptunAuthResult.Failure("OuterLogin sikertelen: HTTP ${outerResp.code}")
+        var outerBody = ""
+        var outerCookies: List<String> = emptyList()
+        okHttpClient.newCall(outerReq).execute().use { outerResp ->
+            if (!outerResp.isSuccessful) {
+                return@withContext NeptunAuthResult.Failure("OuterLogin sikertelen: HTTP ${outerResp.code}")
+            }
+            outerBody = outerResp.body?.string() ?: ""
+            outerCookies = outerResp.headers("Set-Cookie")
         }
-
-        val outerBody = outerResp.body?.string() ?: ""
-        val outerCookies = outerResp.headers("Set-Cookie")
         var mergedCookieMap = initialCookieMap
         if (outerCookies.isNotEmpty()) {
             mergedCookieMap = mergeCookies(mergedCookieMap, parseCookiesFromHeaders(outerCookies))
@@ -1253,10 +1269,6 @@ class NeptunApiClient(
         try {
             val cleanBase = normalizeBaseUrl(aspBaseUrl)
             val bridgeUrl = "$cleanBase/ToNeptunWeb/ToNeptunHWeb"
-            val noRedirectClient = okHttpClient.newBuilder()
-                .followRedirects(false)
-                .followSslRedirects(false)
-                .build()
 
             var cookieMap = parseCookiesFromHeaders(combined.split(";").map { it.trim() })
             val req = Request.Builder()
@@ -1518,13 +1530,20 @@ class NeptunApiClient(
                 reqBuilder.header("Cookie", cookieVal)
             }
 
-            val response = okHttpClient.newCall(reqBuilder.build()).execute()
-            val responseBody = response.body?.string() ?: "{}"
+            var responseBody = "{}"
+            var responseCode = 0
+            var setCookies: List<String> = emptyList()
+            var singleCookieHeader = ""
+            okHttpClient.newCall(reqBuilder.build()).execute().use { response ->
+                responseCode = response.code
+                responseBody = response.body?.string() ?: "{}"
+                setCookies = response.headers("Set-Cookie")
+                singleCookieHeader = response.header("Set-Cookie").orEmpty()
+            }
 
-            val setCookies = response.headers("Set-Cookie")
-            val extractedCookie = extractDeviceCookie(setCookies) ?: extractDeviceCookie(response.header("Set-Cookie").orEmpty())
-            val extractedSessionCookie = extractSessionCookie(setCookies) ?: extractSessionCookie(response.header("Set-Cookie").orEmpty())
-            val extractedRefreshToken = extractRefreshToken(setCookies.joinToString("; ")) ?: extractRefreshToken(response.header("Set-Cookie").orEmpty())
+            val extractedCookie = extractDeviceCookie(setCookies) ?: extractDeviceCookie(singleCookieHeader)
+            val extractedSessionCookie = extractSessionCookie(setCookies) ?: extractSessionCookie(singleCookieHeader)
+            val extractedRefreshToken = extractRefreshToken(setCookies.joinToString("; ")) ?: extractRefreshToken(singleCookieHeader)
 
             if (responseBody.trim().startsWith("<")) {
                 // Fallback to ASP.NET Core login first, then legacy
@@ -1569,8 +1588,8 @@ class NeptunApiClient(
                     aspResult
                 } else {
                     NeptunAuthResult.Failure(
-                        if (response.code in 400..401) "Hibás felhasználónév vagy jelszó!"
-                        else "Nem sikerült a bejelentkezés (HTTP ${response.code})"
+                        if (responseCode in 400..401) "Hibás felhasználónév vagy jelszó!"
+                        else "Nem sikerült a bejelentkezés (HTTP $responseCode)"
                     )
                 }
             }
@@ -1632,9 +1651,9 @@ class NeptunApiClient(
                 ?: dataObj?.get("errorMessage")?.jsonPrimitive?.contentOrNull
                 ?: dataObj?.get("ErrorMessage")?.jsonPrimitive?.contentOrNull
                 ?: dataObj?.get("message")?.jsonPrimitive?.contentOrNull
-                ?: if (response.code in 400..401) "Hibás felhasználónév vagy jelszó!" else "Sikertelen bejelentkezés (HTTP ${response.code})"
+                ?: if (responseCode in 400..401) "Hibás felhasználónév vagy jelszó!" else "Sikertelen bejelentkezés (HTTP $responseCode)"
 
-            if (response.code == 404) {
+            if (responseCode == 404) {
                 val aspResult = authenticateAspDotNet(baseUrl, username, pwd)
                 if (aspResult is NeptunAuthResult.Success || aspResult is NeptunAuthResult.TwoFactorSessionRequired) {
                     return@withContext aspResult
@@ -1721,35 +1740,36 @@ class NeptunApiClient(
                 reqBuilder.addHeader("Cookie", cookiesList.joinToString("; "))
             }
 
-            val resp = okHttpClient.newCall(reqBuilder.build()).execute()
-            if (resp.isSuccessful) {
-                val body = resp.body?.string() ?: ""
-                val parsed = safeParseJsonObject(body)
-                val dataObj = parsed?.get("data")?.jsonObject
-                val newAccessToken = dataObj?.get("accessToken")?.jsonPrimitive?.contentOrNull
-                    ?: dataObj?.get("token")?.jsonPrimitive?.contentOrNull
-                    ?: parsed?.get("accessToken")?.jsonPrimitive?.contentOrNull
-                    ?: parsed?.get("token")?.jsonPrimitive?.contentOrNull
+            okHttpClient.newCall(reqBuilder.build()).execute().use { resp ->
+                if (resp.isSuccessful) {
+                    val body = resp.body?.string() ?: ""
+                    val parsed = safeParseJsonObject(body)
+                    val dataObj = parsed?.get("data")?.jsonObject
+                    val newAccessToken = dataObj?.get("accessToken")?.jsonPrimitive?.contentOrNull
+                        ?: dataObj?.get("token")?.jsonPrimitive?.contentOrNull
+                        ?: parsed?.get("accessToken")?.jsonPrimitive?.contentOrNull
+                        ?: parsed?.get("token")?.jsonPrimitive?.contentOrNull
 
-                val setCookies = resp.headers("Set-Cookie")
-                val newSessionCookie = extractSessionCookie(setCookies) ?: sessionCookie.takeIf { it.isNotBlank() }
-                val newDeviceCookie = extractDeviceCookie(setCookies) ?: deviceCookie.takeIf { it.isNotBlank() }
-                val newRefreshToken = dataObj?.get("refreshToken")?.jsonPrimitive?.contentOrNull
-                    ?: dataObj?.get("refresh_token")?.jsonPrimitive?.contentOrNull
-                    ?: parsed?.get("refreshToken")?.jsonPrimitive?.contentOrNull
-                    ?: newSessionCookie?.let { extractRefreshToken(it) }
+                    val setCookies = resp.headers("Set-Cookie")
+                    val newSessionCookie = extractSessionCookie(setCookies) ?: sessionCookie.takeIf { it.isNotBlank() }
+                    val newDeviceCookie = extractDeviceCookie(setCookies) ?: deviceCookie.takeIf { it.isNotBlank() }
+                    val newRefreshToken = dataObj?.get("refreshToken")?.jsonPrimitive?.contentOrNull
+                        ?: dataObj?.get("refresh_token")?.jsonPrimitive?.contentOrNull
+                        ?: parsed?.get("refreshToken")?.jsonPrimitive?.contentOrNull
+                        ?: newSessionCookie?.let { extractRefreshToken(it) }
 
-                if (!newAccessToken.isNullOrBlank()) {
-                    Log.d(tag, "refreshAccessToken: token refreshed successfully via GetNewTokens")
-                    return@withContext TokenRefreshResult(
-                        accessToken = newAccessToken,
-                        refreshToken = newRefreshToken,
-                        sessionCookie = newSessionCookie,
-                        deviceCookie = newDeviceCookie
-                    )
+                    if (!newAccessToken.isNullOrBlank()) {
+                        Log.d(tag, "refreshAccessToken: token refreshed successfully via GetNewTokens")
+                        return@withContext TokenRefreshResult(
+                            accessToken = newAccessToken,
+                            refreshToken = newRefreshToken,
+                            sessionCookie = newSessionCookie,
+                            deviceCookie = newDeviceCookie
+                        )
+                    }
+                } else {
+                    Log.w(tag, "refreshAccessToken: GetNewTokens returned HTTP ${resp.code}")
                 }
-            } else {
-                Log.w(tag, "refreshAccessToken: GetNewTokens returned HTTP ${resp.code}")
             }
         } catch (e: Exception) {
             Log.e(tag, "Refresh token error: ${e.message}")
@@ -1773,11 +1793,12 @@ class NeptunApiClient(
                 .header("User-Agent", DEFAULT_USER_AGENT)
                 .build()
 
-            val resp = okHttpClient.newCall(req).execute()
-            if (!resp.isSuccessful) return@withContext false
-            val respBody = resp.body?.string() ?: ""
-            val parsed = safeParseJsonObject(respBody) ?: return@withContext false
-            return@withContext parsed["ErrorMessage"] == null || parsed["ErrorMessage"]?.jsonPrimitive?.contentOrNull.isNullOrEmpty()
+            okHttpClient.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) return@withContext false
+                val respBody = resp.body?.string() ?: ""
+                val parsed = safeParseJsonObject(respBody) ?: return@withContext false
+                return@withContext parsed["ErrorMessage"] == null || parsed["ErrorMessage"]?.jsonPrimitive?.contentOrNull.isNullOrEmpty()
+            }
         } catch (e: Exception) {
             Log.e(tag, "Legacy login error: ${e.message}")
         }
@@ -1808,15 +1829,16 @@ class NeptunApiClient(
             if (deviceCookie.isNotBlank()) {
                 reqBuilder.addHeader("Cookie", deviceCookie)
             }
-            val resp = okHttpClient.newCall(reqBuilder.build()).execute()
-            if (resp.code == 401) {
-                return@withContext false
-            }
-            if (resp.isSuccessful) {
-                val body = resp.body?.string() ?: ""
-                val isRedirect = resp.request.url.encodedPath.contains("Login", ignoreCase = true) ||
-                        (body.trim().startsWith("<") && (body.contains("Account/Login", ignoreCase = true) || body.contains("Login2FA", ignoreCase = true)))
-                return@withContext !isRedirect
+            okHttpClient.newCall(reqBuilder.build()).execute().use { resp ->
+                if (resp.code == 401) {
+                    return@withContext false
+                }
+                if (resp.isSuccessful) {
+                    val body = resp.body?.string() ?: ""
+                    val isRedirect = resp.request.url.encodedPath.contains("Login", ignoreCase = true) ||
+                            (body.trim().startsWith("<") && (body.contains("Account/Login", ignoreCase = true) || body.contains("Login2FA", ignoreCase = true)))
+                    return@withContext !isRedirect
+                }
             }
             // Másodlagos ellenőrzés: /api/UserInfo
             val userUrl = "$cleanBase/api/UserInfo"
@@ -1826,11 +1848,12 @@ class NeptunApiClient(
                 .addHeader("Authorization", "Bearer $token")
                 .addHeader("Accept", "application/json, text/plain, */*")
                 .build()
-            val userResp = okHttpClient.newCall(userReq).execute()
-            if (userResp.code == 401) {
-                return@withContext false
+            okHttpClient.newCall(userReq).execute().use { userResp ->
+                if (userResp.code == 401) {
+                    return@withContext false
+                }
+                return@withContext userResp.isSuccessful
             }
-            return@withContext userResp.isSuccessful
         } catch (e: Exception) {
             // Hálózati hiba / timeout esetén nem tekintjük lejártnak a tokent
             Log.e(tag, "isTokenValid ellenőrzési hiba: ${e.message}")
@@ -1854,25 +1877,26 @@ class NeptunApiClient(
                 .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36")
                 .build()
 
-            val resp = okHttpClient.newCall(req).execute()
-            if (resp.isSuccessful) {
-                val body = resp.body?.string() ?: ""
-                val parsed = safeParseJsonObject(body) ?: return@withContext null
-                val dataObj = parsed["data"]?.jsonObject ?: return@withContext null
-                val name = dataObj["name"]?.jsonPrimitive?.contentOrNull
-                    ?: dataObj["userAvatar"]?.jsonObject?.get("printName")?.jsonPrimitive?.contentOrNull
-                    ?: ""
-                val code = dataObj["neptunCode"]?.jsonPrimitive?.contentOrNull ?: ""
-                val trainingId = dataObj["studentTrainingId"]?.jsonPrimitive?.contentOrNull ?: ""
-                val avatarPrintName = dataObj["userAvatar"]?.jsonObject?.get("printName")?.jsonPrimitive?.contentOrNull
+            okHttpClient.newCall(req).execute().use { resp ->
+                if (resp.isSuccessful) {
+                    val body = resp.body?.string() ?: ""
+                    val parsed = safeParseJsonObject(body) ?: return@withContext null
+                    val dataObj = parsed["data"]?.jsonObject ?: return@withContext null
+                    val name = dataObj["name"]?.jsonPrimitive?.contentOrNull
+                        ?: dataObj["userAvatar"]?.jsonObject?.get("printName")?.jsonPrimitive?.contentOrNull
+                        ?: ""
+                    val code = dataObj["neptunCode"]?.jsonPrimitive?.contentOrNull ?: ""
+                    val trainingId = dataObj["studentTrainingId"]?.jsonPrimitive?.contentOrNull ?: ""
+                    val avatarPrintName = dataObj["userAvatar"]?.jsonObject?.get("printName")?.jsonPrimitive?.contentOrNull
 
-                if (name.isNotBlank() || code.isNotBlank() || trainingId.isNotBlank()) {
-                    return@withContext NeptunUserInfo(
-                        name = name.ifBlank { avatarPrintName ?: "" },
-                        neptunCode = code,
-                        studentTrainingId = trainingId,
-                        avatarPrintName = avatarPrintName
-                    )
+                    if (name.isNotBlank() || code.isNotBlank() || trainingId.isNotBlank()) {
+                        return@withContext NeptunUserInfo(
+                            name = name.ifBlank { avatarPrintName ?: "" },
+                            neptunCode = code,
+                            studentTrainingId = trainingId,
+                            avatarPrintName = avatarPrintName
+                        )
+                    }
                 }
             }
         } catch (e: Exception) {
@@ -1893,29 +1917,30 @@ class NeptunApiClient(
                 .addHeader("Content-Type", "application/json")
                 .build()
 
-            val resp = okHttpClient.newCall(req).execute()
-            if (resp.isSuccessful) {
-                val body = resp.body?.string() ?: ""
-                val parsed = safeParseJsonObject(body)
-                val dataArr = parsed?.get("data")?.jsonArray
-                if (!dataArr.isNullOrEmpty()) {
-                    var selected = dataArr.first().jsonObject
-                    for (item in dataArr) {
-                        val obj = item.jsonObject
-                        val hasActual = obj["hasActualTerm"]?.jsonPrimitive?.booleanOrNull == true
-                        val notClosed = obj["isClosedTraining"]?.jsonPrimitive?.booleanOrNull == false
-                        if (hasActual && notClosed) {
-                            selected = obj
-                            break
+            okHttpClient.newCall(req).execute().use { resp ->
+                if (resp.isSuccessful) {
+                    val body = resp.body?.string() ?: ""
+                    val parsed = safeParseJsonObject(body)
+                    val dataArr = parsed?.get("data")?.jsonArray
+                    if (!dataArr.isNullOrEmpty()) {
+                        var selected = dataArr.first().jsonObject
+                        for (item in dataArr) {
+                            val obj = item.jsonObject
+                            val hasActual = obj["hasActualTerm"]?.jsonPrimitive?.booleanOrNull == true
+                            val notClosed = obj["isClosedTraining"]?.jsonPrimitive?.booleanOrNull == false
+                            if (hasActual && notClosed) {
+                                selected = obj
+                                break
+                            }
                         }
-                    }
-                    val id = selected["studentTrainingId"]?.jsonPrimitive?.contentOrNull ?: ""
-                    val name = selected["trainingName"]?.jsonPrimitive?.contentOrNull
-                        ?: selected["studentTrainingName"]?.jsonPrimitive?.contentOrNull
-                        ?: selected["programName"]?.jsonPrimitive?.contentOrNull
-                        ?: ""
-                    if (name.isNotBlank()) {
-                        return@withContext Pair(id, name)
+                        val id = selected["studentTrainingId"]?.jsonPrimitive?.contentOrNull ?: ""
+                        val name = selected["trainingName"]?.jsonPrimitive?.contentOrNull
+                            ?: selected["studentTrainingName"]?.jsonPrimitive?.contentOrNull
+                            ?: selected["programName"]?.jsonPrimitive?.contentOrNull
+                            ?: ""
+                        if (name.isNotBlank()) {
+                            return@withContext Pair(id, name)
+                        }
                     }
                 }
             }
@@ -1933,10 +1958,11 @@ class NeptunApiClient(
                 .addHeader("Content-Type", "application/json")
                 .build()
 
-            val resp = okHttpClient.newCall(req).execute()
-            if (resp.isSuccessful) {
-                val body = resp.body?.string() ?: ""
-                val parsed = safeParseJsonObject(body) ?: return@withContext null
+            val body = okHttpClient.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) return@withContext null
+                resp.body?.string() ?: ""
+            }
+            val parsed = safeParseJsonObject(body) ?: return@withContext null
                 val dataArr = parsed["data"]?.jsonArray
                 if (!dataArr.isNullOrEmpty()) {
                     var selected = dataArr.first().jsonObject
@@ -1957,7 +1983,6 @@ class NeptunApiClient(
                         return@withContext Pair(id, name)
                     }
                 }
-            }
         } catch (e: Exception) {
             Log.e(tag, "GetStudentTrainings error: ${e.message}")
         }
@@ -2117,16 +2142,18 @@ class NeptunApiClient(
                 reqBuilder.addHeader("Cookie", deviceCookie)
             }
 
-            val resp = okHttpClient.newCall(reqBuilder.build()).execute()
-            if (resp.code == 401 || resp.code == 403) {
-                throw NeptunUnauthorizedException("${resp.code} Calendar")
-            }
-            if (!resp.isSuccessful) return@withContext emptyList()
-            val respBody = resp.body?.string() ?: ""
-            val isRedirect = resp.request.url.encodedPath.contains("Login", ignoreCase = true) ||
-                (respBody.trim().startsWith("<") && (respBody.contains("Account/Login", ignoreCase = true) || respBody.contains("Login2FA", ignoreCase = true)))
-            if (isRedirect) {
-                throw NeptunUnauthorizedException("Redirected to Login for Calendar request")
+            val respBody = okHttpClient.newCall(reqBuilder.build()).execute().use { resp ->
+                if (resp.code == 401 || resp.code == 403) {
+                    throw NeptunUnauthorizedException("${resp.code} Calendar")
+                }
+                if (!resp.isSuccessful) return@withContext emptyList()
+                val body = resp.body?.string() ?: ""
+                val isRedirect = resp.request.url.encodedPath.contains("Login", ignoreCase = true) ||
+                    (body.trim().startsWith("<") && (body.contains("Account/Login", ignoreCase = true) || body.contains("Login2FA", ignoreCase = true)))
+                if (isRedirect) {
+                    throw NeptunUnauthorizedException("Redirected to Login for Calendar request")
+                }
+                body
             }
             val parsed = safeParseJsonObject(respBody) ?: return@withContext emptyList()
             val dataPart = parsed["data"] ?: parsed["calendarData"] ?: parsed["events"]
@@ -2235,16 +2262,18 @@ class NeptunApiClient(
                 reqBuilder.addHeader("Cookie", deviceCookie)
             }
 
-            val resp = okHttpClient.newCall(reqBuilder.build()).execute()
-            if (resp.code == 401 || resp.code == 403) {
-                throw NeptunUnauthorizedException("${resp.code} Calendar ICS")
-            }
-            if (!resp.isSuccessful) return@withContext emptyList()
-            val respBody = resp.body?.string() ?: ""
-            val isRedirect = resp.request.url.encodedPath.contains("Login", ignoreCase = true) ||
-                (respBody.trim().startsWith("<") && (respBody.contains("Account/Login", ignoreCase = true) || respBody.contains("Login2FA", ignoreCase = true)))
-            if (isRedirect) {
-                throw NeptunUnauthorizedException("Redirected to Login for Calendar ICS request")
+            val respBody = okHttpClient.newCall(reqBuilder.build()).execute().use { resp ->
+                if (resp.code == 401 || resp.code == 403) {
+                    throw NeptunUnauthorizedException("${resp.code} Calendar ICS")
+                }
+                if (!resp.isSuccessful) return@withContext emptyList()
+                val body = resp.body?.string() ?: ""
+                val isRedirect = resp.request.url.encodedPath.contains("Login", ignoreCase = true) ||
+                    (body.trim().startsWith("<") && (body.contains("Account/Login", ignoreCase = true) || body.contains("Login2FA", ignoreCase = true)))
+                if (isRedirect) {
+                    throw NeptunUnauthorizedException("Redirected to Login for Calendar ICS request")
+                }
+                body
             }
 
             if (respBody.contains("BEGIN:VCALENDAR")) {
@@ -2266,17 +2295,15 @@ class NeptunApiClient(
             val startEpoch = now - 7 * 86400000L
             val endEpoch = now + 21 * 86400000L
 
-            val body = """
-                {
-                    "UserLogin": "$user",
-                    "Password": "$pass",
-                    "Time": true,
-                    "Exam": true,
-                    "startDate": "/Date($startEpoch)/",
-                    "endDate": "/Date($endEpoch)/",
-                    "TotalRowCount": -1
-                }
-            """.trimIndent()
+            val body = buildJsonObject {
+                put("UserLogin", user)
+                put("Password", pass)
+                put("Time", true)
+                put("Exam", true)
+                put("startDate", "/Date($startEpoch)/")
+                put("endDate", "/Date($endEpoch)/")
+                put("TotalRowCount", -1)
+            }.toString()
 
             val url = getLegacyServiceUrl(baseUrl, "GetCalendarData")
             val req = Request.Builder()
@@ -2285,9 +2312,10 @@ class NeptunApiClient(
                 .addHeader("Content-Type", "application/json")
                 .build()
 
-            val resp = okHttpClient.newCall(req).execute()
-            if (!resp.isSuccessful) return@withContext emptyList()
-            val respBody = resp.body?.string() ?: ""
+            val respBody = okHttpClient.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) return@withContext emptyList()
+                resp.body?.string() ?: ""
+            }
             val parsed = safeParseJsonObject(respBody) ?: return@withContext emptyList()
             val calData = parsed["calendarData"]?.jsonArray ?: parsed["CalendarData"]?.jsonArray ?: return@withContext emptyList()
 
@@ -2365,17 +2393,19 @@ class NeptunApiClient(
                     termsReqBuilder.addHeader("Cookie", deviceCookie)
                 }
 
-                val termsResp = okHttpClient.newCall(termsReqBuilder.build()).execute()
-                if (termsResp.code == 401 || termsResp.code == 403) {
-                    throw NeptunUnauthorizedException("${termsResp.code} Grades (Terms)")
+                val (termsSuccess, termsBody) = okHttpClient.newCall(termsReqBuilder.build()).execute().use { termsResp ->
+                    if (termsResp.code == 401 || termsResp.code == 403) {
+                        throw NeptunUnauthorizedException("${termsResp.code} Grades (Terms)")
+                    }
+                    val bodyStr = termsResp.body?.string() ?: ""
+                    val isTermsRedirect = termsResp.request.url.encodedPath.contains("Login", ignoreCase = true) ||
+                        (bodyStr.trim().startsWith("<") && (bodyStr.contains("Account/Login", ignoreCase = true) || bodyStr.contains("Login2FA", ignoreCase = true)))
+                    if (isTermsRedirect) {
+                        throw NeptunUnauthorizedException("Redirected to Login for Terms")
+                    }
+                    termsResp.isSuccessful to bodyStr
                 }
-                val termsBody = termsResp.body?.string() ?: ""
-                val isTermsRedirect = termsResp.request.url.encodedPath.contains("Login", ignoreCase = true) ||
-                    (termsBody.trim().startsWith("<") && (termsBody.contains("Account/Login", ignoreCase = true) || termsBody.contains("Login2FA", ignoreCase = true)))
-                if (isTermsRedirect) {
-                    throw NeptunUnauthorizedException("Redirected to Login for Terms")
-                }
-                if (termsResp.isSuccessful) {
+                if (termsSuccess) {
                     val termsData = safeParseJsonObject(termsBody)?.get("data")?.jsonArray
 
                     if (!termsData.isNullOrEmpty()) {
@@ -2439,17 +2469,19 @@ class NeptunApiClient(
                             subReqBuilder.addHeader("Cookie", deviceCookie)
                         }
 
-                        val subResp = okHttpClient.newCall(subReqBuilder.build()).execute()
-                        if (subResp.code == 401 || subResp.code == 403) {
-                            throw NeptunUnauthorizedException("${subResp.code} Grades ($subjectsUrl)")
-                        }
-                        if (!subResp.isSuccessful) continue
-                        val subBody = subResp.body?.string() ?: ""
-                        val isRedirect = subResp.request.url.encodedPath.contains("Login", ignoreCase = true) ||
-                            (subBody.trim().startsWith("<") && (subBody.contains("Account/Login", ignoreCase = true) || subBody.contains("Login2FA", ignoreCase = true)))
-                        if (isRedirect) {
-                            throw NeptunUnauthorizedException("Redirected to Login for Grades")
-                        }
+                        val subBody = okHttpClient.newCall(subReqBuilder.build()).execute().use { subResp ->
+                            if (subResp.code == 401 || subResp.code == 403) {
+                                throw NeptunUnauthorizedException("${subResp.code} Grades ($subjectsUrl)")
+                            }
+                            if (!subResp.isSuccessful) return@use null
+                            val bodyStr = subResp.body?.string() ?: ""
+                            val isRedirect = subResp.request.url.encodedPath.contains("Login", ignoreCase = true) ||
+                                (bodyStr.trim().startsWith("<") && (bodyStr.contains("Account/Login", ignoreCase = true) || bodyStr.contains("Login2FA", ignoreCase = true)))
+                            if (isRedirect) {
+                                throw NeptunUnauthorizedException("Redirected to Login for Grades")
+                            }
+                            bodyStr
+                        } ?: continue
                         val parsed = safeParseJson(subBody) ?: continue
                         val subjectsData = when {
                             parsed is JsonObject && parsed["data"] is JsonArray -> parsed["data"]?.jsonArray
@@ -2560,9 +2592,10 @@ class NeptunApiClient(
                     .addHeader("Authorization", "Bearer $token")
                     .addHeader("Content-Type", "application/json")
                     .build()
-                val offResp = okHttpClient.newCall(offReq).execute()
-                if (offResp.isSuccessful) {
-                    val offBody = offResp.body?.string() ?: ""
+                val offBody = okHttpClient.newCall(offReq).execute().use { offResp ->
+                    if (offResp.isSuccessful) offResp.body?.string() ?: "" else null
+                }
+                if (offBody != null) {
                     val offData = safeParseJsonObject(offBody)?.get("data")?.jsonArray
                     if (!offData.isNullOrEmpty()) {
                         for (offItem in offData) {
@@ -2617,7 +2650,13 @@ class NeptunApiClient(
     private suspend fun getLegacyGrades(baseUrl: String, user: String, pass: String): List<SubjectGrade> = withContext(Dispatchers.IO) {
         if (baseUrl.contains("elte.hu", ignoreCase = true)) return@withContext emptyList()
         try {
-            val body = """{"UserLogin":"$user","Password":"$pass","CurrentPage":1,"filter":{"TermID":0},"TotalRowCount":-1}"""
+            val body = buildJsonObject {
+                put("UserLogin", user)
+                put("Password", pass)
+                put("CurrentPage", 1)
+                put("filter", buildJsonObject { put("TermID", 0) })
+                put("TotalRowCount", -1)
+            }.toString()
             val url = getLegacyServiceUrl(baseUrl, "GetMarkbookData")
             val req = Request.Builder()
                 .url(url)
@@ -2625,9 +2664,10 @@ class NeptunApiClient(
                 .addHeader("Content-Type", "application/json")
                 .build()
 
-            val resp = okHttpClient.newCall(req).execute()
-            if (!resp.isSuccessful) return@withContext emptyList()
-            val respBody = resp.body?.string() ?: ""
+            val respBody = okHttpClient.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) return@withContext emptyList()
+                resp.body?.string() ?: ""
+            }
             val parsed = safeParseJsonObject(respBody) ?: return@withContext emptyList()
             val markbookList = parsed["MarkBookList"]?.jsonArray ?: parsed["markBookList"]?.jsonArray ?: return@withContext emptyList()
 
@@ -2719,16 +2759,18 @@ class NeptunApiClient(
                 reqBuilder.addHeader("Cookie", deviceCookie)
             }
 
-            val resp = okHttpClient.newCall(reqBuilder.build()).execute()
-            if (resp.code == 401) {
-                throw NeptunUnauthorizedException("401 Messages")
-            }
-            if (!resp.isSuccessful) return@withContext emptyList()
-            val respBody = resp.body?.string() ?: ""
-            val isRedirect = resp.request.url.encodedPath.contains("Login", ignoreCase = true) ||
-                (respBody.trim().startsWith("<") && (respBody.contains("Account/Login", ignoreCase = true) || respBody.contains("Login2FA", ignoreCase = true)))
-            if (isRedirect) {
-                throw NeptunUnauthorizedException("Redirected to Login for Messages request")
+            val respBody = okHttpClient.newCall(reqBuilder.build()).execute().use { resp ->
+                if (resp.code == 401) {
+                    throw NeptunUnauthorizedException("401 Messages")
+                }
+                if (!resp.isSuccessful) return@withContext emptyList()
+                val body = resp.body?.string() ?: ""
+                val isRedirect = resp.request.url.encodedPath.contains("Login", ignoreCase = true) ||
+                    (body.trim().startsWith("<") && (body.contains("Account/Login", ignoreCase = true) || body.contains("Login2FA", ignoreCase = true)))
+                if (isRedirect) {
+                    throw NeptunUnauthorizedException("Redirected to Login for Messages request")
+                }
+                body
             }
             val parsed = safeParseJsonObject(respBody) ?: return@withContext emptyList()
             val recMessages = parsed["data"]?.jsonObject?.get("receivedMessages")?.jsonArray ?: return@withContext emptyList()
@@ -2910,7 +2952,14 @@ class NeptunApiClient(
         if (!isModern && username.isNotBlank() && password.isNotBlank() && !baseUrl.contains("elte.hu", ignoreCase = true)) {
             try {
                 val numId = messageId.toLongOrNull() ?: 0L
-                val body = """{"UserLogin":"$username","Password":"$password","CurrentPage":0,"TotalRowCount":-1,"MessageID":$numId,"MessageSortEnum":0}"""
+                val body = buildJsonObject {
+                    put("UserLogin", username)
+                    put("Password", password)
+                    put("CurrentPage", 0)
+                    put("TotalRowCount", -1)
+                    put("MessageID", numId)
+                    put("MessageSortEnum", 0)
+                }.toString()
                 val url = getLegacyServiceUrl(baseUrl, "GetMessages")
                 val req = Request.Builder()
                     .url(url)
@@ -2918,9 +2967,10 @@ class NeptunApiClient(
                     .addHeader("Content-Type", "application/json")
                     .build()
 
-                val resp = okHttpClient.newCall(req).execute()
-                if (resp.isSuccessful) {
-                    val respBody = resp.body?.string() ?: ""
+                val respBody = okHttpClient.newCall(req).execute().use { resp ->
+                    if (resp.isSuccessful) resp.body?.string() ?: "" else null
+                }
+                if (respBody != null) {
                     val parsed = safeParseJsonObject(respBody)
                     val msgs = parsed?.get("MessagesList")?.jsonArray ?: parsed?.get("messagesList")?.jsonArray
                     if (!msgs.isNullOrEmpty()) {
@@ -2947,7 +2997,14 @@ class NeptunApiClient(
     private suspend fun getLegacyMessages(baseUrl: String, user: String, pass: String, page: Int): List<NeptunMessage> = withContext(Dispatchers.IO) {
         if (baseUrl.contains("elte.hu", ignoreCase = true)) return@withContext emptyList()
         try {
-            val body = """{"UserLogin":"$user","Password":"$pass","CurrentPage":$page,"TotalRowCount":-1,"MessageID":0,"MessageSortEnum":0}"""
+            val body = buildJsonObject {
+                put("UserLogin", user)
+                put("Password", pass)
+                put("CurrentPage", page)
+                put("TotalRowCount", -1)
+                put("MessageID", 0)
+                put("MessageSortEnum", 0)
+            }.toString()
             val url = getLegacyServiceUrl(baseUrl, "GetMessages")
             val req = Request.Builder()
                 .url(url)
@@ -2955,9 +3012,10 @@ class NeptunApiClient(
                 .addHeader("Content-Type", "application/json")
                 .build()
 
-            val resp = okHttpClient.newCall(req).execute()
-            if (!resp.isSuccessful) return@withContext emptyList()
-            val respBody = resp.body?.string() ?: ""
+            val respBody = okHttpClient.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) return@withContext emptyList()
+                resp.body?.string() ?: ""
+            }
             val parsed = safeParseJsonObject(respBody) ?: return@withContext emptyList()
             val msgs = parsed["MessagesList"]?.jsonArray ?: parsed["messagesList"]?.jsonArray ?: return@withContext emptyList()
 
@@ -3028,9 +3086,12 @@ class NeptunApiClient(
                 cleanBase
             }
 
-            val postIdsJson = postIds.joinToString(separator = ",", prefix = "[", postfix = "]") { pid ->
-                if (pid.toLongOrNull() != null) pid else "\"$pid\""
-            }
+            val postIdsJson = JsonArray(
+                postIds.map { pid ->
+                    val num = pid.toLongOrNull()
+                    if (num != null) JsonPrimitive(num) else JsonPrimitive(pid)
+                }
+            ).toString()
 
             var success = false
 
@@ -3196,11 +3257,15 @@ class NeptunApiClient(
                     "$apiBase/api/Message/SetMessageRead?messageId=$messageId",
                     "$apiBase/api/Message/SetReadState?messageId=$messageId"
                 )
+                val fallbackPayload = buildJsonObject {
+                    put("messageId", messageId)
+                    put("isRead", true)
+                }.toString()
                 for (url in fallbackUrls) {
                     try {
                         val req = Request.Builder()
                             .url(url)
-                            .post("""{"messageId":"$messageId","isRead":true}""".toRequestBody("application/json".toMediaType()))
+                            .post(fallbackPayload.toRequestBody("application/json".toMediaType()))
                             .addHeader("Authorization", "Bearer $token")
                             .addHeader("Accept", "application/json, text/plain, */*")
                             .addHeader("Content-Type", "application/json")
@@ -3216,18 +3281,26 @@ class NeptunApiClient(
             } else if (!isModern && username.isNotBlank() && password.isNotBlank()) {
                 val numId = messageId.toLongOrNull() ?: 0L
                 val legacyServices = listOf("SetMessageRead", "ReadMessage")
+                val body = buildJsonObject {
+                    put("UserLogin", username)
+                    put("Password", password)
+                    put("MessageID", numId)
+                    put("PersonMessageID", numId)
+                    put("PersonMessageId", numId)
+                    put("IsRead", true)
+                    put("isRead", true)
+                }.toString()
                 for (svc in legacyServices) {
                     try {
-                        val body = """{"UserLogin":"$username","Password":"$password","MessageID":$numId,"PersonMessageID":$numId,"PersonMessageId":$numId,"IsRead":true,"isRead":true}"""
                         val url = getLegacyServiceUrl(baseUrl, svc)
                         val req = Request.Builder()
                             .url(url)
                             .post(body.toRequestBody("application/json".toMediaType()))
                             .addHeader("Content-Type", "application/json")
                             .build()
-                        val resp = okHttpClient.newCall(req).execute()
-                        if (resp.isSuccessful) success = true
-                        resp.close()
+                        okHttpClient.newCall(req).execute().use { resp ->
+                            if (resp.isSuccessful) success = true
+                        }
                     } catch (e: Exception) {
                         Log.e(tag, "Failed legacy $svc: ${e.message}")
                     }
@@ -3309,19 +3382,21 @@ class NeptunApiClient(
                             reqBuilder.addHeader("Cookie", deviceCookie)
                         }
 
-                        val resp = okHttpClient.newCall(reqBuilder.build()).execute()
-                        if (resp.code == 401 || resp.code == 403) {
-                            throw NeptunUnauthorizedException("${resp.code} Exams")
-                        }
-                        if (!resp.isSuccessful) {
-                            continue
-                        }
-                        val body = resp.body?.string() ?: ""
-                        val isRedirect = resp.request.url.encodedPath.contains("Login", ignoreCase = true) ||
-                            (body.trim().startsWith("<") && (body.contains("Account/Login", ignoreCase = true) || body.contains("Login2FA", ignoreCase = true)))
-                        if (isRedirect) {
-                            throw NeptunUnauthorizedException("Redirected to Login for Exams request")
-                        }
+                        val body = okHttpClient.newCall(reqBuilder.build()).execute().use { resp ->
+                            if (resp.code == 401 || resp.code == 403) {
+                                throw NeptunUnauthorizedException("${resp.code} Exams")
+                            }
+                            if (!resp.isSuccessful) {
+                                return@use null
+                            }
+                            val bodyStr = resp.body?.string() ?: ""
+                            val isRedirect = resp.request.url.encodedPath.contains("Login", ignoreCase = true) ||
+                                (bodyStr.trim().startsWith("<") && (bodyStr.contains("Account/Login", ignoreCase = true) || bodyStr.contains("Login2FA", ignoreCase = true)))
+                            if (isRedirect) {
+                                throw NeptunUnauthorizedException("Redirected to Login for Exams request")
+                            }
+                            bodyStr
+                        } ?: continue
                         val parsed = safeParseJson(body) ?: continue
                         val items = parseExamItems(parsed)
                         if (items.isNotEmpty()) return@withContext items
@@ -3354,14 +3429,12 @@ class NeptunApiClient(
     private suspend fun getLegacyExams(baseUrl: String, user: String, pass: String): List<ExamItem> = withContext(Dispatchers.IO) {
         if (baseUrl.contains("elte.hu", ignoreCase = true)) return@withContext emptyList()
         try {
-            val body = """
-                {
-                    "UserLogin": "$user",
-                    "Password": "$pass",
-                    "TotalRowCount": -1,
-                    "CurrentPage": 0
-                }
-            """.trimIndent()
+            val body = buildJsonObject {
+                put("UserLogin", user)
+                put("Password", pass)
+                put("TotalRowCount", -1)
+                put("CurrentPage", 0)
+            }.toString()
 
             val url = getLegacyServiceUrl(baseUrl, "GetExamData")
             val req = Request.Builder()
@@ -3370,9 +3443,10 @@ class NeptunApiClient(
                 .addHeader("Content-Type", "application/json")
                 .build()
 
-            val resp = okHttpClient.newCall(req).execute()
-            if (!resp.isSuccessful) return@withContext emptyList()
-            val respBody = resp.body?.string() ?: ""
+            val respBody = okHttpClient.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) return@withContext emptyList()
+                resp.body?.string() ?: ""
+            }
             val parsed = safeParseJson(respBody) ?: return@withContext emptyList()
             parseExamItems(parsed)
         } catch (e: Exception) {
@@ -3542,17 +3616,21 @@ class NeptunApiClient(
                 toPayReqBuilder.addHeader("Cookie", deviceCookie)
             }
 
-            val toPayResp = okHttpClient.newCall(toPayReqBuilder.build()).execute()
-            if (toPayResp.code == 401 || toPayResp.code == 403) {
-                throw NeptunUnauthorizedException("${toPayResp.code} Finances (ItemsToBePayed)")
-            }
-            if (toPayResp.isSuccessful) {
-                val toPayBody = toPayResp.body?.string() ?: ""
-                val isRedirect = toPayResp.request.url.encodedPath.contains("Login", ignoreCase = true) ||
-                    (toPayBody.trim().startsWith("<") && (toPayBody.contains("Account/Login", ignoreCase = true) || toPayBody.contains("Login2FA", ignoreCase = true)))
-                if (isRedirect) {
-                    throw NeptunUnauthorizedException("Redirected to Login for ItemsToBePayed")
+            val toPayBody = okHttpClient.newCall(toPayReqBuilder.build()).execute().use { toPayResp ->
+                if (toPayResp.code == 401 || toPayResp.code == 403) {
+                    throw NeptunUnauthorizedException("${toPayResp.code} Finances (ItemsToBePayed)")
                 }
+                if (!toPayResp.isSuccessful) null else {
+                    val bodyStr = toPayResp.body?.string() ?: ""
+                    val isRedirect = toPayResp.request.url.encodedPath.contains("Login", ignoreCase = true) ||
+                        (bodyStr.trim().startsWith("<") && (bodyStr.contains("Account/Login", ignoreCase = true) || bodyStr.contains("Login2FA", ignoreCase = true)))
+                    if (isRedirect) {
+                        throw NeptunUnauthorizedException("Redirected to Login for ItemsToBePayed")
+                    }
+                    bodyStr
+                }
+            }
+            if (toPayBody != null) {
                 val toPayData = safeParseJsonObject(toPayBody)?.get("data")?.jsonArray
                 if (toPayData != null) {
                     for (item in toPayData) {
@@ -3611,17 +3689,21 @@ class NeptunApiClient(
                 impReqBuilder.addHeader("Cookie", deviceCookie)
             }
 
-            val impResp = okHttpClient.newCall(impReqBuilder.build()).execute()
-            if (impResp.code == 401 || impResp.code == 403) {
-                throw NeptunUnauthorizedException("${impResp.code} Finances (StudentImpositions)")
-            }
-            if (impResp.isSuccessful) {
-                val impBody = impResp.body?.string() ?: ""
-                val isRedirect = impResp.request.url.encodedPath.contains("Login", ignoreCase = true) ||
-                    (impBody.trim().startsWith("<") && (impBody.contains("Account/Login", ignoreCase = true) || impBody.contains("Login2FA", ignoreCase = true)))
-                if (isRedirect) {
-                    throw NeptunUnauthorizedException("Redirected to Login for StudentImpositions")
+            val impBody = okHttpClient.newCall(impReqBuilder.build()).execute().use { impResp ->
+                if (impResp.code == 401 || impResp.code == 403) {
+                    throw NeptunUnauthorizedException("${impResp.code} Finances (StudentImpositions)")
                 }
+                if (!impResp.isSuccessful) null else {
+                    val bodyStr = impResp.body?.string() ?: ""
+                    val isRedirect = impResp.request.url.encodedPath.contains("Login", ignoreCase = true) ||
+                        (bodyStr.trim().startsWith("<") && (bodyStr.contains("Account/Login", ignoreCase = true) || bodyStr.contains("Login2FA", ignoreCase = true)))
+                    if (isRedirect) {
+                        throw NeptunUnauthorizedException("Redirected to Login for StudentImpositions")
+                    }
+                    bodyStr
+                }
+            }
+            if (impBody != null) {
                 val impData = safeParseJsonObject(impBody)?.get("data")?.jsonArray
                 if (impData != null) {
                     for (item in impData) {
@@ -3701,17 +3783,21 @@ class NeptunApiClient(
                 reqBuilder.addHeader("Cookie", deviceCookie)
             }
 
-            val resp = okHttpClient.newCall(reqBuilder.build()).execute()
-            if (resp.code == 401 || resp.code == 403) {
-                throw NeptunUnauthorizedException("${resp.code} Finances (PreviousTransactions)")
-            }
-            if (resp.isSuccessful) {
-                val respBody = resp.body?.string() ?: ""
-                val isRedirect = resp.request.url.encodedPath.contains("Login", ignoreCase = true) ||
-                    (respBody.trim().startsWith("<") && (respBody.contains("Account/Login", ignoreCase = true) || respBody.contains("Login2FA", ignoreCase = true)))
-                if (isRedirect) {
-                    throw NeptunUnauthorizedException("Redirected to Login for PreviousTransactions")
+            val respBody = okHttpClient.newCall(reqBuilder.build()).execute().use { resp ->
+                if (resp.code == 401 || resp.code == 403) {
+                    throw NeptunUnauthorizedException("${resp.code} Finances (PreviousTransactions)")
                 }
+                if (!resp.isSuccessful) null else {
+                    val bodyStr = resp.body?.string() ?: ""
+                    val isRedirect = resp.request.url.encodedPath.contains("Login", ignoreCase = true) ||
+                        (bodyStr.trim().startsWith("<") && (bodyStr.contains("Account/Login", ignoreCase = true) || bodyStr.contains("Login2FA", ignoreCase = true)))
+                    if (isRedirect) {
+                        throw NeptunUnauthorizedException("Redirected to Login for PreviousTransactions")
+                    }
+                    bodyStr
+                }
+            }
+            if (respBody != null) {
                 val parsed = safeParseJsonObject(respBody)
                 val dataPart = parsed?.get("data")?.jsonArray
                 if (dataPart != null) {
@@ -3782,7 +3868,11 @@ class NeptunApiClient(
     private suspend fun getLegacyFinances(baseUrl: String, user: String, pass: String): List<FinanceItem> = withContext(Dispatchers.IO) {
         if (baseUrl.contains("elte.hu", ignoreCase = true)) return@withContext emptyList()
         try {
-            val body = """{"UserLogin":"$user","Password":"$pass","TotalRowCount":-1}"""
+            val body = buildJsonObject {
+                put("UserLogin", user)
+                put("Password", pass)
+                put("TotalRowCount", -1)
+            }.toString()
             val url = getLegacyServiceUrl(baseUrl, "GetCashinData")
             val req = Request.Builder()
                 .url(url)
@@ -3790,9 +3880,10 @@ class NeptunApiClient(
                 .addHeader("Content-Type", "application/json")
                 .build()
 
-            val resp = okHttpClient.newCall(req).execute()
-            if (!resp.isSuccessful) return@withContext emptyList()
-            val respBody = resp.body?.string() ?: ""
+            val respBody = okHttpClient.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) return@withContext emptyList()
+                resp.body?.string() ?: ""
+            }
             val parsed = safeParseJsonObject(respBody) ?: return@withContext emptyList()
             val rows = parsed["CashinDataRows"]?.jsonArray ?: parsed["cashinDataRows"]?.jsonArray ?: return@withContext emptyList()
 

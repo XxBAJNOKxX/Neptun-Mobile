@@ -42,9 +42,36 @@ class AlarmScheduler(private val context: Context) {
         prefs.edit().remove(KEY_SCHEDULED_ALARM_IDS).apply()
     }
 
+    fun scheduleClassAlarms(events: List<CalendarEvent>, reminderMinutesBefore: Int = 15) {
+        val current = prefs.getStringSet(KEY_SCHEDULED_ALARM_IDS, emptySet())?.toMutableSet() ?: mutableSetOf()
+        var modified = false
+        for (event in events) {
+            try {
+                val scheduledId = scheduleClassAlarmInternal(event, reminderMinutesBefore, persistId = false)
+                if (scheduledId != null) {
+                    current.add(scheduledId.toString())
+                    modified = true
+                }
+            } catch (_: Exception) {
+                // Single alarm failure should not abort the rest of the batch
+            }
+        }
+        if (modified) {
+            prefs.edit().putStringSet(KEY_SCHEDULED_ALARM_IDS, current).apply()
+        }
+    }
+
     fun scheduleClassAlarm(event: CalendarEvent, reminderMinutesBefore: Int = 15) {
-        if (!event.isActualAttendedClass) return
-        if (event.startHour == 0 && event.startMinute == 0) return
+        scheduleClassAlarmInternal(event, reminderMinutesBefore, persistId = true)
+    }
+
+    private fun scheduleClassAlarmInternal(
+        event: CalendarEvent,
+        reminderMinutesBefore: Int = 15,
+        persistId: Boolean = true
+    ): Int? {
+        if (!event.isActualAttendedClass) return null
+        if (event.startHour == 0 && event.startMinute == 0) return null
 
         val calendar = Calendar.getInstance()
         val now = System.currentTimeMillis()
@@ -73,7 +100,7 @@ class AlarmScheduler(private val context: Context) {
 
         // Do not schedule alarms that have already passed
         if (triggerTime <= now) {
-            return
+            return null
         }
 
         val uniqueKey = generateClassKey(event)
@@ -97,7 +124,7 @@ class AlarmScheduler(private val context: Context) {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        try {
+        return try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 alarmManager.setExactAndAllowWhileIdle(
                     AlarmManager.RTC_WAKEUP,
@@ -111,14 +138,16 @@ class AlarmScheduler(private val context: Context) {
                     pendingIntent
                 )
             }
-            addStoredAlarmId(alarmId)
+            if (persistId) addStoredAlarmId(alarmId)
+            alarmId
         } catch (e: SecurityException) {
             alarmManager.set(
                 AlarmManager.RTC_WAKEUP,
                 triggerTime,
                 pendingIntent
             )
-            addStoredAlarmId(alarmId)
+            if (persistId) addStoredAlarmId(alarmId)
+            alarmId
         }
     }
 

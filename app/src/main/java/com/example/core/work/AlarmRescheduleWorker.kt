@@ -25,18 +25,12 @@ class AlarmRescheduleWorker(
             val notifPrefs = prefs.loadNotificationPreferences()
             if (notifPrefs.notifyClasses) {
                 val events = app.appContainer.neptunRepository.getCalendarEvents().first()
-                events.filter { it.isActualAttendedClass }
+                    .filter { it.isActualAttendedClass }
                     .distinctBy { it.id }
-                    .forEach { event ->
-                        try {
-                            app.appContainer.alarmScheduler.scheduleClassAlarm(
-                                event,
-                                notifPrefs.reminderMinutesBefore
-                            )
-                        } catch (e: Exception) {
-                            // Egyetlen óra ütemezési hibája ne állítsa le a többit
-                        }
-                    }
+                app.appContainer.alarmScheduler.scheduleClassAlarms(
+                    events,
+                    notifPrefs.reminderMinutesBefore
+                )
             }
             Result.success()
         } catch (e: Exception) {

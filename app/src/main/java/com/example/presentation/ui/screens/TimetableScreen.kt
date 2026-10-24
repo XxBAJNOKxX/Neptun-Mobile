@@ -185,11 +185,13 @@ fun TimetableScreen(
                 "PERIODS_LOAD_FAILED" -> strings.periodsLoadFailed
                 else -> uiState.errorMessage
             }
-            val formattedError = if (uiState.selectedTab == 0 && uiState.lastSyncTime > 0) {
-                val sdf = java.text.SimpleDateFormat("yyyy. MM. dd. HH:mm", java.util.Locale.getDefault())
-                "$errorText\n${strings.lastSyncLabel} ${sdf.format(java.util.Date(uiState.lastSyncTime))}"
-            } else {
-                errorText
+            val formattedError = remember(uiState.selectedTab, uiState.lastSyncTime, errorText, strings.lastSyncLabel) {
+                if (uiState.selectedTab == 0 && uiState.lastSyncTime > 0) {
+                    val sdf = java.text.SimpleDateFormat("yyyy. MM. dd. HH:mm", java.util.Locale.getDefault())
+                    "$errorText\n${strings.lastSyncLabel} ${sdf.format(java.util.Date(uiState.lastSyncTime))}"
+                } else {
+                    errorText
+                }
             }
             com.example.presentation.ui.components.SyncErrorBanner(
                 errorMessage = formattedError,
@@ -487,12 +489,14 @@ fun TimetableScreen(
             ) { page ->
                 val day = page + 1
                 val weekDay = uiState.weekDays.getOrNull(page)
-                val eventsForDay = if (hasDatedEvents && weekDay != null) {
-                    uiState.events.filter { it.dateString.startsWith(weekDay.isoDate) }
-                } else {
-                    if (uiState.selectedWeekOffset == 0) uiState.events.filter { it.dayOfWeek == day }
-                    else emptyList()
-                }.sortedBy { it.startHour * 60 + it.startMinute }
+                val eventsForDay = remember(uiState.events, hasDatedEvents, weekDay?.isoDate, uiState.selectedWeekOffset, day) {
+                    if (hasDatedEvents && weekDay != null) {
+                        uiState.events.filter { it.dateString.startsWith(weekDay.isoDate) }
+                    } else {
+                        if (uiState.selectedWeekOffset == 0) uiState.events.filter { it.dayOfWeek == day }
+                        else emptyList()
+                    }.sortedBy { it.startHour * 60 + it.startMinute }
+                }
 
                 if (eventsForDay.isEmpty()) {
                     if (uiState.errorMessage != null && uiState.events.isEmpty()) {
@@ -879,11 +883,13 @@ private fun AcademicPeriodsTabContent(
 ) {
     val strings = currentStrings()
 
-    val filteredPeriods = when (filter) {
-        1 -> periods.filter { it.isCurrentlyActive }
-        2 -> periods.filter { it.isUpcoming }
-        3 -> periods.filter { it.isPast }
-        else -> periods
+    val filteredPeriods = remember(periods, filter) {
+        when (filter) {
+            1 -> periods.filter { it.isCurrentlyActive }
+            2 -> periods.filter { it.isUpcoming }
+            3 -> periods.filter { it.isPast }
+            else -> periods
+        }
     }
 
     Column(

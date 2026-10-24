@@ -37,18 +37,28 @@ object CrashReporter {
         }
     }
 
+    private val AUTH_HEADER_REGEX = Regex("(Authorization\\s*:\\s*)[^\\r\\n]+", RegexOption.IGNORE_CASE)
+    private val COOKIE_HEADER_REGEX = Regex("((?:Set-)?Cookie\\s*:\\s*)[^\\r\\n]+", RegexOption.IGNORE_CASE)
+    private val BEARER_TOKEN_REGEX = Regex("Bearer\\s+[A-Za-z0-9\\-._~+/]+=*", RegexOption.IGNORE_CASE)
+    private val PASSWORD_FIELD_REGEX = Regex("([\"']?(?:password|pass|pwd|jelszo)[\"']?\\s*[:=]\\s*[\"']?)[^\"'\\s&,\n}]+([\"']?)", RegexOption.IGNORE_CASE)
+    private val TOKEN_FIELD_REGEX = Regex("([\"']?(?:accessToken|refreshToken|token|api_key|apiKey)[\"']?\\s*[:=]\\s*[\"']?)[^\"'\\s&,\n}]+([\"']?)", RegexOption.IGNORE_CASE)
+    private val TWO_FACTOR_FIELD_REGEX = Regex("([\"']?(?:Key|twoFactorToken|twoFactorLoginToken|twoFactorCode|totpCode|emailCode|codePrefix|verificationToken|GUID)[\"']?\\s*[:=]\\s*[\"']?)[^\"'\\s&,\n}]+([\"']?)", RegexOption.IGNORE_CASE)
+    private val SESSION_COOKIE_REGEX = Regex("([\"']?(?:cookie|sessionId|NeptunSession|ASP\\.NET_SessionId|\\.AspNetCore\\.[A-Za-z0-9_.]+|devicecookie)[\"']?\\s*[:=]\\s*[\"']?)[^\"'\\s&;,\n}]+([\"']?)", RegexOption.IGNORE_CASE)
+    private val USER_CODE_REGEX = Regex("([\"']?(?:user|username|userLogin|neptunCode|login)[\"']?\\s*[:=]\\s*[\"']?)[A-Za-z0-9]{6}([\"']?)", RegexOption.IGNORE_CASE)
+
     /**
      * Maszkolja a potenciálisan érzékeny adatokat (Bearer tokenek, jelszavak, sütik, Neptun kódok).
      */
     fun maskSensitiveData(raw: String): String {
         var masked = raw
-        masked = Regex("(Authorization\\s*:\\s*)[^\\r\\n]+", RegexOption.IGNORE_CASE).replace(masked, "$1[REDACTED]")
-        masked = Regex("Bearer\\s+[A-Za-z0-9\\-._~+/]+=*", RegexOption.IGNORE_CASE).replace(masked, "Bearer [REDACTED]")
-        masked = Regex("([\"']?(?:password|pass|pwd|jelszo)[\"']?\\s*[:=]\\s*[\"']?)[^\"'\\s&,\n]+([\"']?)", RegexOption.IGNORE_CASE).replace(masked, "$1[REDACTED]$2")
-        masked = Regex("([\"']?(?:accessToken|refreshToken|token|api_key|apiKey)[\"']?\\s*[:=]\\s*[\"']?)[^\"'\\s&,\n]+([\"']?)", RegexOption.IGNORE_CASE).replace(masked, "$1[REDACTED]$2")
-        masked = Regex("([\"']?(?:Key|twoFactorToken|twoFactorLoginToken|twoFactorCode|totpCode|emailCode|codePrefix|verificationToken)[\"']?\\s*[:=]\\s*[\"']?)[^\"'\\s&,\n]+([\"']?)", RegexOption.IGNORE_CASE).replace(masked, "$1[REDACTED]$2")
-        masked = Regex("([\"']?(?:cookie|sessionId|NeptunSession|ASP\\.NET_SessionId)[\"']?\\s*[:=]\\s*[\"']?)[^\"'\\s&;,\n]+([\"']?)", RegexOption.IGNORE_CASE).replace(masked, "$1[REDACTED]$2")
-        masked = Regex("([\"']?(?:user|username|neptunCode|login)[\"']?\\s*[:=]\\s*[\"']?)[A-Za-z0-9]{6}([\"']?)", RegexOption.IGNORE_CASE).replace(masked, "$1[REDACTED]$2")
+        masked = AUTH_HEADER_REGEX.replace(masked, "$1[REDACTED]")
+        masked = COOKIE_HEADER_REGEX.replace(masked, "$1[REDACTED]")
+        masked = BEARER_TOKEN_REGEX.replace(masked, "Bearer [REDACTED]")
+        masked = PASSWORD_FIELD_REGEX.replace(masked, "$1[REDACTED]$2")
+        masked = TOKEN_FIELD_REGEX.replace(masked, "$1[REDACTED]$2")
+        masked = TWO_FACTOR_FIELD_REGEX.replace(masked, "$1[REDACTED]$2")
+        masked = SESSION_COOKIE_REGEX.replace(masked, "$1[REDACTED]$2")
+        masked = USER_CODE_REGEX.replace(masked, "$1[REDACTED]$2")
         return masked
     }
 

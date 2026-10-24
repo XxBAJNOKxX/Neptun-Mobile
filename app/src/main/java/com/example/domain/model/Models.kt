@@ -350,7 +350,7 @@ data class AcademicPeriod(
 
     private fun parseDate(raw: String): java.time.LocalDate? {
         if (raw.isBlank()) return null
-        val match = Regex("""(\d{4})[.\-/]\s*(\d{1,2})[.\-/]\s*(\d{1,2})""").find(raw)
+        val match = DATE_PATTERN_REGEX.find(raw)
         if (match != null) {
             val (y, m, d) = match.destructured
             return try {
@@ -364,6 +364,10 @@ data class AcademicPeriod(
         } catch (_: Exception) {
             null
         }
+    }
+
+    companion object {
+        private val DATE_PATTERN_REGEX = Regex("""(\d{4})[.\-/]\s*(\d{1,2})[.\-/]\s*(\d{1,2})""")
     }
 }
 

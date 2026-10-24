@@ -78,4 +78,16 @@ class IcsExporterTest {
         assertTrue(ics.contains("BEGIN:VALARM"))
         assertTrue(ics.contains("TRIGGER:-PT15M"))
     }
+
+    @Test
+    fun `crlf and uid injection characters are escaped and sanitized`() {
+        val event = weeklyEvent().copy(
+            id = "bad_id\r\nATTACH:http://evil.example/payload",
+            subjectName = "Analízis\r\nURL:http://evil.example"
+        )
+        val ics = IcsExporter.buildIcs(listOf(event))
+        assertFalse(ics.contains("\r\nATTACH:"))
+        assertFalse(ics.contains("\r\nURL:"))
+        assertTrue(ics.contains("SUMMARY:Előadás: Analízis\\nURL:http://evil.example"))
+    }
 }

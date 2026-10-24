@@ -177,6 +177,7 @@ fun SettingsScreen(
     onSimulateGradeNotification: () -> Unit,
     onSimulateFinanceNotification: () -> Unit,
     onCheckForUpdates: () -> Unit = {},
+    onInstallUpdate: (com.example.core.update.UpdateInfo) -> Unit = {},
     onLogoutClick: () -> Unit,
     onManualSync: () -> Unit,
     modifier: Modifier = Modifier
@@ -1566,11 +1567,18 @@ fun SettingsScreen(
                         }
                     }
 
-                    if (updateCheckState.updateAvailable && updateCheckState.downloadUrl != null) {
+                    if (updateCheckState.updateAvailable && (updateCheckState.updateInfo != null || updateCheckState.downloadUrl != null)) {
                         Button(
                             onClick = {
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(updateCheckState.downloadUrl))
-                                context.startActivity(intent)
+                                val info = updateCheckState.updateInfo ?: com.example.core.update.UpdateInfo(
+                                    isUpdateAvailable = true,
+                                    currentVersion = BuildConfig.VERSION_NAME,
+                                    latestVersion = updateCheckState.latestVersionName ?: "",
+                                    downloadUrl = updateCheckState.downloadUrl ?: "",
+                                    releaseNotes = "",
+                                    tagName = updateCheckState.latestVersionName ?: ""
+                                )
+                                onInstallUpdate(info)
                             },
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = NeptunGreen),

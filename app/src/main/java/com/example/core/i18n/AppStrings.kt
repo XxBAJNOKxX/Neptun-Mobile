@@ -2012,9 +2012,9 @@ class GermanStrings : AppStrings {
 }
 
 object AppStringsProvider {
-    val HUNGARIAN: AppStrings = HungarianStrings()
-    val ENGLISH: AppStrings = EnglishStrings()
-    val GERMAN: AppStrings = GermanStrings()
+    val HUNGARIAN: AppStrings by lazy { HungarianStrings() }
+    val ENGLISH: AppStrings by lazy { EnglishStrings() }
+    val GERMAN: AppStrings by lazy { GermanStrings() }
 
     fun getForCode(code: String): AppStrings {
         return when (code.lowercase()) {
@@ -2026,10 +2026,10 @@ object AppStringsProvider {
 
     fun getForContext(context: Context): AppStrings {
         return try {
-            val prefs = context.getSharedPreferences("neptun_secure_storage", Context.MODE_PRIVATE)
-            val fallback = context.getSharedPreferences("neptun_secure_storage_fallback", Context.MODE_PRIVATE)
-            val code = prefs.getString("key_app_language_code", null)
-                ?: fallback.getString("key_app_language_code", null)
+            val appPrefs = (context.applicationContext as? com.example.NeptunApp)?.appContainer?.prefsManager
+            val code = appPrefs?.loadLanguage()?.code
+                ?: context.getSharedPreferences("neptun_secure_storage", Context.MODE_PRIVATE)
+                    .getString("key_app_language_code", null)
                 ?: "hu"
             getForCode(code)
         } catch (e: Exception) {

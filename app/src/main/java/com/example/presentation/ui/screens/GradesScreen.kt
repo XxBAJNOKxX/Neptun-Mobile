@@ -1665,17 +1665,19 @@ private fun ProgressCategoryCard(
     }
 }
 
+private val SHORT_TERM_SUFFIX_REGEX = Regex("""(?i)\s*(?:félév|felev|semester).*""")
+private val SHORT_TERM_FULL_YEAR_REGEX = Regex("""(?:20)?(\d{2})/(?:20)?(\d{2})/(\d)""")
+private val SHORT_TERM_SINGLE_YEAR_REGEX = Regex("""(?:20)?(\d{2})/(\d)""")
+private val SHORT_TERM_EXACT_REGEX = Regex("""^\d{2}/\d$""")
+
 private fun formatShortTermLabel(raw: String): String {
     if (raw.isBlank()) return ""
     val cleaned = raw.trim()
-        .replace(Regex("""(?i)\s*félév.*"""), "")
-        .replace(Regex("""(?i)\s*felev.*"""), "")
-        .replace(Regex("""(?i)\s*semester.*"""), "")
+        .replace(SHORT_TERM_SUFFIX_REGEX, "")
         .trim()
 
     // e.g. "2025/26/1", "2025/2026/1", "25/26/1" -> "26/1"
-    val regexFull = Regex("""(?:20)?(\d{2})/(?:20)?(\d{2})/(\d)""")
-    val matchFull = regexFull.find(cleaned)
+    val matchFull = SHORT_TERM_FULL_YEAR_REGEX.find(cleaned)
     if (matchFull != null) {
         val secondYear = matchFull.groupValues[2]
         val termNum = matchFull.groupValues[3]
@@ -1683,8 +1685,7 @@ private fun formatShortTermLabel(raw: String): String {
     }
 
     // e.g. "2025/1" or "2026/2" -> "25/1", "26/2"
-    val regexSingleYear = Regex("""(?:20)?(\d{2})/(\d)""")
-    val matchSingleYear = regexSingleYear.find(cleaned)
+    val matchSingleYear = SHORT_TERM_SINGLE_YEAR_REGEX.find(cleaned)
     if (matchSingleYear != null) {
         val year = matchSingleYear.groupValues[1]
         val termNum = matchSingleYear.groupValues[2]
@@ -1692,7 +1693,7 @@ private fun formatShortTermLabel(raw: String): String {
     }
 
     // e.g. "26/1"
-    if (Regex("""^\d{2}/\d$""").matches(cleaned)) {
+    if (SHORT_TERM_EXACT_REGEX.matches(cleaned)) {
         return cleaned
     }
 

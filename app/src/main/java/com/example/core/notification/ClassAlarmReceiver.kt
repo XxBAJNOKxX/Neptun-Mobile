@@ -3,26 +3,50 @@ package com.example.core.notification
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import com.example.NeptunApp
 import com.example.core.security.EncryptedPreferencesManager
 import com.example.data.local.NeptunDatabase
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 
 class ClassAlarmReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
-        val prefsManager = EncryptedPreferencesManager(context)
+        val prefsManager = (context.applicationContext as? NeptunApp)?.appContainer?.prefsManager
+            ?: EncryptedPreferencesManager(context)
         if (!prefsManager.isLoggedIn() || prefsManager.getNeptunCode().isBlank()) {
             return
         }
 
-        val db = NeptunDatabase.getInstance(context)
-        val allEvents = runBlocking {
-            try {
-                db.calendarDao().getAllEvents().first()
-            } catch (e: Exception) {
-                emptyList()
+        val pendingResult = goAsync()
+        if (pendingResult != null && !EncryptedPreferencesManager.isTestEnvironment()) {
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    processAlarm(context, intent)
+                } finally {
+                    pendingResult.finish()
+                }
             }
+        } else {
+            try {
+                runBlocking {
+                    processAlarm(context, intent)
+                }
+            } finally {
+                pendingResult?.finish()
+            }
+        }
+    }
+
+    private suspend fun processAlarm(context: Context, intent: Intent) {
+        val db = NeptunDatabase.getInstance(context)
+        val allEvents = try {
+            db.calendarDao().getAllEvents().first()
+        } catch (e: Exception) {
+            emptyList()
         }
         if (allEvents.isEmpty()) {
             return

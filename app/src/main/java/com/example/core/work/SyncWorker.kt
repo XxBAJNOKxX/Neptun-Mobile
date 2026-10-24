@@ -325,7 +325,7 @@ class SyncWorker(
         val events = app.appContainer.neptunRepository.getCalendarEvents().first()
         val reminderMins = notifPrefs.reminderMinutesBefore
 
-        events.filter { it.isActualAttendedClass }
+        val distinctEvents = events.filter { it.isActualAttendedClass }
             .distinctBy { event ->
                 if (event.dateString.isNotBlank()) {
                     "${event.subjectName.trim()}_${event.dateString.take(10)}_${event.startHour}:${event.startMinute}"
@@ -333,13 +333,7 @@ class SyncWorker(
                     "${event.subjectName.trim()}_day${event.dayOfWeek}_${event.startHour}:${event.startMinute}"
                 }
             }
-            .forEach { event ->
-                try {
-                    app.appContainer.alarmScheduler.scheduleClassAlarm(event, reminderMins)
-                } catch (e: Exception) {
-                    // Handled if exact alarm permission is restricted
-                }
-            }
+        app.appContainer.alarmScheduler.scheduleClassAlarms(distinctEvents, reminderMins)
     }
 
     companion object {

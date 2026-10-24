@@ -56,6 +56,28 @@ sealed class HtmlBlock {
     data class Table(val headers: List<String>, val rows: List<List<String>>) : HtmlBlock()
 }
 
+private val HTML_TABLE_REGEX = Regex("(?is)<table[^>]*>(.*?)</table>")
+private val HTML_TR_REGEX = Regex("(?is)<tr[^>]*>(.*?)</tr>")
+private val HTML_TH_REGEX = Regex("(?is)<th[^>]*>(.*?)</th>")
+private val HTML_TD_REGEX = Regex("(?is)<td[^>]*>(.*?)</td>")
+private val HTML_BR_REGEX = Regex("(?i)<br\\s*/?>")
+private val HTML_HR_REGEX = Regex("(?i)<hr\\s*/?>")
+private val HTML_LI_OPEN_REGEX = Regex("(?i)<li[^>]*>")
+private val HTML_LI_CLOSE_REGEX = Regex("(?i)</li>")
+private val HTML_UL_OPEN_REGEX = Regex("(?i)<ul[^>]*>")
+private val HTML_UL_CLOSE_REGEX = Regex("(?i)</ul>")
+private val HTML_OL_OPEN_REGEX = Regex("(?i)<ol[^>]*>")
+private val HTML_OL_CLOSE_REGEX = Regex("(?i)</ol>")
+private val HTML_RAW_NEWLINE_REGEX = Regex("""(?<!>)\n(?!<)""")
+private val HTML_TAG_STRIP_REGEX = Regex("<[^>]+>")
+
+internal fun isSafeLinkUrl(url: String): Boolean {
+    val trimmed = url.trim().lowercase()
+    return trimmed.startsWith("https://") ||
+           trimmed.startsWith("http://") ||
+           trimmed.startsWith("mailto:")
+}
+
 /**
  * Parses raw HTML into blocks of text and structured tables.
  */
@@ -73,10 +95,9 @@ fun parseHtmlBlocks(rawHtml: String): List<HtmlBlock> {
     }
 
     val blocks = mutableListOf<HtmlBlock>()
-    val tableRegex = Regex("(?is)<table[^>]*>(.*?)</table>")
     var lastIndex = 0
 
-    tableRegex.findAll(html).forEach { matchResult ->
+    HTML_TABLE_REGEX.findAll(html).forEach { matchResult ->
         val textBefore = html.substring(lastIndex, matchResult.range.first).trim()
         if (textBefore.isNotBlank()) {
             blocks.add(HtmlBlock.Text(textBefore))
@@ -102,11 +123,7 @@ fun parseHtmlBlocks(rawHtml: String): List<HtmlBlock> {
 }
 
 private fun parseSingleTable(tableHtml: String): HtmlBlock.Table? {
-    val trRegex = Regex("(?is)<tr[^>]*>(.*?)</tr>")
-    val thRegex = Regex("(?is)<th[^>]*>(.*?)</th>")
-    val tdRegex = Regex("(?is)<td[^>]*>(.*?)</td>")
-
-    val trMatches = trRegex.findAll(tableHtml).toList()
+    val trMatches = HTML_TR_REGEX.findAll(tableHtml).toList()
     if (trMatches.isEmpty()) return null
 
     val rawHeaders = mutableListOf<String>()
@@ -114,8 +131,8 @@ private fun parseSingleTable(tableHtml: String): HtmlBlock.Table? {
 
     for (tr in trMatches) {
         val rowHtml = tr.groupValues[1]
-        val ths = thRegex.findAll(rowHtml).map { cleanCellHtml(it.groupValues[1]) }.toList()
-        val tds = tdRegex.findAll(rowHtml).map { cleanCellHtml(it.groupValues[1]) }.toList()
+        val ths = HTML_TH_REGEX.findAll(rowHtml).map { cleanCellHtml(it.groupValues[1]) }.toList()
+        val tds = HTML_TD_REGEX.findAll(rowHtml).map { cleanCellHtml(it.groupValues[1]) }.toList()
 
         if (ths.isNotEmpty()) {
             rawHeaders.addAll(ths)
@@ -140,7 +157,7 @@ private fun parseSingleTable(tableHtml: String): HtmlBlock.Table? {
 
 private fun cleanCellHtml(rawCell: String): String {
     return rawCell
-        .replace(Regex("(?i)<br\\s*/?>"), "<br>")
+        .replace(HTML_BR_REGEX, "<br>")
         .trim()
 }
 
@@ -164,21 +181,21 @@ fun preprocessNeptunHtml(rawHtml: String): String {
     html = html.replace("\r\n", "\n").replace("\r", "\n")
 
     // Replace horizontal rule tags <hr> with a visual divider line
-    html = html.replace(Regex("(?i)<hr\\s*/?>"), "<br>────────────────────<br>")
+    html = html.replace(HTML_HR_REGEX, "<br>────────────────────<br>")
 
     // Convert list items to bullet points
-    html = html.replace(Regex("(?i)<li[^>]*>"), "<br>• ")
-        .replace(Regex("(?i)</li>"), "")
-        .replace(Regex("(?i)<ul[^>]*>"), "")
-        .replace(Regex("(?i)</ul>"), "<br>")
-        .replace(Regex("(?i)<ol[^>]*>"), "")
-        .replace(Regex("(?i)</ol>"), "<br>")
+    html = html.replace(HTML_LI_OPEN_REGEX, "<br>• ")
+        .replace(HTML_LI_CLOSE_REGEX, "")
+        .replace(HTML_UL_OPEN_REGEX, "")
+        .replace(HTML_UL_CLOSE_REGEX, "<br>")
+        .replace(HTML_OL_OPEN_REGEX, "")
+        .replace(HTML_OL_CLOSE_REGEX, "<br>")
 
     // Normalize break tags
-    html = html.replace(Regex("(?i)<br\\s*/?>"), "<br>")
+    html = html.replace(HTML_BR_REGEX, "<br>")
 
     // Convert raw newlines (\n) that are NOT adjacent to HTML tags into <br>
-    html = html.replace(Regex("""(?<!>)\n(?!<)"""), "<br>")
+    html = html.replace(HTML_RAW_NEWLINE_REGEX, "<br>")
 
     return html.trim()
 }
@@ -200,17 +217,19 @@ fun HtmlTableView(
     if (totalCols == 0) return
 
     // Calculate column widths based on cell text length
-    val colWidths = List(totalCols) { colIdx ->
-        val headerLen = table.headers.getOrNull(colIdx)?.replace(Regex("<[^>]+>"), "")?.length ?: 0
-        val maxRowLen = table.rows.maxOfOrNull {
-            it.getOrNull(colIdx)?.replace(Regex("<[^>]+>"), "")?.length ?: 0
-        } ?: 0
-        val maxLen = maxOf(headerLen, maxRowLen)
-        when {
-            maxLen <= 8 -> 100.dp
-            maxLen <= 16 -> 140.dp
-            maxLen <= 25 -> 180.dp
-            else -> 230.dp
+    val colWidths = remember(table, totalCols) {
+        List(totalCols) { colIdx ->
+            val headerLen = table.headers.getOrNull(colIdx)?.replace(HTML_TAG_STRIP_REGEX, "")?.length ?: 0
+            val maxRowLen = table.rows.maxOfOrNull {
+                it.getOrNull(colIdx)?.replace(HTML_TAG_STRIP_REGEX, "")?.length ?: 0
+            } ?: 0
+            val maxLen = maxOf(headerLen, maxRowLen)
+            when {
+                maxLen <= 8 -> 100.dp
+                maxLen <= 16 -> 140.dp
+                maxLen <= 25 -> 180.dp
+                else -> 230.dp
+            }
         }
     }
 
@@ -424,9 +443,9 @@ fun rememberHtmlAnnotatedString(
                 }
                 is URLSpan -> {
                     val url = span.url
-                    if (!url.isNullOrBlank()) {
+                    if (!url.isNullOrBlank() && isSafeLinkUrl(url)) {
                         try {
-                            builder.addLink(LinkAnnotation.Url(url), start, end)
+                            builder.addLink(LinkAnnotation.Url(url.trim()), start, end)
                             builder.addStyle(
                                 SpanStyle(
                                     color = linkColor,

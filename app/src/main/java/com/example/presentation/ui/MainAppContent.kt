@@ -129,9 +129,13 @@ fun MainAppContent(
                 TextButton(onClick = {
                     val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE)
                             as android.content.ClipboardManager
-                    clipboard.setPrimaryClip(
-                        android.content.ClipData.newPlainText("Neptun crash log", crashLog)
-                    )
+                    val clip = android.content.ClipData.newPlainText("Neptun crash log", crashLog)
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                        clip.description.extras = android.os.PersistableBundle().apply {
+                            putBoolean(android.content.ClipDescription.EXTRA_IS_SENSITIVE, true)
+                        }
+                    }
+                    clipboard.setPrimaryClip(clip)
                     lastCrashLog = null
                 }) {
                     Text(strings.copy)
@@ -198,12 +202,41 @@ fun MainAppContent(
     } else {
         // Biometrikus zár (ha be van kapcsolva)
         val personalization by appContainer.prefsManager.personalizationFlow.collectAsStateWithLifecycle()
-        var lockUnlocked by rememberSaveable { mutableStateOf(false) }
+        var lockUnlocked by remember { mutableStateOf(false) }
+        val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
+        val isLocked = personalization.biometricLockEnabled && !lockUnlocked
 
-        if (personalization.biometricLockEnabled && !lockUnlocked) {
+        androidx.compose.runtime.DisposableEffect(lifecycleOwner, personalization.biometricLockEnabled) {
+            val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+                if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP && personalization.biometricLockEnabled) {
+                    val activity = context as? android.app.Activity
+                    if (activity?.isChangingConfigurations != true) {
+                        lockUnlocked = false
+                    }
+                }
+            }
+            lifecycleOwner.lifecycle.addObserver(observer)
+            onDispose {
+                lifecycleOwner.lifecycle.removeObserver(observer)
+            }
+        }
+
+        androidx.compose.runtime.DisposableEffect(isLocked) {
+            val window = (context as? android.app.Activity)?.window
+            if (isLocked) {
+                window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+            } else {
+                window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+            }
+            onDispose {
+                window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+            }
+        }
+
+        if (isLocked) {
             BiometricLockScreen(
                 onUnlock = { lockUnlocked = true },
-                onLogout = { authViewModel.logout() }
+                onLogout = { authViewModel.logout(clearLocalData = true) }
             )
         } else {
             MainDashboard(
@@ -983,7 +1016,9 @@ private fun SettingsTabRoute(
         onSimulateFinanceNotification = { settingsViewModel.simulateFinanceNotification(context) },
         onCheckForUpdates = {
             settingsViewModel.checkForUpdates()
-            appUpdateViewModel.checkForUpdatesOnLaunch()
+        },
+        onInstallUpdate = { info ->
+            appUpdateViewModel.startInAppUpdate(context, info)
         },
         onLogoutClick = { authViewModel.logout(clearLocalData = true) },
         onManualSync = settingsViewModel::triggerManualSync

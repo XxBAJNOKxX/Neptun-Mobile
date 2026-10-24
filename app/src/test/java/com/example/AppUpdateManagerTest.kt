@@ -175,4 +175,14 @@ class AppUpdateManagerTest {
         val hash = updateManager.calculateSha256(tempFile)
         assertEquals("b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9", hash)
     }
+
+    @Test
+    fun `isTrustedDownloadUrl accepts https github domains and rejects http or untrusted hosts`() {
+        assertTrue(AppUpdateManager.isTrustedDownloadUrl("https://github.com/XxBAJNOKxX/Neptun-Mobile/releases/download/v0.2.0/app-release.apk"))
+        assertTrue(AppUpdateManager.isTrustedDownloadUrl("https://objects.githubusercontent.com/github-production-release-asset/12345"))
+        assertTrue(AppUpdateManager.isTrustedDownloadUrl("https://api.github.com/repos/XxBAJNOKxX/Neptun-Mobile/releases/assets/1"))
+        assertFalse(AppUpdateManager.isTrustedDownloadUrl("http://github.com/XxBAJNOKxX/Neptun-Mobile/releases/download/v0.2.0/app-release.apk"))
+        assertFalse(AppUpdateManager.isTrustedDownloadUrl("https://evil-github.com/app-release.apk"))
+        assertFalse(AppUpdateManager.isTrustedDownloadUrl(""))
+    }
 }

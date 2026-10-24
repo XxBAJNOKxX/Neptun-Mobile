@@ -86,7 +86,7 @@ class GradesViewModel(
                     } else {
                         "2025/26/1"
                     }
-                    val displayTerm = rawDisplayTerm.replace(Regex("""(?i)\s*félév.*"""), "").trim()
+                    val displayTerm = rawDisplayTerm.replace(FELEV_SUFFIX_REGEX, "").trim()
                     grade.copy(termId = displayTerm, termName = displayTerm)
                 }
                 val terms = cleanedGrades.map { it.termId }.distinct().sortedDescending()
@@ -141,8 +141,7 @@ class GradesViewModel(
         if (raw.isBlank()) return ""
         val trimmed = raw.trim()
         if (trimmed.startsWith("{") || trimmed.contains("{")) {
-            val regex = Regex(""""(?:text|termName|name|id|termId|value)"\s*:\s*"([^"]+)"""")
-            val match = regex.find(trimmed)
+            val match = TERM_JSON_FIELD_REGEX.find(trimmed)
             if (match != null) {
                 return match.groupValues[1].trim()
             }
@@ -253,6 +252,9 @@ class GradesViewModel(
 
 
     companion object {
+        private val FELEV_SUFFIX_REGEX = Regex("""(?i)\s*félév.*""")
+        private val TERM_JSON_FIELD_REGEX = Regex(""""(?:text|termName|name|id|termId|value)"\s*:\s*"([^"]+)"""")
+
         fun provideFactory(
             neptunRepository: NeptunRepository,
             calculateAveragesUseCase: CalculateAveragesUseCase,

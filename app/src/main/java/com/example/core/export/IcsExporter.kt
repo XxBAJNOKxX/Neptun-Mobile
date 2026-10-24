@@ -76,9 +76,10 @@ object IcsExporter {
         val start = "%02d%02d00".format(event.startHour, event.startMinute)
         val end = "%02d%02d00".format(event.endHour, event.endMinute)
         val dateCompact = startDateIso.replace("-", "")
+        val safeId = event.id.replace(UID_SANITIZE_REGEX, "_")
 
         sb.append("BEGIN:VEVENT\r\n")
-        sb.append("UID:neptun-${event.id}-${dateCompact}-${index}@neptun.mobile\r\n")
+        sb.append("UID:neptun-${safeId}-${dateCompact}-${index}@neptun.mobile\r\n")
         sb.append("DTSTAMP:${nowStamp()}\r\n")
         sb.append("DTSTART;TZID=Europe/Budapest:${dateCompact}T$start\r\n")
         sb.append("DTEND;TZID=Europe/Budapest:${dateCompact}T$end\r\n")
@@ -105,6 +106,8 @@ object IcsExporter {
         sb.append("END:VEVENT\r\n")
     }
 
+    private val UID_SANITIZE_REGEX = Regex("[^A-Za-z0-9._-]")
+
     private fun nowStamp(): String {
         val now = java.time.LocalDateTime.now()
         return "%04d%02d%02dT%02d%02d%02dZ".format(
@@ -115,6 +118,8 @@ object IcsExporter {
     private fun escape(text: String): String {
         return text
             .replace("\\", "\\\\")
+            .replace("\r\n", "\n")
+            .replace("\r", "\n")
             .replace(";", "\\;")
             .replace(",", "\\,")
             .replace("\n", "\\n")

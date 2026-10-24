@@ -48,6 +48,7 @@ class NeptunRepositoryImpl(
 ) : NeptunRepository {
 
     private val tokenMutex = Mutex()
+    private val syncMutex = Mutex()
     private val _calendarEventsFlow = MutableStateFlow<List<CalendarEvent>>(prefsManager.getCalendarEvents())
 
     override fun getCalendarEvents(): Flow<List<CalendarEvent>> = _calendarEventsFlow.asStateFlow()
@@ -72,9 +73,6 @@ class NeptunRepositoryImpl(
             database.calendarDao().getAllEvents().collect { entities ->
                 val domainEvents = entities.map { it.toDomain() }
                 _calendarEventsFlow.value = domainEvents
-                if (domainEvents.isNotEmpty()) {
-                    prefsManager.saveCalendarEvents(domainEvents)
-                }
             }
         }
         CoroutineScope(Dispatchers.IO).launch {
@@ -108,6 +106,7 @@ class NeptunRepositoryImpl(
     override fun getAcademicPeriods(): Flow<List<AcademicPeriod>> = _academicPeriodsFlow.asStateFlow()
 
     override suspend fun syncAllData(neptunCode: String, sessionToken: String): Result<Unit> = withContext(Dispatchers.IO) {
+        syncMutex.withLock {
         try {
             val creds = prefsManager.loadCredentials()
             val isDemo = neptunCode.equals("DEMO01", ignoreCase = true) || creds?.neptunCode.equals("DEMO01", ignoreCase = true)
@@ -131,7 +130,7 @@ class NeptunRepositoryImpl(
                     d7.await()
                 }
                 prefsManager.updateLastSyncTime()
-                return@withContext Result.success(Unit)
+                return@withLock Result.success(Unit)
             }
             prefsManager.setDataMode(DataMode.REAL)
             cleanupMockDataIfPresent()
@@ -196,6 +195,7 @@ class NeptunRepositoryImpl(
             }
         } catch (e: Exception) {
             Result.failure(e)
+        }
         }
     }
 
